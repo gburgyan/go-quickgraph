@@ -40,14 +40,20 @@ func (g *Graphy) ProcessRequest(ctx context.Context, request string) (string, er
 		return "", err
 	}
 
+	// TODO: Variables
+
 	command := parsedCall.Command[0]
 
 	result := map[string]any{}
 	data := map[string]any{}
 	result["data"] = data
 
+	// TODO: In query mode, we can run all these in parallel.
+
 	// Find the mutator
+	// TODO: Make this more general.
 	if mutator, ok := g.mutators[command.Name]; ok {
+		// TODO: Variables
 		r, err := mutator.Call(ctx, command)
 		if err != nil {
 			return "", err
@@ -119,6 +125,7 @@ func (f *GraphFunction) Call(ctx context.Context, command Command) (any, error) 
 		}
 	}
 
+	// TODO: Make sure all required parameters are present.
 	parsedParams := command.Parameters
 	for _, param := range parsedParams.Values {
 		if nameMapping, ok := f.nameMapping[param.Name]; ok {
@@ -207,6 +214,8 @@ func processStruct(filter []ResultField, anyStruct any) (any, error) {
 	for _, field := range filter {
 		if field.Params != nil {
 			// TODO: Deal with parameterized fields.
+		} else if field.Name == "__typename" {
+			// TODO: Magic field to get type.
 		} else {
 			if index, ok := fieldMap[field.Name]; ok {
 				if len(field.SubParts) > 0 {

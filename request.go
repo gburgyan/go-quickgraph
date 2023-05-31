@@ -63,6 +63,9 @@ func (g *Graphy) NewRequestStub(request string) (*RequestStub, error) {
 }
 
 func (g *Graphy) GatherRequestVariables(parsedCall Wrapper) (map[string]RequestVariable, error) {
+	// TODO: Look at the parsed arguments, find their types, then later verify that
+	// they are correct.
+
 	// Find the commands in the request that use variables, extract the types
 	// of the variables, and convert the variables to the correct type. Ensure that
 	// there is consistency with the types in case two commands use the same variable.

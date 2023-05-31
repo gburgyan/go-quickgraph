@@ -41,7 +41,8 @@ type GenericValue struct {
 
 // ResultFilter is a filter for the result.
 type ResultFilter struct {
-	Fields []ResultField `@@*`
+	Fields      []ResultField `@@*`
+	UnionLookup []UnionLookup `(TypeLookup @@)*`
 }
 
 // ResultField is a field in the result to be returned.
@@ -51,8 +52,14 @@ type ResultField struct {
 	SubParts []ResultField  `("{" @@* "}")?`
 }
 
+type UnionLookup struct {
+	TypeName string        `@Ident "{"`
+	Fields   []ResultField `@@* "}"`
+}
+
 var (
 	graphQLLexer = lexer.MustSimple([]lexer.SimpleRule{
+		{"TypeLookup", `\.\.\.\W*on`},
 		{"Ident", `[a-zA-Z]\w*`},
 		{"String", `"(([^"])|\\\")*"`},
 		{"Float", `(\d*\.)?\d+`},

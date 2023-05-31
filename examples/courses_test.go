@@ -13,6 +13,12 @@ func TestCourses_Graph(t *testing.T) {
   alias: courses(categories: ["Golang", "C#"]) {
     title
     instructor
+    ... on CourseA {
+      price
+	}
+    ... on CourseB {
+      price
+	}
   }
 }`
 

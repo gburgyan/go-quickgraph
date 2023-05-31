@@ -9,7 +9,7 @@ import (
 type Wrapper struct {
 	Mode      string            `@Ident?`
 	Variables *VariablePrologue `@@?`
-	Command   []Command         `"{" @@+ "}"`
+	Commands  []Command         `"{" @@+ "}"`
 }
 
 type VariablePrologue struct {
@@ -19,7 +19,7 @@ type VariablePrologue struct {
 
 type VariableDef struct {
 	Name string `@Variable ":"`
-	Type string `@TypeName`
+	Type string `"["? @Ident "!"? "]"? "!"?`
 }
 
 // Command is a GraphQL command. This will be "query" or "mutation".
@@ -73,7 +73,7 @@ var (
 	graphQLLexer = lexer.MustSimple([]lexer.SimpleRule{
 		{"TypeLookup", `\.\.\.\W*on`},
 		{"Ident", `[a-zA-Z]\w*`},
-		{"TypeName", `[a-zA-Z]\w*!?`},
+		//{"TypeName", `[a-zA-Z]\w*`},
 		{"Variable", `\$[a-zA-Z]\w*`},
 		{"String", `"(([^"])|\\\")*"`},
 		{"Float", `(\d*\.)?\d+`},

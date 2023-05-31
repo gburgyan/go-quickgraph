@@ -53,7 +53,7 @@ func NewGraphFunction(name string, mutatorFunc any, names ...string) GraphFuncti
 	return gf
 }
 
-func (f *GraphFunction) Call(ctx context.Context, command Command) (any, error) {
+func (f *GraphFunction) Call(ctx context.Context, req *Request, command Command) (any, error) {
 
 	gft := reflect.TypeOf(f.function)
 	gfv := reflect.ValueOf(f.function)
@@ -75,7 +75,7 @@ func (f *GraphFunction) Call(ctx context.Context, command Command) (any, error) 
 	for _, param := range parsedParams.Values {
 		if nameMapping, ok := f.nameMapping[param.Name]; ok {
 			val := reflect.New(nameMapping.paramType).Elem()
-			parseMappingIntoValue(param.Value, val)
+			parseMappingIntoValue(req, param.Value, val)
 			paramValues[nameMapping.paramIndex] = val
 		}
 	}
@@ -182,9 +182,14 @@ func processStruct(filter []ResultField, anyStruct any) (any, error) {
 	return r, nil
 }
 
-func parseMappingIntoValue(inValue GenericValue, targetValue reflect.Value) {
+func parseMappingIntoValue(req *Request, inValue GenericValue, targetValue reflect.Value) {
 	// TODO: Better error detection and handling.
-	if inValue.String != nil {
+	if inValue.Variable != nil {
+		// Strip the $ from the variable name.
+		variableName := (*inValue.Variable)[1:]
+		value := req.Variables[variableName]
+		targetValue.Set(value)
+	} else if inValue.String != nil {
 		// The string value has quotes around it, remove them.
 		literalValue := (*inValue.String)[1 : len(*inValue.String)-1]
 		if targetValue.Kind() == reflect.Ptr {
@@ -201,7 +206,7 @@ func parseMappingIntoValue(inValue GenericValue, targetValue reflect.Value) {
 		targetType := targetValue.Type()
 		targetValue.Set(reflect.MakeSlice(targetType, len(inValue.List), len(inValue.List)))
 		for i, listItem := range inValue.List {
-			parseMappingIntoValue(listItem, targetValue.Index(i))
+			parseMappingIntoValue(req, listItem, targetValue.Index(i))
 		}
 	} else if inValue.Map != nil {
 		targetType := targetValue.Type()
@@ -231,7 +236,7 @@ func parseMappingIntoValue(inValue GenericValue, targetValue reflect.Value) {
 				fieldName = namedValue.Name
 			}
 			if fieldValue.Kind() != 0 {
-				parseMappingIntoValue(namedValue.Value, fieldValue)
+				parseMappingIntoValue(req, namedValue.Value, fieldValue)
 				delete(requiredFields, fieldName)
 			} else {
 				// TODO: Handle this better. Warning? Error?

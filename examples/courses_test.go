@@ -9,8 +9,8 @@ import (
 
 func TestCourses_Graph(t *testing.T) {
 	input := `
-{
-  alias: courses(categories: ["Golang", "C#"]) {
+query GetCourses($categories: [String!]) {
+  alias: courses(categories: $categories) {
     title
     instructor
     ... on CourseA {
@@ -21,12 +21,16 @@ func TestCourses_Graph(t *testing.T) {
 	}
   }
 }`
+	vars := `
+{
+	"categories": ["Golang", "C#"]
+}`
 
 	ctx := context.Background()
 	g := quickgraph.Graphy{}
 	g.RegisterProcessorWithParamNames(ctx, "courses", GetCourses, "categories")
 
-	resultAny, err := g.ProcessRequest(ctx, input, "")
+	resultAny, err := g.ProcessRequest(ctx, input, vars)
 	assert.NoError(t, err)
 
 	assert.Equal(t, `{"data":{"alias":[{"instructor":"John Doe","title":"Golang"},{"instructor":"Judy Doe","title":"C#"}]}}`, resultAny)

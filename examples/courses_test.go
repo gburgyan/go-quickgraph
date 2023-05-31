@@ -24,9 +24,9 @@ func TestCourses_Graph(t *testing.T) {
 
 	ctx := context.Background()
 	g := quickgraph.Graphy{}
-	g.RegisterMutatorWithParamNames(ctx, "courses", GetCourses, "categories")
+	g.RegisterProcessorWithParamNames(ctx, "courses", GetCourses, "categories")
 
-	resultAny, err := g.ProcessRequest(ctx, input)
+	resultAny, err := g.ProcessRequest(ctx, input, "")
 	assert.NoError(t, err)
 
 	assert.Equal(t, `{"data":{"alias":[{"instructor":"John Doe","title":"Golang"},{"instructor":"Judy Doe","title":"C#"}]}}`, resultAny)

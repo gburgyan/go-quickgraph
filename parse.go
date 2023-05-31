@@ -24,10 +24,10 @@ type VariableDef struct {
 
 // Command is a GraphQL command. This will be "query" or "mutation".
 type Command struct {
-	Alias        *string       `(@Ident ":")?`
-	Name         string        `@Ident`
-	Parameters   ParameterList `"(" @@ ")"`
-	ResultFilter ResultFilter  `("{" @@ "}")?`
+	Alias        *string        `(@Ident ":")?`
+	Name         string         `@Ident`
+	Parameters   *ParameterList `"(" @@ ")"?`
+	ResultFilter ResultFilter   `("{" @@ "}")?`
 }
 
 // ParameterList is a list of parameters for a call to a function.

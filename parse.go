@@ -7,8 +7,19 @@ import (
 
 // Wrapper is the top-level GraphQL wrapper.
 type Wrapper struct {
-	Mode    string    `@Ident?`
-	Command []Command `"{" @@+ "}"`
+	Mode      string            `@Ident?`
+	Variables *VariablePrologue `@@?`
+	Command   []Command         `"{" @@+ "}"`
+}
+
+type VariablePrologue struct {
+	Name      string        `@Ident`
+	Variables []VariableDef `"(" @@ ("," @@)* ")"`
+}
+
+type VariableDef struct {
+	Name string `@Variable ":"`
+	Type string `@TypeName`
 }
 
 // Command is a GraphQL command. This will be "query" or "mutation".
@@ -32,11 +43,12 @@ type NamedValue struct {
 
 // GenericValue is a value of some type.
 type GenericValue struct {
-	String *string        ` @String`
-	Int    *int           `| @Int`
-	Float  *float64       `| @Float`
-	Map    []NamedValue   `| "{" ( @@ ("," @@)*)? "}"`
-	List   []GenericValue `| "[" ( @@ ("," @@)*)? "]"`
+	Variable *string        `@Variable`
+	String   *string        `| @String`
+	Int      *int           `| @Int`
+	Float    *float64       `| @Float`
+	Map      []NamedValue   `| "{" ( @@ ("," @@)*)? "}"`
+	List     []GenericValue `| "[" ( @@ ("," @@)*)? "]"`
 }
 
 // ResultFilter is a filter for the result.
@@ -61,6 +73,8 @@ var (
 	graphQLLexer = lexer.MustSimple([]lexer.SimpleRule{
 		{"TypeLookup", `\.\.\.\W*on`},
 		{"Ident", `[a-zA-Z]\w*`},
+		{"TypeName", `[a-zA-Z]\w*!?`},
+		{"Variable", `\$[a-zA-Z]\w*`},
 		{"String", `"(([^"])|\\\")*"`},
 		{"Float", `(\d*\.)?\d+`},
 		{"Int", `\d+`},

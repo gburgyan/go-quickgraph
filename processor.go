@@ -2,6 +2,7 @@ package quickgraph
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 )
@@ -16,6 +17,7 @@ type FunctionNameMapping struct {
 	name       string
 	paramIndex int
 	paramType  reflect.Type
+	required   bool
 }
 
 func NewGraphFunction(name string, mutatorFunc any, names ...string) GraphFunction {
@@ -24,22 +26,40 @@ func NewGraphFunction(name string, mutatorFunc any, names ...string) GraphFuncti
 		panic("mutatorFunc must be a func")
 	}
 
+	validateFunctionReturnTypes(mft)
+
 	// Check the parameters of the mutatorFunc. The count of names must match the count of parameters.
 	// Note that context.Context is not a parameter that is counted.
 	nameMapping := map[string]FunctionNameMapping{}
 	for i := 0; i < mft.NumIn(); i++ {
-		if mft.In(i).ConvertibleTo(contextType) {
+		funcParam := mft.In(i)
+		if funcParam.ConvertibleTo(contextType) {
 			continue
 		}
+
 		if len(nameMapping) >= len(names) {
 			panic("too few names provided")
 		}
+
 		name := names[len(nameMapping)]
-		nameMapping[name] = FunctionNameMapping{
+
+		required := true
+		switch funcParam.Kind() {
+		case reflect.Ptr:
+			required = false
+
+		case reflect.Map:
+			panic("map parameters are not supported")
+		}
+
+		mapping := FunctionNameMapping{
 			name:       name,
 			paramIndex: i,
-			paramType:  mft.In(i),
+			paramType:  funcParam,
+			required:   required,
 		}
+
+		nameMapping[name] = mapping
 	}
 	if len(nameMapping) != len(names) {
 		panic("the count of names must match the count of parameters")
@@ -53,33 +73,40 @@ func NewGraphFunction(name string, mutatorFunc any, names ...string) GraphFuncti
 	return gf
 }
 
+func validateFunctionReturnTypes(mft reflect.Type) {
+	// Validate that the mutatorFunc has a single non-error return value and an optional error.
+	if mft.NumOut() == 0 {
+		panic("mutatorFunc must have at least one return value")
+	}
+	if mft.NumOut() > 2 {
+		panic("mutatorFunc must have at most two return values")
+	}
+
+	errorCount := 0
+	nonErrorCount := 0
+	for i := 0; i < mft.NumOut(); i++ {
+		if mft.Out(i).ConvertibleTo(errorType) {
+			errorCount++
+		} else {
+			nonErrorCount++
+		}
+	}
+	if errorCount > 1 {
+		panic("mutatorFunc may have at most one error return value")
+	}
+	if nonErrorCount == 0 {
+		panic("mutatorFunc must have at least one non-error return value")
+	}
+}
+
 func (f *GraphFunction) Call(ctx context.Context, req *Request, command Command) (any, error) {
 
-	gft := reflect.TypeOf(f.function)
+	paramValues, err := f.getCallParameters(ctx, req, command)
+	if err != nil {
+		return nil, err
+	}
+
 	gfv := reflect.ValueOf(f.function)
-
-	// Make something to hold the parameters
-	paramValues := make([]reflect.Value, gft.NumIn())
-
-	// Go through all the input parameters and populate the values. If it's a context.Context,
-	// use the context from the call.
-	for i := 0; i < gft.NumIn(); i++ {
-		if gft.In(i).ConvertibleTo(contextType) {
-			paramValues[i] = reflect.ValueOf(ctx)
-			continue
-		}
-	}
-
-	// TODO: Make sure all required parameters are present.
-	parsedParams := command.Parameters
-	for _, param := range parsedParams.Values {
-		if nameMapping, ok := f.nameMapping[param.Name]; ok {
-			val := reflect.New(nameMapping.paramType).Elem()
-			parseMappingIntoValue(req, param.Value, val)
-			paramValues[nameMapping.paramIndex] = val
-		}
-	}
-
 	callResults := gfv.Call(paramValues)
 	if len(callResults) == 0 {
 		return nil, nil
@@ -88,13 +115,17 @@ func (f *GraphFunction) Call(ctx context.Context, req *Request, command Command)
 	// TODO: Tighten this up to deal with the return types better.
 	for _, callResult := range callResults {
 		if callResult.CanConvert(errorType) {
-			return nil, callResult.Interface().(error)
+			return nil, fmt.Errorf("error calling function: %v", callResult.Convert(errorType).Interface().(error))
 		}
 	}
+
+	// Process the results
 	for _, callResult := range callResults {
 		kind := callResult.Kind()
-		if (kind == reflect.Interface || kind == reflect.Pointer) && !callResult.IsNil() {
-			return callResult.Interface(), nil
+		if (kind == reflect.Pointer) && !callResult.IsNil() {
+			// If this is a pointer, dereference it.
+			callResult = callResult.Elem()
+			kind = callResult.Kind() // Update the kind
 		}
 		if kind == reflect.Slice {
 			if !callResult.IsNil() {
@@ -112,10 +143,7 @@ func (f *GraphFunction) Call(ctx context.Context, req *Request, command Command)
 			}
 
 		} else if kind == reflect.Map {
-			// TODO: Is this needed?
-			if !callResult.IsNil() {
-				return callResult.Interface(), nil
-			}
+			return nil, fmt.Errorf("return of map type not supported")
 		} else if kind == reflect.Struct {
 			sr, err := processStruct(command.ResultFilter.Fields, callResult.Interface())
 			if err != nil {
@@ -130,7 +158,49 @@ func (f *GraphFunction) Call(ctx context.Context, req *Request, command Command)
 	return nil, nil
 }
 
-func processStruct(filter []ResultField, anyStruct any) (any, error) {
+func (f *GraphFunction) getCallParameters(ctx context.Context, req *Request, command Command) ([]reflect.Value, error) {
+	gft := reflect.TypeOf(f.function)
+
+	// Make something to hold the parameters
+	paramValues := make([]reflect.Value, gft.NumIn())
+
+	// Go through all the input parameters and populate the values. If it's a context.Context,
+	// use the context from the call.
+	for i := 0; i < gft.NumIn(); i++ {
+		if gft.In(i).ConvertibleTo(contextType) {
+			paramValues[i] = reflect.ValueOf(ctx)
+			continue
+		}
+	}
+
+	// Make a map of the parameters that are required
+	requiredParams := map[string]bool{}
+	for _, nameMapping := range f.nameMapping {
+		if nameMapping.required {
+			requiredParams[nameMapping.name] = true
+		}
+	}
+
+	parsedParams := command.Parameters
+	for _, param := range parsedParams.Values {
+		if nameMapping, ok := f.nameMapping[param.Name]; ok {
+			val := reflect.New(nameMapping.paramType).Elem()
+			parseMappingIntoValue(req, param.Value, val)
+			paramValues[nameMapping.paramIndex] = val
+			delete(requiredParams, param.Name)
+		}
+	}
+	if len(requiredParams) > 0 {
+		missingParams := []string{}
+		for paramName := range requiredParams {
+			missingParams = append(missingParams, paramName)
+		}
+		return nil, fmt.Errorf("missing required parameters: %v", strings.Join(missingParams, ", "))
+	}
+	return paramValues, nil
+}
+
+func processStruct(filter []ResultField, anyStruct any) (map[string]any, error) {
 	r := map[string]any{}
 
 	// If the anyStruct is a pointer, dereference it.

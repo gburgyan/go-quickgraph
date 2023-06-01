@@ -11,6 +11,7 @@ type GraphFunction struct {
 	name        string
 	function    any
 	nameMapping map[string]FunctionNameMapping
+	returnType  reflect.Type
 }
 
 type FunctionNameMapping struct {
@@ -26,7 +27,7 @@ func NewGraphFunction(name string, mutatorFunc any, names ...string) GraphFuncti
 		panic("mutatorFunc must be a func")
 	}
 
-	validateFunctionReturnTypes(mft)
+	returnType := validateFunctionReturnTypes(mft)
 
 	// Check the parameters of the mutatorFunc. The count of names must match the count of parameters.
 	// Note that context.Context is not a parameter that is counted.
@@ -69,11 +70,12 @@ func NewGraphFunction(name string, mutatorFunc any, names ...string) GraphFuncti
 		name:        name,
 		function:    mutatorFunc,
 		nameMapping: nameMapping,
+		returnType:  returnType,
 	}
 	return gf
 }
 
-func validateFunctionReturnTypes(mft reflect.Type) {
+func validateFunctionReturnTypes(mft reflect.Type) reflect.Type {
 	// Validate that the mutatorFunc has a single non-error return value and an optional error.
 	if mft.NumOut() == 0 {
 		panic("mutatorFunc must have at least one return value")
@@ -84,11 +86,13 @@ func validateFunctionReturnTypes(mft reflect.Type) {
 
 	errorCount := 0
 	nonErrorCount := 0
+	var returnType reflect.Type
 	for i := 0; i < mft.NumOut(); i++ {
 		if mft.Out(i).ConvertibleTo(errorType) {
 			errorCount++
 		} else {
 			nonErrorCount++
+			returnType = mft.Out(i)
 		}
 	}
 	if errorCount > 1 {
@@ -97,6 +101,7 @@ func validateFunctionReturnTypes(mft reflect.Type) {
 	if nonErrorCount == 0 {
 		panic("mutatorFunc must have at least one non-error return value")
 	}
+	return returnType
 }
 
 func (f *GraphFunction) Call(ctx context.Context, req *Request, command Command) (any, error) {

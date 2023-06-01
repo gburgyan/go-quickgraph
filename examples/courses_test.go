@@ -13,18 +13,18 @@ query GetCourses($categories: [String!]) {
   alias: courses(categories: $categories) {
     title
     instructor
-	__typename
+    __typename
     ... on CourseA {
       price
-	}
+    }
     ... on CourseB {
       price
-	}
+    }
   }
 }`
 	vars := `
 {
-	"categories": ["Golang", "C#"]
+    "categories": ["Golang", "C#"]
 }`
 
 	ctx := context.Background()

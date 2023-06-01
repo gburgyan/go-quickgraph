@@ -7,14 +7,14 @@ import (
 
 // Wrapper is the top-level GraphQL wrapper.
 type Wrapper struct {
-	Mode      string            `@Ident?`
-	Variables *VariablePrologue `@@?`
-	Commands  []Command         `"{" @@+ "}"`
+	Mode      string         `@Ident?`
+	Variables *OperationName `@@?`
+	Commands  []Command      `"{" @@+ "}"`
 }
 
-type VariablePrologue struct {
+type OperationName struct {
 	Name      string        `@Ident`
-	Variables []VariableDef `"(" @@ ("," @@)* ")"`
+	Variables []VariableDef `("(" @@ ("," @@)* ")")?`
 }
 
 type VariableDef struct {

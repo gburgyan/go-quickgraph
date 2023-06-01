@@ -1,6 +1,9 @@
 package examples
 
-import "strings"
+import (
+	"context"
+	"strings"
+)
 
 type Course struct {
 	Title      string  `json:"title"`
@@ -41,7 +44,7 @@ var courses = []*Course{
 	},
 }
 
-func GetCourses(categories []*string) []*Course {
+func GetCourses(ctx context.Context, categories []*string) []*Course {
 	if len(categories) == 0 {
 		return courses
 	}

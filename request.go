@@ -148,7 +148,6 @@ func (r *Request) Execute(ctx context.Context) (string, error) {
 
 	// Find the processor
 	if processor, ok := r.Graphy.processors[command.Name]; ok {
-		// TODO: Variables
 		r, err := processor.Call(ctx, r, command)
 		if err != nil {
 			return "", err

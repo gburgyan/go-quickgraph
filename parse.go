@@ -72,7 +72,7 @@ type UnionLookup struct {
 var (
 	graphQLLexer = lexer.MustSimple([]lexer.SimpleRule{
 		{"TypeLookup", `\.\.\.\W*on`},
-		{"Ident", `[a-zA-Z]\w*`},
+		{"Ident", `[a-zA-Z_]\w*`},
 		//{"TypeName", `[a-zA-Z]\w*`},
 		{"Variable", `\$[a-zA-Z]\w*`},
 		{"String", `"(([^"])|\\\")*"`},

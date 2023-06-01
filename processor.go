@@ -235,7 +235,7 @@ func processStruct(filter []ResultField, anyStruct any) (map[string]any, error) 
 		if field.Params != nil {
 			// TODO: Deal with parameterized fields.
 		} else if field.Name == "__typename" {
-			// TODO: Magic field to get type.
+			r[field.Name] = t.Name()
 		} else {
 			if index, ok := fieldMap[field.Name]; ok {
 				if len(field.SubParts) > 0 {

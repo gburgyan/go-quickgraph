@@ -13,6 +13,7 @@ query GetCourses($categories: [String!]) {
   alias: courses(categories: $categories) {
     title
     instructor
+	__typename
     ... on CourseA {
       price
 	}
@@ -33,5 +34,5 @@ query GetCourses($categories: [String!]) {
 	resultAny, err := g.ProcessRequest(ctx, input, vars)
 	assert.NoError(t, err)
 
-	assert.Equal(t, `{"data":{"alias":[{"instructor":"John Doe","title":"Golang"},{"instructor":"Judy Doe","title":"C#"}]}}`, resultAny)
+	assert.Equal(t, `{"data":{"alias":[{"__typename":"Course","instructor":"John Doe","title":"Golang"},{"__typename":"Course","instructor":"Judy Doe","title":"C#"}]}}`, resultAny)
 }

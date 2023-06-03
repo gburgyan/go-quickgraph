@@ -138,7 +138,7 @@ func (f *GraphFunction) Call(ctx context.Context, req *Request, command Command)
 				count := callResult.Len()
 				for i := 0; i < count; i++ {
 					a := callResult.Index(i).Interface()
-					sr, err := processStruct(command.ResultFilter.Fields, a)
+					sr, err := processStruct(command.ResultFilter, a)
 					if err != nil {
 						return nil, err
 					}
@@ -150,7 +150,7 @@ func (f *GraphFunction) Call(ctx context.Context, req *Request, command Command)
 		} else if kind == reflect.Map {
 			return nil, fmt.Errorf("return of map type not supported")
 		} else if kind == reflect.Struct {
-			sr, err := processStruct(command.ResultFilter.Fields, callResult.Interface())
+			sr, err := processStruct(command.ResultFilter, callResult.Interface())
 			if err != nil {
 				return nil, err
 			}
@@ -205,7 +205,7 @@ func (f *GraphFunction) getCallParameters(ctx context.Context, req *Request, com
 	return paramValues, nil
 }
 
-func processStruct(filter []ResultField, anyStruct any) (map[string]any, error) {
+func processStruct(filter *ResultFilter, anyStruct any) (map[string]any, error) {
 	r := map[string]any{}
 
 	// If the anyStruct is a pointer, dereference it.
@@ -216,11 +216,17 @@ func processStruct(filter []ResultField, anyStruct any) (map[string]any, error) 
 		anyStruct = reflect.ValueOf(anyStruct).Elem().Interface()
 	}
 
+	anyStruct, err := deferenceUnionType(anyStruct)
+	if err != nil {
+		return nil, err
+	}
+
 	// Create map of field names, as specified by the json tag or field name, to index.
 	// This is used to map the fields in the struct to the fields in the result.
 	// TODO: Cache this.
 	fieldMap := map[string]int{}
 	t := reflect.TypeOf(anyStruct)
+	typeName := t.Name()
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
 		fieldName := field.Name
@@ -230,15 +236,27 @@ func processStruct(filter []ResultField, anyStruct any) (map[string]any, error) 
 		fieldMap[fieldName] = i
 	}
 
+	fieldsToProcess := []ResultField{}
+	for _, field := range filter.Fields {
+		fieldsToProcess = append(fieldsToProcess, field)
+	}
+	for _, union := range filter.UnionLookup {
+		if union.TypeName == typeName {
+			for _, field := range union.Fields.Fields {
+				fieldsToProcess = append(fieldsToProcess, field)
+			}
+		}
+	}
+
 	// Go through the result fields and map them to the struct fields.
-	for _, field := range filter {
+	for _, field := range fieldsToProcess {
 		if field.Params != nil {
 			// TODO: Deal with parameterized fields.
 		} else if field.Name == "__typename" {
-			r[field.Name] = t.Name()
+			r[field.Name] = typeName
 		} else {
 			if index, ok := fieldMap[field.Name]; ok {
-				if len(field.SubParts) > 0 {
+				if field.SubParts != nil {
 					subPart, err := processStruct(field.SubParts, reflect.ValueOf(anyStruct).Field(index).Interface())
 					if err != nil {
 						return nil, err
@@ -255,6 +273,40 @@ func processStruct(filter []ResultField, anyStruct any) (map[string]any, error) 
 	}
 
 	return r, nil
+}
+
+func deferenceUnionType(anyStruct any) (any, error) {
+	// If the anyStruct is a union type, as indicated by its name ending in "Union", then
+	// we need to get the actual type of the struct. We do this by finding the field that is
+	// not nil. The expectation is that there will be only one field that is not nil. Further
+	// the fields must be pointers so we can check for nil.
+	if strings.HasSuffix(reflect.TypeOf(anyStruct).Name(), "Union") {
+		// Find the field that is not nil.
+		t := reflect.TypeOf(anyStruct)
+		v := reflect.ValueOf(anyStruct)
+		found := false
+		for i := 0; i < t.NumField(); i++ {
+			switch v.Field(i).Kind() {
+			case reflect.Map, reflect.Pointer, reflect.Interface, reflect.Slice:
+				break
+
+			default:
+				return nil, fmt.Errorf("fields in union type must be pointers, maps, slices, or interfaces")
+			}
+			if v.Field(i).IsNil() {
+				continue
+			}
+			if found {
+				return nil, fmt.Errorf("more than one field in union type is not nil")
+			}
+			anyStruct = v.Field(i).Elem().Interface()
+			found = true
+		}
+		if !found {
+			return nil, fmt.Errorf("no fields in union type are not nil")
+		}
+	}
+	return anyStruct, nil
 }
 
 func parseMappingIntoValue(req *Request, inValue GenericValue, targetValue reflect.Value) {

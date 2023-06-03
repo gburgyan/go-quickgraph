@@ -36,3 +36,5 @@ func (g *Graphy) ProcessRequest(ctx context.Context, request string, variableJso
 
 	return newRequest.Execute(ctx)
 }
+
+// TODO: Generate the schema from the registered processors.

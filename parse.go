@@ -27,7 +27,7 @@ type Command struct {
 	Alias        *string        `(@Ident ":")?`
 	Name         string         `@Ident`
 	Parameters   *ParameterList `"(" @@ ")"?`
-	ResultFilter ResultFilter   `("{" @@ "}")?`
+	ResultFilter *ResultFilter  `("{" @@ "}")?`
 }
 
 // ParameterList is a list of parameters for a call to a function.
@@ -61,12 +61,12 @@ type ResultFilter struct {
 type ResultField struct {
 	Name     string         `@Ident`
 	Params   *ParameterList `("(" @@ ")")?`
-	SubParts []ResultField  `("{" @@* "}")?`
+	SubParts *ResultFilter  `("{" @@* "}")?`
 }
 
 type UnionLookup struct {
 	TypeName string        `@Ident "{"`
-	Fields   []ResultField `@@* "}"`
+	Fields   *ResultFilter `@@* "}"`
 }
 
 var (

@@ -216,6 +216,11 @@ func processStruct(filter *ResultFilter, anyStruct any) (map[string]any, error) 
 		anyStruct = reflect.ValueOf(anyStruct).Elem().Interface()
 	}
 
+	kind := reflect.TypeOf(anyStruct).Kind()
+	if kind == reflect.Map && reflect.ValueOf(anyStruct).IsNil() {
+		return nil, nil
+	}
+
 	anyStruct, err := deferenceUnionType(anyStruct)
 	if err != nil {
 		return nil, err

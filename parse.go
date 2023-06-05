@@ -53,7 +53,7 @@ type GenericValue struct {
 
 // ResultFilter is a filter for the result.
 type ResultFilter struct {
-	Fields      []ResultField `@@*`
+	Fields      []ResultField `@@+`
 	UnionLookup []UnionLookup `(TypeLookup @@)*`
 }
 
@@ -61,7 +61,7 @@ type ResultFilter struct {
 type ResultField struct {
 	Name     string         `@Ident`
 	Params   *ParameterList `("(" @@ ")")?`
-	SubParts *ResultFilter  `("{" @@* "}")?`
+	SubParts *ResultFilter  `("{" @@ "}")?`
 }
 
 type UnionLookup struct {

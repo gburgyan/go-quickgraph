@@ -21,6 +21,19 @@ type FunctionNameMapping struct {
 	required   bool
 }
 
+type TypeFieldLookup struct {
+	name         string
+	typ          reflect.Type
+	fieldIndexes []int
+}
+
+func MakeTypeFieldLookup(typ reflect.Type) map[string]TypeFieldLookup {
+}
+
+func (t *TypeFieldLookup) Fetch(v reflect.Value) (any, error) {
+
+}
+
 func NewGraphFunction(name string, mutatorFunc any, names ...string) GraphFunction {
 	mft := reflect.TypeOf(mutatorFunc)
 	if mft.Kind() != reflect.Func {

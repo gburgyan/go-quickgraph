@@ -124,40 +124,5 @@ func (f *GraphFunction) Call(ctx context.Context, req *Request, command Command)
 	}
 
 	// Process the results
-	for _, callResult := range callResults {
-		kind := callResult.Kind()
-		if (kind == reflect.Pointer) && !callResult.IsNil() {
-			// If this is a pointer, dereference it.
-			callResult = callResult.Elem()
-			kind = callResult.Kind() // Update the kind
-		}
-		if kind == reflect.Slice {
-			if !callResult.IsNil() {
-				var retVal []any
-				count := callResult.Len()
-				for i := 0; i < count; i++ {
-					a := callResult.Index(i).Interface()
-					sr, err := processStruct(command.ResultFilter, a)
-					if err != nil {
-						return nil, err
-					}
-					retVal = append(retVal, sr)
-				}
-				return retVal, nil
-			}
-
-		} else if kind == reflect.Map {
-			return nil, fmt.Errorf("return of map type not supported")
-		} else if kind == reflect.Struct {
-			sr, err := processStruct(command.ResultFilter, callResult.Interface())
-			if err != nil {
-				return nil, err
-			}
-			return sr, nil
-		}
-	}
-
-	// TODO: Better error handling.
-
-	return nil, nil
+	return f.processCallResults(command, callResults)
 }

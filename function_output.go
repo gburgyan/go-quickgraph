@@ -6,6 +6,48 @@ import (
 	"strings"
 )
 
+func (f *GraphFunction) processCallResults(command Command, callResults []reflect.Value) (any, error) {
+	// TODO: What if the function returns multiple values? Error?
+	for _, callResult := range callResults {
+		kind := callResult.Kind()
+		if (kind == reflect.Pointer) && !callResult.IsNil() {
+			// If this is a pointer, dereference it.
+			callResult = callResult.Elem()
+			kind = callResult.Kind() // Update the kind
+		}
+		if kind == reflect.Slice {
+			if !callResult.IsNil() {
+				var retVal []any
+				count := callResult.Len()
+				for i := 0; i < count; i++ {
+					a := callResult.Index(i).Interface()
+					sr, err := processStruct(command.ResultFilter, a)
+					if err != nil {
+						return nil, err
+					}
+					retVal = append(retVal, sr)
+				}
+				return retVal, nil
+			}
+
+		} else if kind == reflect.Map {
+			// TODO: Handle maps?
+			return nil, fmt.Errorf("return of map type not supported")
+		} else if kind == reflect.Struct {
+			sr, err := processStruct(command.ResultFilter, callResult.Interface())
+			if err != nil {
+				return nil, err
+			}
+			return sr, nil
+		} else {
+			return nil, fmt.Errorf("return type of %v not supported", kind)
+		}
+	}
+
+	// TODO: Better error handling.
+	return nil, nil
+}
+
 func processStruct(filter *ResultFilter, anyStruct any) (map[string]any, error) {
 	r := map[string]any{}
 

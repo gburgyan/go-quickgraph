@@ -66,10 +66,11 @@ func (f *GraphFunction) getCallParameters(ctx context.Context, req *Request, com
 // It returns an error if the input cannot be parsed into the target type.
 func parseMappingIntoValue(req *Request, inValue GenericValue, targetValue reflect.Value) error {
 	// TODO: Better error detection and handling.
+	var err error
 	if inValue.Variable != nil {
 		// Strip the $ from the variable name.
 		variableName := (*inValue.Variable)[1:]
-		parseVariableIntoValue(req, variableName, targetValue)
+		err = parseVariableIntoValue(req, variableName, targetValue)
 	} else if inValue.String != nil {
 		// The string value has quotes around it, remove them.
 		literalValue := (*inValue.String)[1 : len(*inValue.String)-1]
@@ -77,10 +78,7 @@ func parseMappingIntoValue(req *Request, inValue GenericValue, targetValue refle
 	} else if inValue.Identifier != nil {
 		// This is where we handle enums. We have to look up the value based on the field.
 		// This will only work with enums that are strings.
-		err := parseIdentifierIntoValue(*inValue.Identifier, targetValue)
-		if err != nil {
-			return err
-		}
+		err = parseIdentifierIntoValue(*inValue.Identifier, targetValue)
 	} else if inValue.Int != nil {
 		i := *inValue.Int
 		parseIntIntoValue(i, targetValue)
@@ -88,26 +86,27 @@ func parseMappingIntoValue(req *Request, inValue GenericValue, targetValue refle
 		f := *inValue.Float
 		parseFloatIntoValue(f, targetValue)
 	} else if inValue.List != nil {
-		err := parseListIntoValue(req, inValue, targetValue)
-		if err != nil {
-			return err
-		}
+		err = parseListIntoValue(req, inValue, targetValue)
 	} else if inValue.Map != nil {
-		err := parseMapIntoValue(req, inValue, targetValue)
-		if err != nil {
-			return err
-		}
+		err = parseMapIntoValue(req, inValue, targetValue)
 	} else {
 		return fmt.Errorf("unknown value type: %v", inValue)
+	}
+	if err != nil {
+		return err
 	}
 
 	return nil
 }
 
 // parseVariableIntoValue extracts the value of a variable from the provided request and assigns it to targetValue.
-func parseVariableIntoValue(req *Request, variableName string, targetValue reflect.Value) {
-	value := req.Variables[variableName]
+func parseVariableIntoValue(req *Request, variableName string, targetValue reflect.Value) error {
+	value, ok := req.Variables[variableName]
+	if !ok {
+		return fmt.Errorf("variable %v not found", variableName)
+	}
 	targetValue.Set(value)
+	return nil
 }
 
 // parseStringIntoValue interprets the provided string and assigns it to targetValue.

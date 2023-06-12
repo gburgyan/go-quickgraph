@@ -11,6 +11,9 @@ type TypeFieldLookup struct {
 	fieldIndexes []int
 }
 
+// MakeTypeFieldLookup creates a lookup of fields for a given type. It performs
+// a depth-first search of the type, including anonymous fields. It creates the lookup
+// using either the json tag name or the field name.
 func MakeTypeFieldLookup(typ reflect.Type) map[string]TypeFieldLookup {
 	// Do a depth-first search of the type to find all of the fields.
 	// Include the anonymous fields in this search and treat them as if
@@ -20,6 +23,9 @@ func MakeTypeFieldLookup(typ reflect.Type) map[string]TypeFieldLookup {
 	return result
 }
 
+// processFieldLookup is a helper function for MakeTypeFieldLookup. It recursively processes
+// a given type, populating the result map with field lookups. It takes into account JSON
+// tags for naming and field exclusion.
 func processFieldLookup(typ reflect.Type, prevIndex []int, result map[string]TypeFieldLookup) {
 	for i := 0; i < typ.NumField(); i++ {
 		field := typ.Field(i)
@@ -59,6 +65,8 @@ func processFieldLookup(typ reflect.Type, prevIndex []int, result map[string]Typ
 
 }
 
+// Fetch fetches a value from a given reflect.Value using the field indexes.
+// It walks the field indexes in order to find the nested field if necessary.
 func (t *TypeFieldLookup) Fetch(v reflect.Value) (any, error) {
 	for _, i := range t.fieldIndexes {
 		v = v.Field(i)

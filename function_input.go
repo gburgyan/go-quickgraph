@@ -61,9 +61,9 @@ func (f *GraphFunction) getCallParameters(ctx context.Context, req *Request, com
 	return paramValues, nil
 }
 
-// parseMappingIntoValue parses the given mapping into the given value. A GenericValue represents
-// an input that is of some indeterminate type. The value is parsed and converted into the type
-// of the targetValue.
+// parseMappingIntoValue interprets a GenericValue according to the type of the targetValue and assigns the result to targetValue.
+// This method takes into account various types of input such as string, int, float, list, map, identifier, and GraphQL variable.
+// It returns an error if the input cannot be parsed into the target type.
 func parseMappingIntoValue(req *Request, inValue GenericValue, targetValue reflect.Value) error {
 	// TODO: Better error detection and handling.
 	if inValue.Variable != nil {
@@ -104,11 +104,13 @@ func parseMappingIntoValue(req *Request, inValue GenericValue, targetValue refle
 	return nil
 }
 
+// parseVariableIntoValue extracts the value of a variable from the provided request and assigns it to targetValue.
 func parseVariableIntoValue(req *Request, variableName string, targetValue reflect.Value) {
 	value := req.Variables[variableName]
 	targetValue.Set(value)
 }
 
+// parseStringIntoValue interprets the provided string and assigns it to targetValue.
 func parseStringIntoValue(s string, targetValue reflect.Value) {
 	if targetValue.Kind() == reflect.Ptr {
 		// Create a pointer to the target type and set the value.
@@ -122,6 +124,7 @@ func parseStringIntoValue(s string, targetValue reflect.Value) {
 	}
 }
 
+// parseIntIntoValue converts an int64 to the appropriate type and assigns it to targetValue.
 func parseIntIntoValue(i int64, targetValue reflect.Value) {
 	if targetValue.Kind() == reflect.Ptr {
 		// Create a pointer to the target type and set the value.
@@ -135,6 +138,7 @@ func parseIntIntoValue(i int64, targetValue reflect.Value) {
 	}
 }
 
+// parseFloatIntoValue converts a float64 to the appropriate type and assigns it to targetValue.
 func parseFloatIntoValue(f float64, targetValue reflect.Value) {
 	if targetValue.Kind() == reflect.Ptr {
 		// Create a pointer to the target type and set the value.
@@ -148,6 +152,8 @@ func parseFloatIntoValue(f float64, targetValue reflect.Value) {
 	}
 }
 
+// parseIdentifierIntoValue attempts to interpret an identifier and assign its corresponding value to targetValue. It supports
+// EnumUnmarshaler interface and strings. Returns an error if it cannot unmarshal the identifier.
 func parseIdentifierIntoValue(identifier string, value reflect.Value) error {
 	if value.Kind() == reflect.Ptr {
 		// If the value is a pointer, dereference it.
@@ -174,6 +180,8 @@ func parseIdentifierIntoValue(identifier string, value reflect.Value) error {
 	return fmt.Errorf("cannot unmarshal identifier %s into type: %v", identifier, value.Type())
 }
 
+// parseListIntoValue assigns a list of GenericValues to targetValue. Each item in the list is parsed into a value and assigned
+// to the corresponding index in the slice represented by targetValue. If an item cannot be parsed, it returns an error.
 func parseListIntoValue(req *Request, inVal GenericValue, targetValue reflect.Value) error {
 	targetType := targetValue.Type()
 	targetValue.Set(reflect.MakeSlice(targetType, len(inVal.List), len(inVal.List)))
@@ -186,6 +194,9 @@ func parseListIntoValue(req *Request, inVal GenericValue, targetValue reflect.Va
 	return nil
 }
 
+// parseMapIntoValue assigns a map of GenericValues to the struct represented by targetValue. Each field in the input map is parsed
+// into a value and set on the struct field that has a matching "json" tag or field name. If a required field is missing from the
+// input map, it returns an error.
 func parseMapIntoValue(req *Request, inValue GenericValue, targetValue reflect.Value) error {
 	// A map is a little more complicated. We need to loop through the fields of the target type
 	// and set the values from the input map. This is how we initialize a struct from a map.

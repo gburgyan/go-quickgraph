@@ -7,6 +7,7 @@ import (
 	"reflect"
 )
 
+// RequestType is an enumeration of the types of requests. It can be a Query or a Mutation.
 type RequestType int
 
 const (
@@ -14,6 +15,8 @@ const (
 	Mutation
 )
 
+// RequestStub represents a stub of a GraphQL-like request. It contains the Graphy instance,
+// the mode of the request (Query or Mutation), the commands to execute, and the variables used in the request.
 type RequestStub struct {
 	Graphy    *Graphy
 	Mode      RequestType
@@ -21,17 +24,23 @@ type RequestStub struct {
 	Variables map[string]RequestVariable
 }
 
+// RequestVariable represents a variable in a GraphQL-like request. It contains the variable name and its type.
 type RequestVariable struct {
 	Name string
 	Type reflect.Type
 }
 
+// Request represents a complete GraphQL-like request. It contains the Graphy instance, the request stub,
+// and the actual variables used in the request.
 type Request struct {
 	Graphy    *Graphy
 	Stub      RequestStub
 	Variables map[string]reflect.Value
 }
 
+// NewRequestStub creates a new request stub from a string representation of a GraphQL request.
+// It parses the request, gathers and validates the variables used in the request, and determines
+// the request type (Query or Mutation).
 func (g *Graphy) NewRequestStub(request string) (*RequestStub, error) {
 	parsedCall, err := ParseRequest(request)
 	if err != nil {
@@ -62,6 +71,8 @@ func (g *Graphy) NewRequestStub(request string) (*RequestStub, error) {
 	return &rs, nil
 }
 
+// GatherRequestVariables gathers and validates the variables used in a GraphQL request.
+// It ensures that the variables used across different commands are of the same type.
 func (g *Graphy) GatherRequestVariables(parsedCall Wrapper) (map[string]RequestVariable, error) {
 	// TODO: Look at the parsed arguments, find their types, then later verify that
 	// they are correct.
@@ -103,6 +114,8 @@ func (g *Graphy) GatherRequestVariables(parsedCall Wrapper) (map[string]RequestV
 	return variableTypeMap, nil
 }
 
+// NewRequest creates a new request from a request stub and a JSON string representing the variables used in the request.
+// It unmarshals the variables and assigns them to the corresponding variables in the request.
 func (rs *RequestStub) NewRequest(variableJson string) (*Request, error) {
 	rawVariables := map[string]json.RawMessage{}
 	if variableJson != "" {
@@ -136,6 +149,8 @@ func (rs *RequestStub) NewRequest(variableJson string) (*Request, error) {
 	}, nil
 }
 
+// Execute executes a GraphQL request. It looks up the appropriate processor for each command and invokes it.
+// It returns the result of the request as a JSON string.
 func (r *Request) Execute(ctx context.Context) (string, error) {
 	// TODO: Deal with all commands.
 	command := r.Stub.Commands[0]

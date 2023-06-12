@@ -20,6 +20,10 @@ type FunctionNameMapping struct {
 	required   bool
 }
 
+// NewGraphFunction creates a new graph function given a name, function, and an optional list of parameter names.
+// The function provided must be of the type func and the names provided should match the count of parameters.
+// It panics if the function is not a func type, the number of names doesn't match parameters, or if unsupported
+// parameters like map are provided.
 func NewGraphFunction(name string, graphFunc any, names ...string) GraphFunction {
 	mft := reflect.TypeOf(graphFunc)
 	if mft.Kind() != reflect.Func {
@@ -74,6 +78,9 @@ func NewGraphFunction(name string, graphFunc any, names ...string) GraphFunction
 	return gf
 }
 
+// validateFunctionReturnTypes validates the return types of the function passed. It requires the function
+// to have at least one non-error return value and at most one error return value. The function should have
+// between one and two return values.
 func validateFunctionReturnTypes(mft reflect.Type) reflect.Type {
 	// Validate that the mutatorFunc has a single non-error return value and an optional error.
 	if mft.NumOut() == 0 {
@@ -103,6 +110,9 @@ func validateFunctionReturnTypes(mft reflect.Type) reflect.Type {
 	return returnType
 }
 
+// Call executes the graph function with a given context, request and command. It first prepares the
+// parameters for the function call, then invokes the function and processes the results. If the function
+// returns an error, it returns a formatted error. If the function returns no results, it returns nil.
 func (f *GraphFunction) Call(ctx context.Context, req *Request, command Command) (any, error) {
 
 	paramValues, err := f.getCallParameters(ctx, req, command)

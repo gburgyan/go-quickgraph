@@ -6,6 +6,11 @@ import (
 	"strings"
 )
 
+// processCallResults takes a command and a slice of call results,
+// processes the results based on the kind of value returned,
+// and returns a single value and an error if there is any.
+// Currently, it only supports slices, maps, and structs,
+// and returns an error if the function returns a different kind of value.
 func (f *GraphFunction) processCallResults(command Command, callResults []reflect.Value) (any, error) {
 	// TODO: What if the function returns multiple values? Error?
 	for _, callResult := range callResults {
@@ -48,6 +53,8 @@ func (f *GraphFunction) processCallResults(command Command, callResults []reflec
 	return nil, nil
 }
 
+// processStruct takes a result filter and a struct, processes the struct according to the filter,
+// and returns a map and an error if there is any. The map contains the processed fields of the struct.
 func processStruct(filter *ResultFilter, anyStruct any) (map[string]any, error) {
 	r := map[string]any{}
 
@@ -118,6 +125,10 @@ func processStruct(filter *ResultFilter, anyStruct any) (map[string]any, error) 
 	return r, nil
 }
 
+// deferenceUnionType takes a struct and checks if the struct is a union type.
+// If it is, it finds the actual type of the struct and returns it.
+// If the struct is not a union type it's simply returned as-is. If there is an
+// error, it is returned.
 func deferenceUnionType(anyStruct any) (any, error) {
 	// If the anyStruct is a union type, as indicated by its name ending in "Union", then
 	// we need to get the actual type of the struct. We do this by finding the field that is

@@ -48,11 +48,11 @@ func processFieldLookup(typ reflect.Type, prevIndex []int, result map[string]Typ
 			processFieldLookup(field.Type, index, result)
 		} else {
 			tfl := TypeFieldLookup{
-				name:         field.Name,
+				name:         fieldName,
 				typ:          field.Type,
 				fieldIndexes: index,
 			}
-			result[field.Name] = tfl
+			result[fieldName] = tfl
 		}
 	}
 	// TODO: Handle functions as well as those can fulfil parameterized calls.

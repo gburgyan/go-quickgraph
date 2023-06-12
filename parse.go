@@ -43,12 +43,13 @@ type NamedValue struct {
 
 // GenericValue is a value of some type.
 type GenericValue struct {
-	Variable *string        `@Variable`
-	String   *string        `| @String`
-	Int      *int           `| @Int`
-	Float    *float64       `| @Float`
-	Map      []NamedValue   `| "{" ( @@ ("," @@)*)? "}"`
-	List     []GenericValue `| "[" ( @@ ("," @@)*)? "]"`
+	Variable   *string        `@Variable`
+	Identifier *string        `| @Ident`
+	String     *string        `| @String`
+	Int        *int64         `| @Int`
+	Float      *float64       `| @Float`
+	Map        []NamedValue   `| "{" ( @@ ("," @@)*)? "}"`
+	List       []GenericValue `| "[" ( @@ ("," @@)*)? "]"`
 }
 
 // ResultFilter is a filter for the result.

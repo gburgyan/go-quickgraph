@@ -43,7 +43,7 @@ func (f *GraphFunction) getCallParameters(ctx context.Context, req *Request, com
 	for _, param := range parsedParams.Values {
 		if nameMapping, ok := f.nameMapping[param.Name]; ok {
 			val := reflect.New(nameMapping.paramType).Elem()
-			err := parseMappingIntoValue(req, param.Value, val)
+			err := parseInputIntoValue(req, param.Value, val)
 			if err != nil {
 				return nil, err
 			}
@@ -61,12 +61,17 @@ func (f *GraphFunction) getCallParameters(ctx context.Context, req *Request, com
 	return paramValues, nil
 }
 
-// parseMappingIntoValue interprets a GenericValue according to the type of the targetValue and assigns the result to targetValue.
+// parseInputIntoValue interprets a GenericValue according to the type of the targetValue and assigns the result to targetValue.
 // This method takes into account various types of input such as string, int, float, list, map, identifier, and GraphQL variable.
 // It returns an error if the input cannot be parsed into the target type.
-func parseMappingIntoValue(req *Request, inValue GenericValue, targetValue reflect.Value) error {
-	// TODO: Better error detection and handling.
-	var err error
+func parseInputIntoValue(req *Request, inValue GenericValue, targetValue reflect.Value) (err error) {
+	// Catch panics and return them as errors.
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic: %v", r)
+		}
+	}()
+
 	if inValue.Variable != nil {
 		// Strip the $ from the variable name.
 		variableName := (*inValue.Variable)[1:]
@@ -185,7 +190,7 @@ func parseListIntoValue(req *Request, inVal GenericValue, targetValue reflect.Va
 	targetType := targetValue.Type()
 	targetValue.Set(reflect.MakeSlice(targetType, len(inVal.List), len(inVal.List)))
 	for i, listItem := range inVal.List {
-		err := parseMappingIntoValue(req, listItem, targetValue.Index(i))
+		err := parseInputIntoValue(req, listItem, targetValue.Index(i))
 		if err != nil {
 			return err
 		}
@@ -233,7 +238,7 @@ func parseMapIntoValue(req *Request, inValue GenericValue, targetValue reflect.V
 
 		if fieldValue.Kind() != reflect.Invalid {
 			// We have found the field, so parse the value into it.
-			err := parseMappingIntoValue(req, namedValue.Value, fieldValue)
+			err := parseInputIntoValue(req, namedValue.Value, fieldValue)
 			if err != nil {
 				return err
 			}

@@ -26,7 +26,7 @@ func (f *GraphFunction) processCallResults(command Command, callResults []reflec
 				count := callResult.Len()
 				for i := 0; i < count; i++ {
 					a := callResult.Index(i).Interface()
-					sr, err := processStruct(command.ResultFilter, a)
+					sr, err := processOutputStruct(command.ResultFilter, a)
 					if err != nil {
 						return nil, err
 					}
@@ -39,7 +39,7 @@ func (f *GraphFunction) processCallResults(command Command, callResults []reflec
 			// TODO: Handle maps?
 			return nil, fmt.Errorf("return of map type not supported")
 		} else if kind == reflect.Struct {
-			sr, err := processStruct(command.ResultFilter, callResult.Interface())
+			sr, err := processOutputStruct(command.ResultFilter, callResult.Interface())
 			if err != nil {
 				return nil, err
 			}
@@ -53,9 +53,9 @@ func (f *GraphFunction) processCallResults(command Command, callResults []reflec
 	return nil, nil
 }
 
-// processStruct takes a result filter and a struct, processes the struct according to the filter,
+// processOutputStruct takes a result filter and a struct, processes the struct according to the filter,
 // and returns a map and an error if there is any. The map contains the processed fields of the struct.
-func processStruct(filter *ResultFilter, anyStruct any) (map[string]any, error) {
+func processOutputStruct(filter *ResultFilter, anyStruct any) (map[string]any, error) {
 	r := map[string]any{}
 
 	// If the anyStruct is a pointer, dereference it.
@@ -108,7 +108,7 @@ func processStruct(filter *ResultFilter, anyStruct any) (map[string]any, error) 
 					return nil, err
 				}
 				if field.SubParts != nil {
-					subPart, err := processStruct(field.SubParts, fieldVal)
+					subPart, err := processOutputStruct(field.SubParts, fieldVal)
 					if err != nil {
 						return nil, err
 					}

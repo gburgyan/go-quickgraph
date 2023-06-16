@@ -13,7 +13,7 @@ var contextType = reflect.TypeOf((*context.Context)(nil)).Elem()
 var errorType = reflect.TypeOf((*error)(nil)).Elem()
 
 func (g *Graphy) RegisterProcessorWithParamNames(ctx context.Context, name string, mutatorFunc any, names ...string) {
-	gf := NewGraphFunction(name, mutatorFunc, names...)
+	gf := NewGraphFunctionWithNames(name, mutatorFunc, names...)
 	if g.processors == nil {
 		g.processors = map[string]GraphFunction{}
 	}

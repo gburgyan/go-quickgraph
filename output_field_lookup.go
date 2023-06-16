@@ -61,8 +61,23 @@ func processFieldLookup(typ reflect.Type, prevIndex []int, result map[string]Typ
 			result[fieldName] = tfl
 		}
 	}
+
 	// TODO: Handle functions as well as those can fulfil parameterized calls.
 
+	// A function is more complicated. In all cases a function may take a context
+	// parameter and must return some concrete type. The function may also return an
+	// error. If the function takes exactly one non-context parameter, it will be
+	// treated as an unnamed parameter and any input will be passed to it. If a function
+	// needs more complicated parameterization, the parameter must be a struct with
+	// fields that match the input.
+
+	// Loop through the methods of the type and find any that match the above criteria.
+
+	//for i := 0; i < typ.NumMethod(); i++ {
+	//	m := typ.Method(i)
+	//	m.Func
+	//
+	//}
 }
 
 // Fetch fetches a value from a given reflect.Value using the field indexes.

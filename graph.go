@@ -13,11 +13,21 @@ var contextType = reflect.TypeOf((*context.Context)(nil)).Elem()
 var errorType = reflect.TypeOf((*error)(nil)).Elem()
 
 func (g *Graphy) RegisterProcessorWithParamNames(ctx context.Context, name string, mutatorFunc any, names ...string) {
-	gf := NewGraphFunction(name, mutatorFunc, names...)
+	g.ensureInitialized()
+	gf := NewGraphFunctionWithNames(name, mutatorFunc, names...)
+	g.processors[name] = gf
+}
+
+func (g *Graphy) RegisterProcessor(ctx context.Context, name string, mutatorFunc any) {
+	g.ensureInitialized()
+	gf := NewGraphFunction(name, mutatorFunc)
+	g.processors[name] = gf
+}
+
+func (g *Graphy) ensureInitialized() {
 	if g.processors == nil {
 		g.processors = map[string]GraphFunction{}
 	}
-	g.processors[name] = gf
 }
 
 func (g *Graphy) ProcessRequest(ctx context.Context, request string, variableJson string) (string, error) {

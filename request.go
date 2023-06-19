@@ -137,7 +137,7 @@ func (rs *RequestStub) NewRequest(variableJson string) (*Request, error) {
 		variableValue := reflect.New(variable.Type)
 		err := json.Unmarshal(variableJson, variableValue.Interface())
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("variable %s into type %s: %s", varName, variable.Type.Name(), err)
 		}
 		variables[varName] = variableValue.Elem()
 	}

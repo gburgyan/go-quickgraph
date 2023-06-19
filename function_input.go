@@ -124,10 +124,10 @@ func (f *GraphFunction) getCallParamsNamedStruct(ctx context.Context, req *Reque
 		if gft.In(i).ConvertibleTo(contextType) {
 			paramValues[i] = reflect.ValueOf(ctx)
 			continue
-		} else if gft.In(i).Kind() == reflect.Ptr {
+		} else if gft.In(i).Kind() == reflect.Struct {
 			// This is the value parameter, save it for later.
-			valueParam = reflect.New(gft.In(i))
-			paramValues[i] = valueParam.Elem()
+			valueParam = reflect.New(gft.In(i)).Elem()
+			paramValues[i] = valueParam
 			continue
 		}
 		panic(fmt.Errorf("invalid parameter type %v", gft.In(i)))

@@ -1,6 +1,7 @@
 package quickgraph
 
 import (
+	"context"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -41,4 +42,63 @@ func TestDeferenceUnionType(t *testing.T) {
 	_, err = deferenceUnionType(nonUnion)
 	assert.Error(t, err)
 	assert.Equal(t, "fields in union type must be pointers, maps, slices, or interfaces", err.Error())
+}
+
+func TestGraphFunction_Struct(t *testing.T) {
+	type in struct {
+		InString string
+	}
+	type res struct {
+		OutString string
+	}
+	f := func(ctx context.Context, i in) res {
+		return res{OutString: i.InString}
+	}
+
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterProcessor(ctx, "f", f)
+
+	gf := NewGraphFunction("f", f)
+	assert.Equal(t, "f", gf.name)
+	assert.Equal(t, NamedParamsStruct, gf.mode)
+
+	gql := `
+query {
+  f(InString: "InputString") {
+    OutString
+  }
+}`
+
+	response, err := g.ProcessRequest(ctx, gql, "")
+	assert.NoError(t, err)
+	assert.Equal(t, `{"data":{"f":{"OutString":"InputString"}}}`, response)
+}
+
+func TestGraphFunction_Anonymous(t *testing.T) {
+	type res struct {
+		OutString string
+	}
+	f := func(ctx context.Context, input string) res {
+		return res{OutString: input}
+	}
+
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterProcessor(ctx, "f", f)
+
+	gf := NewGraphFunction("f", f)
+	assert.Equal(t, "f", gf.name)
+	assert.Equal(t, AnonymousParamsInline, gf.mode)
+
+	gql := `
+query {
+  f(FooBar: "InputString") {
+    OutString
+  }
+}`
+
+	response, err := g.ProcessRequest(ctx, gql, "")
+	assert.NoError(t, err)
+	assert.Equal(t, `{"data":{"f":{"OutString":"InputString"}}}`, response)
 }

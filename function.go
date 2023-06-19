@@ -15,12 +15,11 @@ const (
 )
 
 type GraphFunction struct {
-	name           string
-	mode           GraphFunctionMode
-	function       any
-	orderedMapping []FunctionNameMapping
-	nameMapping    map[string]FunctionNameMapping
-	returnType     reflect.Type
+	name        string
+	mode        GraphFunctionMode
+	function    any
+	nameMapping map[string]FunctionNameMapping
+	returnType  reflect.Type
 }
 
 type FunctionNameMapping struct {
@@ -159,8 +158,9 @@ func newAnonymousGraphFunction(name string, graphFunc any, types []reflect.Type)
 	// parameters as we don't have any names to use.
 
 	gf := GraphFunction{
-		name: name,
-		mode: AnonymousParamsInline,
+		name:     name,
+		mode:     AnonymousParamsInline,
+		function: graphFunc,
 	}
 
 	mft := reflect.TypeOf(graphFunc)
@@ -187,9 +187,6 @@ func newAnonymousGraphFunction(name string, graphFunc any, types []reflect.Type)
 		anonymousArgs = append(anonymousArgs, mapping)
 	}
 
-	gf.orderedMapping = anonymousArgs
-	gf.function = graphFunc
-
 	return gf
 }
 
@@ -198,8 +195,9 @@ func newStructGraphFunction(name string, graphFunc any, paramType reflect.Type) 
 	// the names of the struct fields as the parameter names.
 
 	gf := GraphFunction{
-		name: name,
-		mode: NamedParamsStruct,
+		name:     name,
+		mode:     NamedParamsStruct,
+		function: graphFunc,
 	}
 
 	mft := reflect.TypeOf(graphFunc)
@@ -208,16 +206,15 @@ func newStructGraphFunction(name string, graphFunc any, paramType reflect.Type) 
 
 	// The parameter type must be a pointer to a struct. We will panic if it is
 	// not.
-	if paramType.Kind() != reflect.Ptr || paramType.Elem().Kind() != reflect.Struct {
-		panic("paramType must be a pointer to a struct")
+	if paramType.Kind() != reflect.Struct {
+		panic("paramType must a struct")
 	}
 
 	// Iterate over the fields of the struct and create the name mapping.
 	nameMapping := map[string]FunctionNameMapping{}
-	orderedMapping := []FunctionNameMapping{}
 
-	for i := 0; i < paramType.Elem().NumField(); i++ {
-		field := paramType.Elem().Field(i)
+	for i := 0; i < paramType.NumField(); i++ {
+		field := paramType.Field(i)
 		if field.Anonymous {
 			// Todo: support anonymous fields
 			panic("anonymous fields are not supported")
@@ -243,11 +240,9 @@ func newStructGraphFunction(name string, graphFunc any, paramType reflect.Type) 
 		}
 
 		nameMapping[name] = mapping
-		orderedMapping = append(orderedMapping, mapping)
 	}
 
 	gf.nameMapping = nameMapping
-	gf.orderedMapping = orderedMapping
 
 	return gf
 }

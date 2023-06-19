@@ -17,6 +17,20 @@ var enumUnmarshalerType = reflect.TypeOf((*EnumUnmarshaler)(nil)).Elem()
 // The parameters are returned as a slice of reflect.Value that can be used to call the function.
 // The request and command are used to populate the parameters to the function.
 func (f *GraphFunction) getCallParameters(ctx context.Context, req *Request, command Command) ([]reflect.Value, error) {
+	switch f.mode {
+	case NamedParamsInline:
+		return f.getCallParamsNamedInline(ctx, req, command)
+
+	case AnonymousParamsInline:
+		return f.getCallParamsAnonymousInline(ctx, req, command)
+
+	case NamedParamsStruct:
+		return f.getCallParamsNamedStruct(ctx, req, command)
+	}
+	return nil, fmt.Errorf("unknown function mode: %v", f.mode)
+}
+
+func (f *GraphFunction) getCallParamsNamedInline(ctx context.Context, req *Request, command Command) ([]reflect.Value, error) {
 	gft := reflect.TypeOf(f.function)
 
 	// Make something to hold the parameters
@@ -48,6 +62,92 @@ func (f *GraphFunction) getCallParameters(ctx context.Context, req *Request, com
 				return nil, err
 			}
 			paramValues[nameMapping.paramIndex] = val
+			delete(requiredParams, param.Name)
+		}
+	}
+	if len(requiredParams) > 0 {
+		missingParams := []string{}
+		for paramName := range requiredParams {
+			missingParams = append(missingParams, paramName)
+		}
+		return nil, fmt.Errorf("missing required parameters: %v", strings.Join(missingParams, ", "))
+	}
+	return paramValues, nil
+}
+
+func (f *GraphFunction) getCallParamsAnonymousInline(ctx context.Context, req *Request, command Command) ([]reflect.Value, error) {
+	gft := reflect.TypeOf(f.function)
+
+	// Make something to hold the parameters
+	paramValues := make([]reflect.Value, gft.NumIn())
+
+	// Go through all the input parameters and populate the values. If it's a context.Context,
+	// use the context from the call. Also keep a count of the number of non-context parameters
+	// and fill in those values from the command.
+	normalParamCount := 0
+	for i := 0; i < gft.NumIn(); i++ {
+		if gft.In(i).ConvertibleTo(contextType) {
+			paramValues[i] = reflect.ValueOf(ctx)
+			continue
+		} else {
+			// This is a normal parameter, fill it in from the command.
+			if normalParamCount >= len(command.Parameters.Values) {
+				return nil, fmt.Errorf("too many parameters provided %d", normalParamCount)
+			}
+			val := reflect.New(gft.In(i)).Elem()
+			err := parseInputIntoValue(req, command.Parameters.Values[normalParamCount].Value, val)
+			if err != nil {
+				return nil, err
+			}
+			paramValues[i] = val
+		}
+		normalParamCount++
+	}
+	if normalParamCount < len(command.Parameters.Values) {
+		return nil, fmt.Errorf("too few parameters provided %d", normalParamCount)
+	}
+
+	return paramValues, nil
+}
+
+func (f *GraphFunction) getCallParamsNamedStruct(ctx context.Context, req *Request, command Command) ([]reflect.Value, error) {
+	gft := reflect.TypeOf(f.function)
+
+	// Make something to hold the parameters
+	paramValues := make([]reflect.Value, gft.NumIn())
+
+	// Go through all the input parameters and populate the values. If it's a context.Context,
+	// use the context from the call. Grab the non-context parameter (only one based on the type)
+	// and save that for later.
+	var valueParam reflect.Value
+	for i := 0; i < gft.NumIn(); i++ {
+		if gft.In(i).ConvertibleTo(contextType) {
+			paramValues[i] = reflect.ValueOf(ctx)
+			continue
+		} else if gft.In(i).Kind() == reflect.Ptr {
+			// This is the value parameter, save it for later.
+			valueParam = reflect.New(gft.In(i))
+			paramValues[i] = valueParam.Elem()
+			continue
+		}
+		panic(fmt.Errorf("invalid parameter type %v", gft.In(i)))
+	}
+
+	// Make a map of the parameters that are required
+	requiredParams := map[string]bool{}
+	for _, nameMapping := range f.nameMapping {
+		if nameMapping.required {
+			requiredParams[nameMapping.name] = true
+		}
+	}
+
+	parsedParams := command.Parameters
+	for _, param := range parsedParams.Values {
+		if nameMapping, ok := f.nameMapping[param.Name]; ok {
+			err := parseInputIntoValue(req, param.Value, valueParam.Field(nameMapping.paramIndex))
+			if err != nil {
+				return nil, err
+			}
 			delete(requiredParams, param.Name)
 		}
 	}

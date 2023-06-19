@@ -10,6 +10,7 @@ type GraphFunctionMode int
 
 const (
 	NamedParamsStruct GraphFunctionMode = iota
+	NamedParamsInline
 	AnonymousParamsInline
 )
 
@@ -24,7 +25,7 @@ type GraphFunction struct {
 
 type FunctionNameMapping struct {
 	name              string
-	paramIndex        int
+	paramIndex        int // Todo: make this into a slice of param indexes for anonymous params
 	paramType         reflect.Type
 	required          bool
 	anonymousArgument bool
@@ -85,6 +86,7 @@ func NewGraphFunctionWithNames(name string, graphFunc any, names ...string) Grap
 		function:    graphFunc,
 		nameMapping: nameMapping,
 		returnType:  returnType,
+		mode:        NamedParamsInline,
 	}
 	return gf
 }
@@ -140,9 +142,9 @@ func NewGraphFunction(name string, graphFunc any) GraphFunction {
 		return newAnonymousGraphFunction(name, graphFunc, inputTypes)
 	} else {
 		// A single parameter. We will use the name of the parameter if it is a
-		// *struct, otherwise we will use an anonymous argument.
+		// struct, otherwise we will use an anonymous argument.
 		paramType := inputTypes[0]
-		if paramType.Kind() == reflect.Ptr && paramType.Elem().Kind() == reflect.Struct {
+		if paramType.Kind() == reflect.Struct {
 			// Invoke option 1
 			return newStructGraphFunction(name, graphFunc, paramType)
 		} else {
@@ -160,6 +162,10 @@ func newAnonymousGraphFunction(name string, graphFunc any, types []reflect.Type)
 		name: name,
 		mode: AnonymousParamsInline,
 	}
+
+	mft := reflect.TypeOf(graphFunc)
+	returnType := validateFunctionReturnTypes(mft)
+	gf.returnType = returnType
 
 	// Iterate over the parameters and create the anonymous arguments.
 	anonymousArgs := []FunctionNameMapping{}
@@ -195,6 +201,10 @@ func newStructGraphFunction(name string, graphFunc any, paramType reflect.Type) 
 		name: name,
 		mode: NamedParamsStruct,
 	}
+
+	mft := reflect.TypeOf(graphFunc)
+	returnType := validateFunctionReturnTypes(mft)
+	gf.returnType = returnType
 
 	// The parameter type must be a pointer to a struct. We will panic if it is
 	// not.

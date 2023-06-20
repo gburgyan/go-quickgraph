@@ -73,11 +73,13 @@ func processFieldLookup(typ reflect.Type, prevIndex []int, result map[string]Typ
 
 	// Loop through the methods of the type and find any that match the above criteria.
 
-	//for i := 0; i < typ.NumMethod(); i++ {
-	//	m := typ.Method(i)
-	//	m.Func
-	//
-	//}
+	for i := 0; i < typ.NumMethod(); i++ {
+		//m := typ.Method(i)
+		//if isValidGraphFunction(m.Func, true) {
+		//
+		//}
+
+	}
 }
 
 // Fetch fetches a value from a given reflect.Value using the field indexes.

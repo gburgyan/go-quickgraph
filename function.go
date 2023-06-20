@@ -41,7 +41,14 @@ func NewGraphFunctionWithNames(name string, graphFunc any, names ...string) Grap
 		panic("graphFunc must be a func")
 	}
 
-	returnType := validateFunctionReturnTypes(mft)
+	if !isValidGraphFunction(graphFunc, false) {
+		panic("not valid graph function")
+	}
+
+	returnType, err := validateFunctionReturnTypes(mft)
+	if err != nil {
+		panic(fmt.Sprintf("invalid return type: %s", err.Error()))
+	}
 
 	// Check the parameters of the graphFunc. The count of names must match the count
 	// of parameters. Note that context.Context is not a parameter that is counted.
@@ -88,6 +95,56 @@ func NewGraphFunctionWithNames(name string, graphFunc any, names ...string) Grap
 		mode:        NamedParamsInline,
 	}
 	return gf
+}
+
+func isValidGraphFunction(graphFunc any, method bool) bool {
+	// A valid graph function must be a func type. It's inputs must be zero or more
+	// serializable types. If it's a method, the first parameter must be a pointer to
+	// a struct for the receiver. It may, optionally, take a context.Context
+	// parameter. It must return a serializable type. It may also return an error.
+
+	// Check the function type.
+	mft := reflect.TypeOf(graphFunc)
+	if mft.Kind() != reflect.Func {
+		return false
+	}
+
+	// Check the parameters of the graphFunc. The first parameter may be a
+	// context.Context. If it is, it is ignored for the purposes of the graph
+	// function.
+	for i := 0; i < mft.NumIn(); i++ {
+		funcParam := mft.In(i)
+		if funcParam.ConvertibleTo(contextType) {
+			continue
+		}
+
+		switch funcParam.Kind() {
+		case reflect.Ptr:
+			if method {
+				// The first parameter must be a pointer to a struct.
+				if funcParam.Elem().Kind() != reflect.Struct {
+					return false
+				}
+			} else {
+				return false
+			}
+
+		case reflect.Map:
+			return false
+		}
+	}
+
+	// Check the return types of the graphFunc. It must return a serializable
+	// type. It may also return an error.
+	returnType, err := validateFunctionReturnTypes(mft)
+	if err != nil {
+		return false
+	}
+	if returnType == nil {
+		return false
+	}
+
+	return true
 }
 
 func NewGraphFunction(name string, graphFunc any) GraphFunction {
@@ -164,7 +221,10 @@ func newAnonymousGraphFunction(name string, graphFunc any, types []reflect.Type)
 	}
 
 	mft := reflect.TypeOf(graphFunc)
-	returnType := validateFunctionReturnTypes(mft)
+	returnType, err := validateFunctionReturnTypes(mft)
+	if err != nil {
+		panic(err)
+	}
 	gf.returnType = returnType
 
 	// Iterate over the parameters and create the anonymous arguments.
@@ -201,7 +261,10 @@ func newStructGraphFunction(name string, graphFunc any, paramType reflect.Type) 
 	}
 
 	mft := reflect.TypeOf(graphFunc)
-	returnType := validateFunctionReturnTypes(mft)
+	returnType, err := validateFunctionReturnTypes(mft)
+	if err != nil {
+		panic(err)
+	}
 	gf.returnType = returnType
 
 	// The parameter type must be a pointer to a struct. We will panic if it is
@@ -250,7 +313,7 @@ func newStructGraphFunction(name string, graphFunc any, paramType reflect.Type) 
 // validateFunctionReturnTypes validates the return types of the function passed. It requires the function
 // to have at least one non-error return value and at most one error return value. The function should have
 // between one and two return values.
-func validateFunctionReturnTypes(mft reflect.Type) reflect.Type {
+func validateFunctionReturnTypes(mft reflect.Type) (reflect.Type, error) {
 	// Validate that the mutatorFunc has a single non-error return value and an optional error.
 	if mft.NumOut() == 0 {
 		panic("mutatorFunc must have at least one return value")
@@ -271,12 +334,12 @@ func validateFunctionReturnTypes(mft reflect.Type) reflect.Type {
 		}
 	}
 	if errorCount > 1 {
-		panic("mutatorFunc may have at most one error return value")
+		return nil, fmt.Errorf("mutatorFunc may have at most one error return value")
 	}
 	if nonErrorCount == 0 {
-		panic("mutatorFunc must have at least one non-error return value")
+		return nil, fmt.Errorf("mutatorFunc must have at least one non-error return value")
 	}
-	return returnType
+	return returnType, nil
 }
 
 // Call executes the graph function with a given context, request and command. It first prepares the

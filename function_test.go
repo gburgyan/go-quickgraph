@@ -102,3 +102,39 @@ query {
 	assert.NoError(t, err)
 	assert.Equal(t, `{"data":{"f":{"OutString":"InputString"}}}`, response)
 }
+
+type resultWithFunc struct {
+	OutString string
+}
+
+func (r resultWithFunc) Func() string {
+	return r.OutString
+}
+
+func TestGraphFunction_FuncReturn(t *testing.T) {
+	type in struct {
+		InString string
+	}
+	f := func(ctx context.Context, i in) resultWithFunc {
+		return resultWithFunc{OutString: i.InString}
+	}
+
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterProcessor(ctx, "f", f)
+
+	gf := NewGraphFunction("f", f)
+	assert.Equal(t, "f", gf.name)
+	assert.Equal(t, AnonymousParamsInline, gf.mode)
+
+	gql := `
+query {
+  f(FooBar: "InputString") {
+    Func
+  }
+}`
+
+	response, err := g.ProcessRequest(ctx, gql, "")
+	assert.NoError(t, err)
+	assert.Equal(t, `{"data":{"f":{"OutString":"InputString"}}}`, response)
+}

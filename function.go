@@ -358,13 +358,16 @@ func (f *GraphFunction) Call(ctx context.Context, req *Request, command Command)
 		return nil, nil
 	}
 
+	var resultValue reflect.Value
 	// TODO: Tighten this up to deal with the return types better.
 	for _, callResult := range callResults {
 		if callResult.CanConvert(errorType) {
 			return nil, fmt.Errorf("error calling function: %v", callResult.Convert(errorType).Interface().(error))
+		} else {
+			resultValue = callResult
 		}
 	}
 
 	// Process the results
-	return f.processCallResults(command, callResults)
+	return f.processCallOutput(req, command.ResultFilter, resultValue)
 }

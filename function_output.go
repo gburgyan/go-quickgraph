@@ -6,47 +6,48 @@ import (
 	"strings"
 )
 
-// processCallResults takes a command and a slice of call results,
+// processCallOutput takes a command and a slice of call results,
 // processes the results based on the kind of value returned,
 // and returns a single value and an error if there is any.
 // Currently, it only supports slices, maps, and structs,
 // and returns an error if the function returns a different kind of value.
-func (f *GraphFunction) processCallResults(command Command, callResults []reflect.Value) (any, error) {
-	// TODO: What if the function returns multiple values? Error?
-	for _, callResult := range callResults {
-		kind := callResult.Kind()
-		if (kind == reflect.Pointer) && !callResult.IsNil() {
-			// If this is a pointer, dereference it.
-			callResult = callResult.Elem()
-			kind = callResult.Kind() // Update the kind
-		}
-		if kind == reflect.Slice {
-			if !callResult.IsNil() {
-				var retVal []any
-				count := callResult.Len()
-				for i := 0; i < count; i++ {
-					a := callResult.Index(i).Interface()
-					sr, err := processOutputStruct(command.ResultFilter, a)
-					if err != nil {
-						return nil, err
-					}
-					retVal = append(retVal, sr)
-				}
-				return retVal, nil
-			}
+func (f *GraphFunction) processCallOutput(req *Request, filter *ResultFilter, callResult reflect.Value) (any, error) {
+	kind := callResult.Kind()
+	if callResult.CanConvert(errorType) {
+		return nil, fmt.Errorf("error calling function: %v", callResult.Convert(errorType).Interface().(error))
+	}
 
-		} else if kind == reflect.Map {
-			// TODO: Handle maps?
-			return nil, fmt.Errorf("return of map type not supported")
-		} else if kind == reflect.Struct {
-			sr, err := processOutputStruct(command.ResultFilter, callResult.Interface())
-			if err != nil {
-				return nil, err
+	if (kind == reflect.Pointer) && !callResult.IsNil() {
+		// If this is a pointer, dereference it.
+		callResult = callResult.Elem()
+		kind = callResult.Kind() // Update the kind
+	}
+	if kind == reflect.Slice {
+		if !callResult.IsNil() {
+			var retVal []any
+			count := callResult.Len()
+			for i := 0; i < count; i++ {
+				a := callResult.Index(i).Interface()
+				sr, err := f.processOutputStruct(req, filter, a)
+				if err != nil {
+					return nil, err
+				}
+				retVal = append(retVal, sr)
 			}
-			return sr, nil
-		} else {
-			return nil, fmt.Errorf("return type of %v not supported", kind)
+			return retVal, nil
 		}
+
+	} else if kind == reflect.Map {
+		// TODO: Handle maps?
+		return nil, fmt.Errorf("return of map type not supported")
+	} else if kind == reflect.Struct {
+		sr, err := f.processOutputStruct(req, filter, callResult.Interface())
+		if err != nil {
+			return nil, err
+		}
+		return sr, nil
+	} else {
+		return nil, fmt.Errorf("return type of %v not supported", kind)
 	}
 
 	// TODO: Better error handling.
@@ -55,7 +56,7 @@ func (f *GraphFunction) processCallResults(command Command, callResults []reflec
 
 // processOutputStruct takes a result filter and a struct, processes the struct according to the filter,
 // and returns a map and an error if there is any. The map contains the processed fields of the struct.
-func processOutputStruct(filter *ResultFilter, anyStruct any) (map[string]any, error) {
+func (f *GraphFunction) processOutputStruct(req *Request, filter *ResultFilter, anyStruct any) (map[string]any, error) {
 	r := map[string]any{}
 
 	// If the anyStruct is a pointer, dereference it.
@@ -103,18 +104,19 @@ func processOutputStruct(filter *ResultFilter, anyStruct any) (map[string]any, e
 			r[field.Name] = typeName
 		} else {
 			if fieldInfo, ok := fieldMap[field.Name]; ok {
-				fieldVal, err := fieldInfo.Fetch(reflect.ValueOf(anyStruct))
+				fieldAny, err := fieldInfo.Fetch(req, reflect.ValueOf(anyStruct))
 				if err != nil {
 					return nil, err
 				}
 				if field.SubParts != nil {
-					subPart, err := processOutputStruct(field.SubParts, fieldVal)
+					fieldVal := reflect.ValueOf(fieldAny)
+					subPart, err := f.processCallOutput(req, field.SubParts, fieldVal)
 					if err != nil {
 						return nil, err
 					}
 					r[field.Name] = subPart
 				} else {
-					r[field.Name] = fieldVal
+					r[field.Name] = fieldAny
 				}
 			} else {
 				// TODO: Is this an error?

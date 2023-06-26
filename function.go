@@ -330,8 +330,6 @@ func newStructGraphFunction(name string, graphFunc reflect.Value, paramType refl
 // to have at least one non-error return value and at most one error return value. The function should have
 // between one and two return values.
 func validateFunctionReturnTypes(mft reflect.Type) (reflect.Type, error) {
-	// Todo: support scalar return types
-
 	// Validate that the mutatorFunc has a single non-error return value and an optional error.
 	if mft.NumOut() == 0 {
 		panic("mutatorFunc must have at least one return value")

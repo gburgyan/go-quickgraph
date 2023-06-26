@@ -111,8 +111,8 @@ type funcResult struct {
 	OutString string
 }
 
-func (r resultWithFunc) Func() funcResult {
-	return funcResult{OutString: r.OutString}
+func (r resultWithFunc) Func() string {
+	return r.OutString
 }
 
 func TestGraphFunction_FuncReturn(t *testing.T) {
@@ -134,9 +134,7 @@ func TestGraphFunction_FuncReturn(t *testing.T) {
 	gql := `
 query {
   f(InString: "InputString") {
-    Func {
-      OutString
-    }
+    Func
   }
 }`
 

@@ -15,13 +15,13 @@ var stringType = reflect.TypeOf((*string)(nil)).Elem()
 
 func (g *Graphy) RegisterProcessorWithParamNames(ctx context.Context, name string, mutatorFunc any, names ...string) {
 	g.ensureInitialized()
-	gf := NewGraphFunctionWithNames(name, mutatorFunc, names...)
+	gf := NewGraphFunctionWithNames(name, reflect.ValueOf(mutatorFunc), names...)
 	g.processors[name] = gf
 }
 
 func (g *Graphy) RegisterProcessor(ctx context.Context, name string, mutatorFunc any) {
 	g.ensureInitialized()
-	gf := NewGraphFunction(name, mutatorFunc)
+	gf := NewGraphFunction(name, mutatorFunc, false)
 	g.processors[name] = gf
 }
 

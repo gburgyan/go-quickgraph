@@ -59,7 +59,7 @@ func TestGraphFunction_Struct(t *testing.T) {
 	g := Graphy{}
 	g.RegisterProcessor(ctx, "f", f)
 
-	gf := NewGraphFunction("f", f)
+	gf := NewGraphFunction("f", f, false)
 	assert.Equal(t, "f", gf.name)
 	assert.Equal(t, NamedParamsStruct, gf.mode)
 
@@ -87,7 +87,7 @@ func TestGraphFunction_Anonymous(t *testing.T) {
 	g := Graphy{}
 	g.RegisterProcessor(ctx, "f", f)
 
-	gf := NewGraphFunction("f", f)
+	gf := NewGraphFunction("f", f, false)
 	assert.Equal(t, "f", gf.name)
 	assert.Equal(t, AnonymousParamsInline, gf.mode)
 
@@ -107,8 +107,12 @@ type resultWithFunc struct {
 	OutString string
 }
 
-func (r resultWithFunc) Func() string {
-	return r.OutString
+type funcResult struct {
+	OutString string
+}
+
+func (r resultWithFunc) Func() funcResult {
+	return funcResult{OutString: r.OutString}
 }
 
 func TestGraphFunction_FuncReturn(t *testing.T) {
@@ -123,18 +127,20 @@ func TestGraphFunction_FuncReturn(t *testing.T) {
 	g := Graphy{}
 	g.RegisterProcessor(ctx, "f", f)
 
-	gf := NewGraphFunction("f", f)
+	gf := NewGraphFunction("f", f, false)
 	assert.Equal(t, "f", gf.name)
 	assert.Equal(t, NamedParamsStruct, gf.mode)
 
 	gql := `
 query {
   f(InString: "InputString") {
-    Func
+    Func {
+      OutString
+    }
   }
 }`
 
 	response, err := g.ProcessRequest(ctx, gql, "")
 	assert.NoError(t, err)
-	assert.Equal(t, `{"data":{"f":{"OutString":"InputString"}}}`, response)
+	assert.Equal(t, `{"data":{"f":{"Func":{"OutString":"InputString"}}}}`, response)
 }

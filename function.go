@@ -105,6 +105,7 @@ func isValidGraphFunction(graphFunc any, method bool) bool {
 
 	// Check the function type.
 	mft := reflect.TypeOf(graphFunc)
+	fmt.Printf("Mft type: %s\n", mft.Kind())
 	if mft.Kind() != reflect.Func {
 		return false
 	}
@@ -118,19 +119,20 @@ func isValidGraphFunction(graphFunc any, method bool) bool {
 			continue
 		}
 
-		switch funcParam.Kind() {
-		case reflect.Ptr:
-			if method {
-				// The first parameter must be a pointer to a struct.
-				if funcParam.Elem().Kind() != reflect.Struct {
-					return false
-				}
-			} else {
+		if i == 0 && method {
+			// The first parameter must be a pointer to a struct.
+			if funcParam.Elem().Kind() != reflect.Struct {
 				return false
 			}
+		} else {
 
-		case reflect.Map:
-			return false
+			switch funcParam.Kind() {
+			case reflect.Ptr:
+				return true
+
+			case reflect.Map:
+				return false
+			}
 		}
 	}
 
@@ -203,9 +205,8 @@ func NewGraphFunction(name string, graphFunc any) GraphFunction {
 		if paramType.Kind() == reflect.Struct {
 			// Invoke option 1
 			return newStructGraphFunction(name, graphFunc, paramType)
-		} else {
-			return newAnonymousGraphFunction(name, graphFunc, inputTypes)
 		}
+		return newAnonymousGraphFunction(name, graphFunc, inputTypes)
 	}
 }
 
@@ -369,5 +370,5 @@ func (f *GraphFunction) Call(ctx context.Context, req *Request, command Command)
 	}
 
 	// Process the results
-	return f.processCallOutput(req, command.ResultFilter, resultValue)
+	return f.processCallOutput(ctx, req, command.ResultFilter, resultValue)
 }

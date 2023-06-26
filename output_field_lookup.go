@@ -1,6 +1,7 @@
 package quickgraph
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -100,8 +101,14 @@ func processFieldLookup(typ reflect.Type, prevIndex []int, result map[string]Typ
 		// This allows us to call the function without having to pass in the struct.
 		proxyFunc := reflect.FuncOf(inTypes[1:], outTypes, false)
 
-		if isValidGraphFunction(proxyFunc, true) {
-			newStructGraphFunction(m.Name, m.Func, typ)
+		// Todo: Change the isValidGraphFunction to take a reflect.Type instead of an any.
+		tempFunc := reflect.MakeFunc(proxyFunc, func(args []reflect.Value) []reflect.Value {
+			return []reflect.Value{}
+		})
+
+		if isValidGraphFunction(tempFunc.Interface(), true) {
+			// Todo: Make this take a reflect.Type instead of an any.
+			newStructGraphFunction(m.Name, tempFunc.Interface(), typ)
 			tfl := TypeFieldLookup{
 				name:         m.Name,
 				resultType:   m.Type,
@@ -115,7 +122,7 @@ func processFieldLookup(typ reflect.Type, prevIndex []int, result map[string]Typ
 
 // Fetch fetches a value from a given reflect.Value using the field indexes.
 // It walks the field indexes in order to find the nested field if necessary.
-func (t *TypeFieldLookup) Fetch(req *Request, v reflect.Value) (any, error) {
+func (t *TypeFieldLookup) Fetch(ctx context.Context, req *Request, v reflect.Value) (any, error) {
 	switch t.fieldType {
 	case FieldTypeField:
 		return t.fetchField(v)

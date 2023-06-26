@@ -11,6 +11,7 @@ type Graphy struct {
 
 var contextType = reflect.TypeOf((*context.Context)(nil)).Elem()
 var errorType = reflect.TypeOf((*error)(nil)).Elem()
+var stringType = reflect.TypeOf((*string)(nil)).Elem()
 
 func (g *Graphy) RegisterProcessorWithParamNames(ctx context.Context, name string, mutatorFunc any, names ...string) {
 	g.ensureInitialized()

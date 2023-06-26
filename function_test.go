@@ -125,11 +125,11 @@ func TestGraphFunction_FuncReturn(t *testing.T) {
 
 	gf := NewGraphFunction("f", f)
 	assert.Equal(t, "f", gf.name)
-	assert.Equal(t, AnonymousParamsInline, gf.mode)
+	assert.Equal(t, NamedParamsStruct, gf.mode)
 
 	gql := `
 query {
-  f(FooBar: "InputString") {
+  f(InString: "InputString") {
     Func
   }
 }`

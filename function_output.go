@@ -1,6 +1,7 @@
 package quickgraph
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -11,7 +12,7 @@ import (
 // and returns a single value and an error if there is any.
 // Currently, it only supports slices, maps, and structs,
 // and returns an error if the function returns a different kind of value.
-func (f *GraphFunction) processCallOutput(req *Request, filter *ResultFilter, callResult reflect.Value) (any, error) {
+func (f *GraphFunction) processCallOutput(ctx context.Context, req *Request, filter *ResultFilter, callResult reflect.Value) (any, error) {
 	kind := callResult.Kind()
 	if callResult.CanConvert(errorType) {
 		return nil, fmt.Errorf("error calling function: %v", callResult.Convert(errorType).Interface().(error))
@@ -28,7 +29,7 @@ func (f *GraphFunction) processCallOutput(req *Request, filter *ResultFilter, ca
 			count := callResult.Len()
 			for i := 0; i < count; i++ {
 				a := callResult.Index(i).Interface()
-				sr, err := f.processOutputStruct(req, filter, a)
+				sr, err := f.processOutputStruct(ctx, req, filter, a)
 				if err != nil {
 					return nil, err
 				}
@@ -41,7 +42,7 @@ func (f *GraphFunction) processCallOutput(req *Request, filter *ResultFilter, ca
 		// TODO: Handle maps?
 		return nil, fmt.Errorf("return of map type not supported")
 	} else if kind == reflect.Struct {
-		sr, err := f.processOutputStruct(req, filter, callResult.Interface())
+		sr, err := f.processOutputStruct(nil, req, filter, callResult.Interface())
 		if err != nil {
 			return nil, err
 		}
@@ -56,7 +57,7 @@ func (f *GraphFunction) processCallOutput(req *Request, filter *ResultFilter, ca
 
 // processOutputStruct takes a result filter and a struct, processes the struct according to the filter,
 // and returns a map and an error if there is any. The map contains the processed fields of the struct.
-func (f *GraphFunction) processOutputStruct(req *Request, filter *ResultFilter, anyStruct any) (map[string]any, error) {
+func (f *GraphFunction) processOutputStruct(ctx context.Context, req *Request, filter *ResultFilter, anyStruct any) (map[string]any, error) {
 	r := map[string]any{}
 
 	// If the anyStruct is a pointer, dereference it.
@@ -104,13 +105,13 @@ func (f *GraphFunction) processOutputStruct(req *Request, filter *ResultFilter, 
 			r[field.Name] = typeName
 		} else {
 			if fieldInfo, ok := fieldMap[field.Name]; ok {
-				fieldAny, err := fieldInfo.Fetch(req, reflect.ValueOf(anyStruct))
+				fieldAny, err := fieldInfo.Fetch(nil, req, reflect.ValueOf(anyStruct))
 				if err != nil {
 					return nil, err
 				}
 				if field.SubParts != nil {
 					fieldVal := reflect.ValueOf(fieldAny)
-					subPart, err := f.processCallOutput(req, field.SubParts, fieldVal)
+					subPart, err := f.processCallOutput(ctx, req, field.SubParts, fieldVal)
 					if err != nil {
 						return nil, err
 					}

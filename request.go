@@ -163,7 +163,11 @@ func (r *Request) Execute(ctx context.Context) (string, error) {
 
 	// Find the processor
 	if processor, ok := r.Graphy.processors[command.Name]; ok {
-		r, err := processor.Call(ctx, r, command)
+		obj, err := processor.Call(ctx, r, command.Parameters, reflect.Value{})
+		if err != nil {
+			return "", err
+		}
+		res, err := processor.GenerateResult(ctx, r, obj, command.ResultFilter)
 		if err != nil {
 			return "", err
 		}
@@ -171,7 +175,7 @@ func (r *Request) Execute(ctx context.Context) (string, error) {
 		if command.Alias != nil {
 			name = *command.Alias
 		}
-		data[name] = r
+		data[name] = res
 	}
 
 	// Serialize the result to JSON.

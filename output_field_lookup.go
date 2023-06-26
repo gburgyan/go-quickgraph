@@ -1,14 +1,25 @@
 package quickgraph
 
 import (
+	"context"
+	"fmt"
 	"reflect"
 	"strings"
 )
 
+type FieldType int
+
+const (
+	FieldTypeField FieldType = iota
+	FieldTypeGraphFunction
+)
+
 type TypeFieldLookup struct {
-	name         string
-	typ          reflect.Type
-	fieldIndexes []int
+	fieldType     FieldType
+	name          string
+	resultType    reflect.Type
+	fieldIndexes  []int
+	graphFunction *GraphFunction
 }
 
 // MakeTypeFieldLookup creates a lookup of fields for a given type. It performs
@@ -55,8 +66,9 @@ func processFieldLookup(typ reflect.Type, prevIndex []int, result map[string]Typ
 		} else {
 			tfl := TypeFieldLookup{
 				name:         fieldName,
-				typ:          field.Type,
+				resultType:   field.Type,
 				fieldIndexes: index,
+				fieldType:    FieldTypeField,
 			}
 			result[fieldName] = tfl
 		}
@@ -74,19 +86,57 @@ func processFieldLookup(typ reflect.Type, prevIndex []int, result map[string]Typ
 	// Loop through the methods of the type and find any that match the above criteria.
 
 	for i := 0; i < typ.NumMethod(); i++ {
-		//m := typ.Method(i)
-		//if isValidGraphFunction(m.Func, true) {
-		//
-		//}
+		m := typ.Method(i)
 
+		// Gather the inputs and outputs of the function.
+		inTypes := []reflect.Type{}
+		outTypes := []reflect.Type{}
+		for j := 0; j < m.Type.NumIn(); j++ {
+			inTypes = append(inTypes, m.Type.In(j))
+		}
+		for j := 0; j < m.Type.NumOut(); j++ {
+			outTypes = append(outTypes, m.Type.Out(j))
+		}
+
+		if isValidGraphFunction(m.Func, true) {
+			// Todo: Make this take a reflect.Type instead of an any.
+			gf := NewGraphFunction(m.Name, m.Func, true)
+			tfl := TypeFieldLookup{
+				name:          m.Name,
+				resultType:    m.Type,
+				fieldIndexes:  nil,
+				fieldType:     FieldTypeGraphFunction,
+				graphFunction: &gf,
+			}
+			result[m.Name] = tfl
+		}
 	}
 }
 
 // Fetch fetches a value from a given reflect.Value using the field indexes.
 // It walks the field indexes in order to find the nested field if necessary.
-func (t *TypeFieldLookup) Fetch(v reflect.Value) (any, error) {
+func (t *TypeFieldLookup) Fetch(ctx context.Context, req *Request, v reflect.Value, params *ParameterList) (any, error) {
+	switch t.fieldType {
+	case FieldTypeField:
+		return t.fetchField(v)
+	case FieldTypeGraphFunction:
+		return t.fetchGraphFunction(ctx, req, v, params)
+	}
+	// Return error
+	return nil, fmt.Errorf("unknown field type: %v", t.fieldType)
+}
+
+func (t *TypeFieldLookup) fetchField(v reflect.Value) (any, error) {
 	for _, i := range t.fieldIndexes {
 		v = v.Field(i)
 	}
 	return v.Interface(), nil
+}
+
+func (t *TypeFieldLookup) fetchGraphFunction(ctx context.Context, req *Request, v reflect.Value, params *ParameterList) (any, error) {
+	obj, err := t.graphFunction.Call(ctx, req, params, v)
+	if err != nil {
+		return nil, err
+	}
+	return obj.Interface(), nil
 }

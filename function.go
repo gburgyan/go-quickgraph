@@ -17,9 +17,10 @@ const (
 type GraphFunction struct {
 	name        string
 	mode        GraphFunctionMode
-	function    any
+	function    reflect.Value
 	nameMapping map[string]FunctionNameMapping
 	returnType  reflect.Type
+	method      bool
 }
 
 type FunctionNameMapping struct {
@@ -35,8 +36,8 @@ type FunctionNameMapping struct {
 // type func and the names provided should match the count of parameters. It
 // panics if the function is not a func type, the number of names doesn't match
 // parameters, or if unsupported parameters like map are provided.
-func NewGraphFunctionWithNames(name string, graphFunc any, names ...string) GraphFunction {
-	mft := reflect.TypeOf(graphFunc)
+func NewGraphFunctionWithNames(name string, graphFunc reflect.Value, names ...string) GraphFunction {
+	mft := graphFunc.Type()
 	if mft.Kind() != reflect.Func {
 		panic("graphFunc must be a func")
 	}
@@ -97,14 +98,15 @@ func NewGraphFunctionWithNames(name string, graphFunc any, names ...string) Grap
 	return gf
 }
 
-func isValidGraphFunction(graphFunc any, method bool) bool {
+func isValidGraphFunction(graphFunc reflect.Value, method bool) bool {
 	// A valid graph function must be a func type. It's inputs must be zero or more
 	// serializable types. If it's a method, the first parameter must be a pointer to
 	// a struct for the receiver. It may, optionally, take a context.Context
 	// parameter. It must return a serializable type. It may also return an error.
 
 	// Check the function type.
-	mft := reflect.TypeOf(graphFunc)
+	mft := graphFunc.Type()
+	fmt.Printf("Mft type: %s\n", mft.Kind())
 	if mft.Kind() != reflect.Func {
 		return false
 	}
@@ -118,19 +120,18 @@ func isValidGraphFunction(graphFunc any, method bool) bool {
 			continue
 		}
 
-		switch funcParam.Kind() {
-		case reflect.Ptr:
-			if method {
-				// The first parameter must be a pointer to a struct.
-				if funcParam.Elem().Kind() != reflect.Struct {
-					return false
-				}
-			} else {
+		if i == 0 && method {
+			// The first parameter must be a pointer to a struct.
+			// TODO: Validation
+		} else {
+
+			switch funcParam.Kind() {
+			case reflect.Ptr:
+				return true
+
+			case reflect.Map:
 				return false
 			}
-
-		case reflect.Map:
-			return false
 		}
 	}
 
@@ -147,7 +148,7 @@ func isValidGraphFunction(graphFunc any, method bool) bool {
 	return true
 }
 
-func NewGraphFunction(name string, graphFunc any) GraphFunction {
+func NewGraphFunction(name string, graphFunc any, method bool) GraphFunction {
 	// This form of the graph function needs to be able to figure out the params
 	// only from the function signature. This is tricky because Go doesn't have
 	// named parameters. To get around this, we can operate in two modes:
@@ -169,15 +170,29 @@ func NewGraphFunction(name string, graphFunc any) GraphFunction {
 	// first parameter. This will be ignored for the purposes of the graph
 	// function.
 
-	funcTyp := reflect.TypeOf(graphFunc)
+	var funcTyp reflect.Type
+	var funcVal reflect.Value
+
+	if rVal, ok := graphFunc.(reflect.Value); ok {
+		funcVal = rVal
+		funcTyp = funcVal.Type()
+	} else {
+		funcVal = reflect.ValueOf(graphFunc)
+		funcTyp = funcVal.Type()
+	}
+
 	if funcTyp.Kind() != reflect.Func {
 		panic("graphFunc must be a function")
 	}
 
+	startParam := 0
+	if method {
+		startParam = 1
+	}
 	// Gather the parameter types, ignoring the context.Context if it is
 	// present.
 	inputTypes := []reflect.Type{}
-	for i := 0; i < funcTyp.NumIn(); i++ {
+	for i := startParam; i < funcTyp.NumIn(); i++ {
 		in := funcTyp.In(i)
 		if in.ConvertibleTo(contextType) {
 			// Skip this parameter if it is a context.Context.
@@ -190,26 +205,25 @@ func NewGraphFunction(name string, graphFunc any) GraphFunction {
 		// This is fine -- this case is used primarily in result generation. If a field's
 		// output is expensive to get, it can be hidden behind a function to ensure it's
 		// only invoked if it is asked for.
-		return newAnonymousGraphFunction(name, graphFunc, inputTypes)
+		return newAnonymousGraphFunction(name, funcVal, inputTypes, method)
 	} else if len(inputTypes) > 1 {
 		// We are in the case where there are multiple parameters. We will use the
 		// types of the parameters to create anonymous arguments.
 		// Invoke option 2
-		return newAnonymousGraphFunction(name, graphFunc, inputTypes)
+		return newAnonymousGraphFunction(name, funcVal, inputTypes, method)
 	} else {
 		// A single parameter. We will use the name of the parameter if it is a
 		// struct, otherwise we will use an anonymous argument.
 		paramType := inputTypes[0]
 		if paramType.Kind() == reflect.Struct {
 			// Invoke option 1
-			return newStructGraphFunction(name, graphFunc, paramType)
-		} else {
-			return newAnonymousGraphFunction(name, graphFunc, inputTypes)
+			return newStructGraphFunction(name, funcVal, paramType, method)
 		}
+		return newAnonymousGraphFunction(name, funcVal, inputTypes, method)
 	}
 }
 
-func newAnonymousGraphFunction(name string, graphFunc any, types []reflect.Type) GraphFunction {
+func newAnonymousGraphFunction(name string, graphFunc reflect.Value, types []reflect.Type, method bool) GraphFunction {
 	// We are in the case where there are multiple parameters. We will use the
 	// types of the parameters to create anonymous arguments. We won't have any named
 	// parameters as we don't have any names to use.
@@ -218,9 +232,10 @@ func newAnonymousGraphFunction(name string, graphFunc any, types []reflect.Type)
 		name:     name,
 		mode:     AnonymousParamsInline,
 		function: graphFunc,
+		method:   method,
 	}
 
-	mft := reflect.TypeOf(graphFunc)
+	mft := graphFunc.Type()
 	returnType, err := validateFunctionReturnTypes(mft)
 	if err != nil {
 		panic(err)
@@ -250,7 +265,7 @@ func newAnonymousGraphFunction(name string, graphFunc any, types []reflect.Type)
 	return gf
 }
 
-func newStructGraphFunction(name string, graphFunc any, paramType reflect.Type) GraphFunction {
+func newStructGraphFunction(name string, graphFunc reflect.Value, paramType reflect.Type, method bool) GraphFunction {
 	// We are in the case where there is a single struct parameter. We will use
 	// the names of the struct fields as the parameter names.
 
@@ -258,9 +273,10 @@ func newStructGraphFunction(name string, graphFunc any, paramType reflect.Type) 
 		name:     name,
 		mode:     NamedParamsStruct,
 		function: graphFunc,
+		method:   method,
 	}
 
-	mft := reflect.TypeOf(graphFunc)
+	mft := graphFunc.Type()
 	returnType, err := validateFunctionReturnTypes(mft)
 	if err != nil {
 		panic(err)
@@ -345,26 +361,33 @@ func validateFunctionReturnTypes(mft reflect.Type) (reflect.Type, error) {
 // Call executes the graph function with a given context, request and command. It first prepares the
 // parameters for the function call, then invokes the function and processes the results. If the function
 // returns an error, it returns a formatted error. If the function returns no results, it returns nil.
-func (f *GraphFunction) Call(ctx context.Context, req *Request, command Command) (any, error) {
+func (f *GraphFunction) Call(ctx context.Context, req *Request, params *ParameterList, methodTarget reflect.Value) (reflect.Value, error) {
 
-	paramValues, err := f.getCallParameters(ctx, req, command)
+	paramValues, err := f.getCallParameters(ctx, req, params, methodTarget)
 	if err != nil {
-		return nil, err
+		return reflect.Value{}, err
 	}
 
-	gfv := reflect.ValueOf(f.function)
+	gfv := f.function
 	callResults := gfv.Call(paramValues)
 	if len(callResults) == 0 {
-		return nil, nil
+		return reflect.Value{}, nil
 	}
 
+	var resultValue reflect.Value
 	// TODO: Tighten this up to deal with the return types better.
 	for _, callResult := range callResults {
 		if callResult.CanConvert(errorType) {
-			return nil, fmt.Errorf("error calling function: %v", callResult.Convert(errorType).Interface().(error))
+			return reflect.Value{}, fmt.Errorf("error calling function: %v", callResult.Convert(errorType).Interface().(error))
+		} else {
+			resultValue = callResult
 		}
 	}
 
+	return resultValue, nil
+}
+
+func (f *GraphFunction) GenerateResult(ctx context.Context, req *Request, obj reflect.Value, filter *ResultFilter) (any, error) {
 	// Process the results
-	return f.processCallResults(command, callResults)
+	return f.processCallOutput(ctx, req, filter, obj)
 }

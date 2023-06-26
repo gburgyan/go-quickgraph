@@ -99,9 +99,7 @@ func (f *GraphFunction) processOutputStruct(ctx context.Context, req *Request, f
 
 	// Go through the result fields and map them to the struct fields.
 	for _, field := range fieldsToProcess {
-		if field.Params != nil {
-			// TODO: Deal with parameterized fields.
-		} else if field.Name == "__typename" {
+		if field.Name == "__typename" {
 			r[field.Name] = typeName
 		} else {
 			if fieldInfo, ok := fieldMap[field.Name]; ok {

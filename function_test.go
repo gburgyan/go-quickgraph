@@ -115,6 +115,14 @@ func (r resultWithFunc) Func() string {
 	return r.OutString
 }
 
+func (r *resultWithFunc) PFunc() string {
+	return r.OutString
+}
+
+func (r resultWithFunc) FuncParam(s string) string {
+	return s + " " + r.OutString
+}
+
 func TestGraphFunction_FuncReturn(t *testing.T) {
 	type in struct {
 		InString string
@@ -141,4 +149,93 @@ query {
 	response, err := g.ProcessRequest(ctx, gql, "")
 	assert.NoError(t, err)
 	assert.Equal(t, `{"data":{"f":{"Func":"InputString"}}}`, response)
+}
+
+func TestGraphFunction_PointerFuncReturn(t *testing.T) {
+	type in struct {
+		InString string
+	}
+	f := func(ctx context.Context, i in) resultWithFunc {
+		return resultWithFunc{OutString: i.InString}
+	}
+
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterProcessor(ctx, "f", f)
+
+	gf := NewGraphFunction("f", f, false)
+	assert.Equal(t, "f", gf.name)
+	assert.Equal(t, NamedParamsStruct, gf.mode)
+
+	gql := `
+query {
+  f(InString: "InputString") {
+    PFunc
+  }
+}`
+
+	response, err := g.ProcessRequest(ctx, gql, "")
+	assert.NoError(t, err)
+	assert.Equal(t, `{"data":{"f":{"PFunc":"InputString"}}}`, response)
+}
+
+func TestGraphFunction_FuncParamReturn(t *testing.T) {
+	type in struct {
+		InString string
+	}
+	f := func(ctx context.Context, i in) resultWithFunc {
+		return resultWithFunc{OutString: i.InString}
+	}
+
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterProcessor(ctx, "f", f)
+
+	gf := NewGraphFunction("f", f, false)
+	assert.Equal(t, "f", gf.name)
+	assert.Equal(t, NamedParamsStruct, gf.mode)
+
+	gql := `
+query {
+  f(InString: "InputString") {
+    FuncParam(s: "Hello")
+  }
+}`
+
+	response, err := g.ProcessRequest(ctx, gql, "")
+	assert.NoError(t, err)
+	assert.Equal(t, `{"data":{"f":{"FuncParam":"Hello InputString"}}}`, response)
+}
+
+func TestGraphFunction_FuncVariableParamReturn(t *testing.T) {
+	type in struct {
+		InString string
+	}
+	f := func(ctx context.Context, i in) resultWithFunc {
+		return resultWithFunc{OutString: i.InString}
+	}
+
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterProcessor(ctx, "f", f)
+
+	gf := NewGraphFunction("f", f, false)
+	assert.Equal(t, "f", gf.name)
+	assert.Equal(t, NamedParamsStruct, gf.mode)
+
+	gql := `
+query {
+  f(InString: "InputString") {
+    FuncParam(s: $var)
+  }
+}`
+	vars := `
+{
+  "var": "Hello"
+}
+`
+
+	response, err := g.ProcessRequest(ctx, gql, vars)
+	assert.NoError(t, err)
+	assert.Equal(t, `{"data":{"f":{"FuncParam":"Hello InputString"}}}`, response)
 }

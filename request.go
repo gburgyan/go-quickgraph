@@ -47,9 +47,9 @@ func (g *Graphy) NewRequestStub(request string) (*RequestStub, error) {
 		return nil, err
 	}
 
-	variableTypeMap, err2 := g.GatherRequestVariables(parsedCall)
-	if err2 != nil {
-		return nil, err2
+	variableTypeMap, err := g.GatherRequestVariables(parsedCall)
+	if err != nil {
+		return nil, err
 	}
 
 	rs := RequestStub{
@@ -110,6 +110,66 @@ func (g *Graphy) GatherRequestVariables(parsedCall Wrapper) (map[string]RequestV
 		}
 
 		// TODO: Dive into the result filter and find variables there.
+
+		// Depth first search into the result filter.
+		if command.ResultFilter != nil {
+			ftl := MakeTypeFieldLookup(processor.returnType)
+			for _, field := range command.ResultFilter.Fields {
+				if pf, ok := ftl[field.Name]; ok {
+					var commandField *ResultField
+					for _, resultField := range command.ResultFilter.Fields {
+						if resultField.Name == field.Name {
+							commandField = &resultField
+							break
+						}
+					}
+					if commandField == nil {
+						// Todo: Warning?
+						continue
+					}
+					// Todo: handle union types
+					if pf.fieldType == FieldTypeField {
+						ftl = MakeTypeFieldLookup(pf.resultType)
+						// Recurse
+					} else if pf.fieldType == FieldTypeGraphFunction {
+						gf := pf.graphFunction
+						paramIndex := 1 // Skip the first parameter which is the receiver.
+
+						if commandField.Params != nil {
+							for _, cfp := range commandField.Params.Values {
+								if cfp.Value.Variable != nil {
+									varName := *cfp.Value.Variable
+									// Strip the leading $ from the variable name.
+									varName = varName[1:]
+
+									var targetType reflect.Type
+									if gf.mode == AnonymousParamsInline {
+										targetType = gf.function.Type().In(paramIndex)
+										paramIndex++
+									} else {
+										targetType = gf.nameMapping[cfp.Name].paramType
+									}
+
+									if existingVariable, found := variableTypeMap[varName]; found {
+										if existingVariable.Type != targetType {
+											return nil, fmt.Errorf("variable %s is used with different types", varName)
+										}
+									} else {
+										variableTypeMap[varName] = RequestVariable{
+											Name: varName,
+											Type: targetType,
+										}
+									}
+								}
+							}
+						}
+						// Recurse
+					}
+				} else {
+					return nil, fmt.Errorf("unknown field %s", field.Name)
+				}
+			}
+		}
 	}
 	return variableTypeMap, nil
 }

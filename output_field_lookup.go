@@ -85,6 +85,19 @@ func processFieldLookup(typ reflect.Type, prevIndex []int, result map[string]Typ
 
 	// Loop through the methods of the type and find any that match the above criteria.
 
+	addGraphMethodsForType(typ, result)
+
+	// if typ is a struct, make a pointer to it to account for receiver pointers.
+	if typ.Kind() == reflect.Struct {
+		typ = reflect.PtrTo(typ)
+		addGraphMethodsForType(typ, result)
+	} else if typ.Kind() == reflect.Ptr {
+		typ = typ.Elem()
+		addGraphMethodsForType(typ, result)
+	}
+}
+
+func addGraphMethodsForType(typ reflect.Type, result map[string]TypeFieldLookup) {
 	for i := 0; i < typ.NumMethod(); i++ {
 		m := typ.Method(i)
 

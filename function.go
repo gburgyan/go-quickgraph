@@ -391,3 +391,22 @@ func (f *GraphFunction) GenerateResult(ctx context.Context, req *Request, obj re
 	// Process the results
 	return f.processCallOutput(ctx, req, filter, obj)
 }
+
+func (f *GraphFunction) receiverValueForFunction(target reflect.Value) reflect.Value {
+	if !f.method {
+		panic("receiverValueForFunction called on non-method")
+	}
+
+	receiverType := f.function.Type().In(0)
+	if receiverType.Kind() == reflect.Ptr && target.Kind() != reflect.Ptr {
+		// Make a new pointer to the target.
+		ptrElem := reflect.New(target.Type())
+		ptrElem.Elem().Set(target)
+		return ptrElem
+	} else if receiverType.Kind() == reflect.Struct && target.Kind() == reflect.Ptr {
+		return target.Elem()
+	} else if receiverType.Kind() == target.Kind() {
+		return target
+	}
+	panic("receiverValueForFunction called with incompatible receiver type")
+}

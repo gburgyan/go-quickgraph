@@ -140,5 +140,5 @@ query {
 
 	response, err := g.ProcessRequest(ctx, gql, "")
 	assert.NoError(t, err)
-	assert.Equal(t, `{"data":{"f":{"Func":{"OutString":"InputString"}}}}`, response)
+	assert.Equal(t, `{"data":{"f":{"Func":"InputString"}}}`, response)
 }

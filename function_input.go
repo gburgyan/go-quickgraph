@@ -39,7 +39,7 @@ func (f *GraphFunction) getCallParamsNamedInline(ctx context.Context, req *Reque
 	startIndex := 0
 	if f.method {
 		// If this is a method, the first parameter is the receiver.
-		paramValues[0] = target
+		paramValues[0] = f.receiverValueForFunction(target)
 		startIndex = 1
 	}
 
@@ -91,7 +91,7 @@ func (f *GraphFunction) getCallParamsAnonymousInline(ctx context.Context, req *R
 	startIndex := 0
 	if f.method {
 		// If this is a method, the first parameter is the receiver.
-		paramValues[0] = target
+		paramValues[0] = f.receiverValueForFunction(target)
 		startIndex = 1
 	}
 
@@ -137,7 +137,7 @@ func (f *GraphFunction) getCallParamsNamedStruct(ctx context.Context, req *Reque
 	startIndex := 0
 	if f.method {
 		// If this is a method, the first parameter is the receiver.
-		paramValues[0] = target
+		paramValues[0] = f.receiverValueForFunction(target)
 		startIndex = 1
 	}
 

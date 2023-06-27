@@ -22,10 +22,12 @@ type TypeFieldLookup struct {
 	graphFunction *GraphFunction
 }
 
+type TypeLookup map[string]TypeFieldLookup
+
 // MakeTypeFieldLookup creates a lookup of fields for a given type. It performs
 // a depth-first search of the type, including anonymous fields. It creates the lookup
 // using either the json tag name or the field name.
-func MakeTypeFieldLookup(typ reflect.Type) map[string]TypeFieldLookup {
+func MakeTypeFieldLookup(typ reflect.Type) TypeLookup {
 	// Do a depth-first search of the type to find all of the fields.
 	// Include the anonymous fields in this search and treat them as if
 	// they were part of the current type in a flattened manner.

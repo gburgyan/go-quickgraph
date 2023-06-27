@@ -82,7 +82,7 @@ func (g *Graphy) GatherRequestVariables(parsedCall Wrapper) (map[string]RequestV
 	// there is consistency with the types in case two commands use the same variable.
 	variableTypeMap := map[string]RequestVariable{}
 	for _, command := range parsedCall.Commands {
-		processor, ok := g.processors[command.Name]
+		graphFunc, ok := g.processors[command.Name]
 		if !ok {
 			return nil, fmt.Errorf("unknown command %s", command.Name)
 		}
@@ -93,7 +93,7 @@ func (g *Graphy) GatherRequestVariables(parsedCall Wrapper) (map[string]RequestV
 					varName := *parameter.Value.Variable
 					// String the leading $ from the variable name.
 					varName = varName[1:]
-					paramTarget := processor.nameMapping[parameter.Name]
+					paramTarget := graphFunc.nameMapping[parameter.Name]
 					targetType := paramTarget.paramType
 					if existingVariable, found := variableTypeMap[varName]; found {
 						if existingVariable.Type != targetType {
@@ -112,66 +112,83 @@ func (g *Graphy) GatherRequestVariables(parsedCall Wrapper) (map[string]RequestV
 		// TODO: Dive into the result filter and find variables there.
 
 		// Depth first search into the result filter.
-		if command.ResultFilter != nil {
-			ftl := MakeTypeFieldLookup(processor.returnType)
-			for _, field := range command.ResultFilter.Fields {
-				if pf, ok := ftl[field.Name]; ok {
-					var commandField *ResultField
-					for _, resultField := range command.ResultFilter.Fields {
-						if resultField.Name == field.Name {
-							commandField = &resultField
-							break
-						}
-					}
-					if commandField == nil {
-						// Todo: Warning?
-						continue
-					}
-					// Todo: handle union types
-					if pf.fieldType == FieldTypeField {
-						ftl = MakeTypeFieldLookup(pf.resultType)
-						// Recurse
-					} else if pf.fieldType == FieldTypeGraphFunction {
-						gf := pf.graphFunction
-						paramIndex := 1 // Skip the first parameter which is the receiver.
-
-						if commandField.Params != nil {
-							for _, cfp := range commandField.Params.Values {
-								if cfp.Value.Variable != nil {
-									varName := *cfp.Value.Variable
-									// Strip the leading $ from the variable name.
-									varName = varName[1:]
-
-									var targetType reflect.Type
-									if gf.mode == AnonymousParamsInline {
-										targetType = gf.function.Type().In(paramIndex)
-										paramIndex++
-									} else {
-										targetType = gf.nameMapping[cfp.Name].paramType
-									}
-
-									if existingVariable, found := variableTypeMap[varName]; found {
-										if existingVariable.Type != targetType {
-											return nil, fmt.Errorf("variable %s is used with different types", varName)
-										}
-									} else {
-										variableTypeMap[varName] = RequestVariable{
-											Name: varName,
-											Type: targetType,
-										}
-									}
-								}
-							}
-						}
-						// Recurse
-					}
-				} else {
-					return nil, fmt.Errorf("unknown field %s", field.Name)
-				}
-			}
+		err := g.addFunctionVariables(graphFunc.returnType, command.ResultFilter, variableTypeMap)
+		if err != nil {
+			return nil, err
 		}
 	}
 	return variableTypeMap, nil
+}
+
+func (g *Graphy) addFunctionVariables(typ reflect.Type, filter *ResultFilter, variableTypeMap map[string]RequestVariable) error {
+
+	if filter == nil {
+		return nil
+	}
+
+	ftl := MakeTypeFieldLookup(typ)
+	for _, field := range filter.Fields {
+		if pf, ok := ftl[field.Name]; ok {
+			var commandField *ResultField
+			for _, resultField := range filter.Fields {
+				if resultField.Name == field.Name {
+					commandField = &resultField
+					break
+				}
+			}
+			if commandField == nil {
+				// Todo: Warning?
+				continue
+			}
+			// Todo: handle union types
+			var childType TypeLookup
+			if pf.fieldType == FieldTypeField {
+				childType = g.TypeLookup(pf.resultType)
+				// Recurse
+			} else if pf.fieldType == FieldTypeGraphFunction {
+				gf := pf.graphFunction
+				childType = g.TypeLookup(gf.returnType)
+				paramIndex := 1 // Skip the first parameter which is the receiver.
+
+				if commandField.Params != nil {
+					for _, cfp := range commandField.Params.Values {
+						if cfp.Value.Variable != nil {
+							varName := *cfp.Value.Variable
+							// Strip the leading $ from the variable name.
+							varName = varName[1:]
+
+							var targetType reflect.Type
+							if gf.mode == AnonymousParamsInline {
+								targetType = gf.function.Type().In(paramIndex)
+								paramIndex++
+							} else {
+								targetType = gf.nameMapping[cfp.Name].paramType
+							}
+
+							if existingVariable, found := variableTypeMap[varName]; found {
+								if existingVariable.Type != targetType {
+									return fmt.Errorf("variable %s is used with different types", varName)
+								}
+							} else {
+								variableTypeMap[varName] = RequestVariable{
+									Name: varName,
+									Type: targetType,
+								}
+							}
+						}
+					}
+				}
+			}
+
+			if childType != nil {
+				// Recurse
+
+			}
+		} else {
+			return fmt.Errorf("unknown field %s", field.Name)
+		}
+	}
+	return nil
 }
 
 // NewRequest creates a new request from a request stub and a JSON string representing the variables used in the request.

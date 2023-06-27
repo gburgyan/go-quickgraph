@@ -48,4 +48,14 @@ func (g *Graphy) ProcessRequest(ctx context.Context, request string, variableJso
 	return newRequest.Execute(ctx)
 }
 
+func (g *Graphy) TypeLookup(typ reflect.Type) TypeLookup {
+	if typ.Kind() == reflect.Ptr {
+		typ = typ.Elem()
+	}
+	if typ.Kind() == reflect.Struct {
+		return MakeTypeFieldLookup(typ)
+	}
+	return nil
+}
+
 // TODO: Generate the schema from the registered processors.

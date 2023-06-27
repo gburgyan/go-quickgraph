@@ -112,7 +112,8 @@ func (g *Graphy) GatherRequestVariables(parsedCall Wrapper) (map[string]RequestV
 		// TODO: Dive into the result filter and find variables there.
 
 		// Depth first search into the result filter.
-		err := g.addFunctionVariables(graphFunc.returnType, command.ResultFilter, variableTypeMap)
+		typeLookup := g.TypeLookup(graphFunc.returnType)
+		err := g.addTypeVariables(typeLookup, command.ResultFilter, variableTypeMap)
 		if err != nil {
 			return nil, err
 		}
@@ -120,15 +121,14 @@ func (g *Graphy) GatherRequestVariables(parsedCall Wrapper) (map[string]RequestV
 	return variableTypeMap, nil
 }
 
-func (g *Graphy) addFunctionVariables(typ reflect.Type, filter *ResultFilter, variableTypeMap map[string]RequestVariable) error {
+func (g *Graphy) addTypeVariables(typ TypeLookup, filter *ResultFilter, variableTypeMap map[string]RequestVariable) error {
 
 	if filter == nil {
 		return nil
 	}
 
-	ftl := MakeTypeFieldLookup(typ)
 	for _, field := range filter.Fields {
-		if pf, ok := ftl[field.Name]; ok {
+		if pf, ok := typ[field.Name]; ok {
 			var commandField *ResultField
 			for _, resultField := range filter.Fields {
 				if resultField.Name == field.Name {
@@ -182,7 +182,10 @@ func (g *Graphy) addFunctionVariables(typ reflect.Type, filter *ResultFilter, va
 
 			if childType != nil {
 				// Recurse
-
+				err := g.addTypeVariables(childType, field.SubParts, variableTypeMap)
+				if err != nil {
+					return err
+				}
 			}
 		} else {
 			return fmt.Errorf("unknown field %s", field.Name)

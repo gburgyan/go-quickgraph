@@ -3,10 +3,13 @@ package quickgraph
 import (
 	"context"
 	"reflect"
+	"sync"
 )
 
 type Graphy struct {
-	processors map[string]GraphFunction
+	processors  map[string]GraphFunction
+	typeLookups map[reflect.Type]*TypeLookup
+	m           sync.Mutex
 }
 
 var contextType = reflect.TypeOf((*context.Context)(nil)).Elem()
@@ -48,12 +51,25 @@ func (g *Graphy) ProcessRequest(ctx context.Context, request string, variableJso
 	return newRequest.Execute(ctx)
 }
 
-func (g *Graphy) TypeLookup(typ reflect.Type) TypeLookup {
+func (g *Graphy) TypeLookup(typ reflect.Type) *TypeLookup {
+	g.m.Lock()
+	defer g.m.Unlock()
+
+	if g.typeLookups == nil {
+		g.typeLookups = map[reflect.Type]*TypeLookup{}
+	}
+
+	if tl, ok := g.typeLookups[typ]; ok {
+		return tl
+	}
+
 	if typ.Kind() == reflect.Ptr {
 		typ = typ.Elem()
 	}
 	if typ.Kind() == reflect.Struct {
-		return MakeTypeFieldLookup(typ)
+		tl := MakeTypeFieldLookup(typ)
+		g.typeLookups[typ] = tl
+		return tl
 	}
 	return nil
 }

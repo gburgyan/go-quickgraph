@@ -102,7 +102,7 @@ func (f *GraphFunction) processOutputStruct(ctx context.Context, req *Request, f
 		if field.Name == "__typename" {
 			r[field.Name] = typeName
 		} else {
-			if fieldInfo, ok := fieldMap[field.Name]; ok {
+			if fieldInfo, ok := fieldMap.fields[field.Name]; ok {
 				fieldAny, err := fieldInfo.Fetch(ctx, req, reflect.ValueOf(anyStruct), field.Params)
 				if err != nil {
 					return nil, err

@@ -106,7 +106,6 @@ func isValidGraphFunction(graphFunc reflect.Value, method bool) bool {
 
 	// Check the function type.
 	mft := graphFunc.Type()
-	fmt.Printf("Mft type: %s\n", mft.Kind())
 	if mft.Kind() != reflect.Func {
 		return false
 	}
@@ -173,6 +172,7 @@ func NewGraphFunction(name string, graphFunc any, method bool) GraphFunction {
 	var funcTyp reflect.Type
 	var funcVal reflect.Value
 
+	// Todo: This feels awkward. Is there a better way to do this?
 	if rVal, ok := graphFunc.(reflect.Value); ok {
 		funcVal = rVal
 		funcTyp = funcVal.Type()
@@ -181,8 +181,8 @@ func NewGraphFunction(name string, graphFunc any, method bool) GraphFunction {
 		funcTyp = funcVal.Type()
 	}
 
-	if funcTyp.Kind() != reflect.Func {
-		panic("graphFunc must be a function")
+	if !isValidGraphFunction(funcVal, method) {
+		panic("not valid graph function")
 	}
 
 	startParam := 0

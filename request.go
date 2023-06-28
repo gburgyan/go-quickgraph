@@ -121,14 +121,14 @@ func (g *Graphy) GatherRequestVariables(parsedCall Wrapper) (map[string]RequestV
 	return variableTypeMap, nil
 }
 
-func (g *Graphy) addTypeVariables(typ TypeLookup, filter *ResultFilter, variableTypeMap map[string]RequestVariable) error {
+func (g *Graphy) addTypeVariables(typ *TypeLookup, filter *ResultFilter, variableTypeMap map[string]RequestVariable) error {
 
 	if filter == nil {
 		return nil
 	}
 
 	for _, field := range filter.Fields {
-		if pf, ok := typ[field.Name]; ok {
+		if pf, ok := typ.fields[field.Name]; ok {
 			var commandField *ResultField
 			for _, resultField := range filter.Fields {
 				if resultField.Name == field.Name {
@@ -141,7 +141,7 @@ func (g *Graphy) addTypeVariables(typ TypeLookup, filter *ResultFilter, variable
 				continue
 			}
 			// Todo: handle union types
-			var childType TypeLookup
+			var childType *TypeLookup
 			if pf.fieldType == FieldTypeField {
 				childType = g.TypeLookup(pf.resultType)
 				// Recurse

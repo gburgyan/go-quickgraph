@@ -303,6 +303,16 @@ func parseIdentifierIntoValue(identifier string, value reflect.Value) error {
 		}
 		value.Set(reflect.ValueOf(val))
 		return nil
+	} else if value.Kind() == reflect.Bool {
+		// If the value is a bool, set it.
+		if identifier == "true" {
+			value.SetBool(true)
+		} else if identifier == "false" {
+			value.SetBool(false)
+		} else {
+			return fmt.Errorf("cannot unmarshal identifier %s into type: %v", identifier, value.Type())
+		}
+		return nil
 	} else if value.Kind() == reflect.String {
 		// If the value is a string, set it.
 		value.SetString(identifier)

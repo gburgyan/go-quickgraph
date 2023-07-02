@@ -148,35 +148,10 @@ func (g *Graphy) addTypeVariables(typ *TypeLookup, filter *ResultFilter, variabl
 			} else if pf.fieldType == FieldTypeGraphFunction {
 				gf := pf.graphFunction
 				childType = g.TypeLookup(gf.returnType)
-				paramIndex := 1 // Skip the first parameter which is the receiver.
 
-				if commandField.Params != nil {
-					for _, cfp := range commandField.Params.Values {
-						if cfp.Value.Variable != nil {
-							varName := *cfp.Value.Variable
-							// Strip the leading $ from the variable name.
-							varName = varName[1:]
-
-							var targetType reflect.Type
-							if gf.mode == AnonymousParamsInline {
-								targetType = gf.function.Type().In(paramIndex)
-								paramIndex++
-							} else {
-								targetType = gf.nameMapping[cfp.Name].paramType
-							}
-
-							if existingVariable, found := variableTypeMap[varName]; found {
-								if existingVariable.Type != targetType {
-									return fmt.Errorf("variable %s is used with different types", varName)
-								}
-							} else {
-								variableTypeMap[varName] = RequestVariable{
-									Name: varName,
-									Type: targetType,
-								}
-							}
-						}
-					}
+				err := g.validateGraphFunctionParameters(commandField, gf, variableTypeMap)
+				if err != nil {
+					return err
 				}
 			}
 
@@ -189,6 +164,106 @@ func (g *Graphy) addTypeVariables(typ *TypeLookup, filter *ResultFilter, variabl
 			}
 		} else {
 			return fmt.Errorf("unknown field %s", field.Name)
+		}
+	}
+	return nil
+}
+
+func (g *Graphy) validateGraphFunctionParameters(commandField *ResultField, gf *GraphFunction, variableTypeMap map[string]RequestVariable) error {
+	// Validate the parameters.
+	switch gf.mode {
+	case AnonymousParamsInline:
+		return g.validateAnonymousFunctionParams(commandField, gf, variableTypeMap)
+	case NamedParamsStruct:
+		return g.validateNamedFunctionParams(commandField, gf, variableTypeMap)
+	default:
+		return fmt.Errorf("unknown function mode %d", gf.mode)
+	}
+}
+
+func (g *Graphy) validateAnonymousFunctionParams(commandField *ResultField, gf *GraphFunction, variableTypeMap map[string]RequestVariable) error {
+	// Ensure that the number of parameters is correct.
+	if commandField.Params == nil && gf.function.Type().NumIn() != 1 {
+		return fmt.Errorf("missing parameters")
+	}
+	paramCount := 0
+	if commandField.Params != nil {
+		paramCount = len(commandField.Params.Values)
+	}
+	if paramCount != gf.function.Type().NumIn()-1 {
+		return fmt.Errorf("wrong number of parameters")
+	}
+	paramIndex := 1 // Skip the first parameter which is the receiver.
+	if commandField.Params == nil {
+		return nil
+	}
+	for _, cfp := range commandField.Params.Values {
+		targetType := gf.function.Type().In(paramIndex)
+		paramIndex++
+
+		// Ensure that the parameter is the correct type.
+		if cfp.Value.Variable != nil {
+			varName := *cfp.Value.Variable
+			// Strip the leading $ from the variable name.
+			varName = varName[1:]
+
+			err := g.validateFunctionVarParam(variableTypeMap, varName, targetType)
+			if err != nil {
+				return err
+			}
+		}
+		// Todo: Consider parsing, validating, and caching the value for value types. The
+		// special consideration that is needed is that pointers to objects are
+		// allowed -- and we have to ensure that objects that are cached are not
+		// changed between calls. Short-term, we can just not cache value types.
+	}
+	return nil
+}
+
+func (g *Graphy) validateNamedFunctionParams(commandField *ResultField, gf *GraphFunction, variableTypeMap map[string]RequestVariable) error {
+	neededField := map[string]bool{}
+	for _, param := range gf.nameMapping {
+		neededField[param.name] = true
+	}
+
+	for _, cfp := range commandField.Params.Values {
+		targetType := gf.nameMapping[cfp.Name].paramType
+
+		if cfp.Value.Variable != nil {
+			varName := *cfp.Value.Variable
+			// Strip the leading $ from the variable name.
+			varName = varName[1:]
+
+			err := g.validateFunctionVarParam(variableTypeMap, varName, targetType)
+			if err != nil {
+				return err
+			}
+		}
+		// Todo: Consider parsing, validating, and caching the value for value types. The
+		// special consideration that is needed is that pointers to objects are
+		// allowed -- and we have to ensure that objects that are cached are not
+		// changed between calls. Short-term, we can just not cache value types.
+	}
+
+	// Ensure that all parameters are present.
+	for name, val := range neededField {
+		if val == true {
+			return fmt.Errorf("missing parameter %s", name)
+		}
+	}
+
+	return nil
+}
+
+func (g *Graphy) validateFunctionVarParam(variableTypeMap map[string]RequestVariable, varName string, targetType reflect.Type) error {
+	if existingVariable, found := variableTypeMap[varName]; found {
+		if existingVariable.Type != targetType {
+			return fmt.Errorf("variable %s is used with different types", varName)
+		}
+	} else {
+		variableTypeMap[varName] = RequestVariable{
+			Name: varName,
+			Type: targetType,
 		}
 	}
 	return nil

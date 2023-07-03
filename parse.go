@@ -26,6 +26,7 @@ type VariableDef struct {
 type Command struct {
 	Alias        *string        `(@Ident ":")?`
 	Name         string         `@Ident`
+	Directives   []Directive    `@@*`
 	Parameters   *ParameterList `"(" @@ ")"?`
 	ResultFilter *ResultFilter  `("{" @@ "}")?`
 }
@@ -70,12 +71,18 @@ type UnionLookup struct {
 	Fields   *ResultFilter `@@* "}"`
 }
 
+type Directive struct {
+	Name       string         `@Directive`
+	Parameters *ParameterList `"(" @@ ")"?`
+}
+
 var (
 	graphQLLexer = lexer.MustSimple([]lexer.SimpleRule{
 		{"TypeLookup", `\.\.\.\W*on`},
 		{"Ident", `[a-zA-Z_]\w*`},
 		//{"TypeName", `[a-zA-Z]\w*`},
 		{"Variable", `\$[a-zA-Z]\w*`},
+		{"Directive", `@[a-zA-Z]\w*`},
 		{"String", `"(([^"])|\\\")*"`},
 		{"Float", `(\d*\.)?\d+`},
 		{"Int", `\d+`},

@@ -99,24 +99,26 @@ func (f *GraphFunction) processOutputStruct(ctx context.Context, req *Request, f
 		if field.Name == "__typename" {
 			r[field.Name] = typeName
 		} else {
-			if fieldInfo, ok := fieldMap.fields[field.Name]; ok {
-				// Todo: Check for directives. Either here or in Fetch.
-				fieldAny, err := fieldInfo.Fetch(ctx, req, reflect.ValueOf(anyStruct), field.Params)
+			fieldInfo, ok := fieldMap.fields[field.Name]
+			if !ok {
+				// TODO: Is this an error?
+				continue
+			}
+			// Todo: Check for directives. Either here or in Fetch.
+
+			fieldAny, err := fieldInfo.Fetch(ctx, req, reflect.ValueOf(anyStruct), field.Params)
+			if err != nil {
+				return nil, err
+			}
+			if field.SubParts != nil {
+				fieldVal := reflect.ValueOf(fieldAny)
+				subPart, err := f.processCallOutput(ctx, req, field.SubParts, fieldVal)
 				if err != nil {
 					return nil, err
 				}
-				if field.SubParts != nil {
-					fieldVal := reflect.ValueOf(fieldAny)
-					subPart, err := f.processCallOutput(ctx, req, field.SubParts, fieldVal)
-					if err != nil {
-						return nil, err
-					}
-					r[field.Name] = subPart
-				} else {
-					r[field.Name] = fieldAny
-				}
+				r[field.Name] = subPart
 			} else {
-				// TODO: Is this an error?
+				r[field.Name] = fieldAny
 			}
 		}
 	}

@@ -26,7 +26,6 @@ type VariableDef struct {
 type Command struct {
 	Alias        *string        `(@Ident ":")?`
 	Name         string         `@Ident`
-	Directives   []Directive    `@@*`
 	Parameters   *ParameterList `"(" @@ ")"?`
 	ResultFilter *ResultFilter  `("{" @@ "}")?`
 }
@@ -61,9 +60,10 @@ type ResultFilter struct {
 
 // ResultField is a field in the result to be returned.
 type ResultField struct {
-	Name     string         `@Ident`
-	Params   *ParameterList `("(" @@ ")")?`
-	SubParts *ResultFilter  `("{" @@ "}")?`
+	Name       string         `@Ident`
+	Params     *ParameterList `("(" @@ ")")?`
+	Directives []Directive    `@@*`
+	SubParts   *ResultFilter  `("{" @@ "}")?`
 }
 
 type UnionLookup struct {

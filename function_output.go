@@ -23,6 +23,7 @@ func (f *GraphFunction) processCallOutput(ctx context.Context, req *Request, fil
 		callResult = callResult.Elem()
 		kind = callResult.Kind() // Update the kind
 	}
+
 	if kind == reflect.Slice {
 		if !callResult.IsNil() {
 			var retVal []any
@@ -37,7 +38,6 @@ func (f *GraphFunction) processCallOutput(ctx context.Context, req *Request, fil
 			}
 			return retVal, nil
 		}
-
 	} else if kind == reflect.Map {
 		// TODO: Handle maps?
 		return nil, fmt.Errorf("return of map type not supported")
@@ -78,9 +78,6 @@ func (f *GraphFunction) processOutputStruct(ctx context.Context, req *Request, f
 		return nil, err
 	}
 
-	// Create map of field names, as specified by the json tag or field name, to index.
-	// This is used to map the fields in the struct to the fields in the result.
-	// TODO: Cache this.
 	t := reflect.TypeOf(anyStruct)
 	typeName := t.Name()
 	fieldMap := MakeTypeFieldLookup(t)
@@ -103,6 +100,7 @@ func (f *GraphFunction) processOutputStruct(ctx context.Context, req *Request, f
 			r[field.Name] = typeName
 		} else {
 			if fieldInfo, ok := fieldMap.fields[field.Name]; ok {
+				// Todo: Check for directives. Either here or in Fetch.
 				fieldAny, err := fieldInfo.Fetch(ctx, req, reflect.ValueOf(anyStruct), field.Params)
 				if err != nil {
 					return nil, err

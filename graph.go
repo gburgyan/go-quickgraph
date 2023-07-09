@@ -63,6 +63,9 @@ func (g *Graphy) TypeLookup(typ reflect.Type) *TypeLookup {
 		return tl
 	}
 
+	if typ.Kind() == reflect.Slice {
+		typ = typ.Elem()
+	}
 	if typ.Kind() == reflect.Ptr {
 		typ = typ.Elem()
 	}

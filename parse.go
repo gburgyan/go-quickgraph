@@ -26,7 +26,7 @@ type VariableDef struct {
 type Command struct {
 	Alias        *string        `(@Ident ":")?`
 	Name         string         `@Ident`
-	Parameters   *ParameterList `"(" @@ ")"?`
+	Parameters   *ParameterList `("(" @@ ")")?`
 	ResultFilter *ResultFilter  `("{" @@ "}")?`
 }
 
@@ -73,7 +73,7 @@ type UnionLookup struct {
 
 type Directive struct {
 	Name       string         `@Directive`
-	Parameters *ParameterList `"(" @@ ")"?`
+	Parameters *ParameterList `("(" @@ ")")?`
 }
 
 var (
@@ -86,12 +86,13 @@ var (
 		{"String", `"(([^"])|\\\")*"`},
 		{"Float", `(\d*\.)?\d+`},
 		{"Int", `\d+`},
+		{"Comment", `#[^\n]*`},
 		{"Punct", `[-[!@#$%^&*()+_={}\|:;"'<,>.?/]|]`},
 		{"Whitespace", `[ \t\n\r]+`},
 	})
 	parser = participle.MustBuild[Wrapper](
 		participle.Lexer(graphQLLexer),
-		participle.Elide("Whitespace"),
+		participle.Elide("Whitespace", "Comment"),
 		participle.UseLookahead(2),
 	)
 )

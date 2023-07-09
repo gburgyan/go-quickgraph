@@ -61,17 +61,20 @@ func (f *GraphFunction) getCallParamsNamedInline(ctx context.Context, req *Reque
 	}
 
 	parsedParams := params
-	for _, param := range parsedParams.Values {
-		if nameMapping, ok := f.nameMapping[param.Name]; ok {
-			val := reflect.New(nameMapping.paramType).Elem()
-			err := parseInputIntoValue(req, param.Value, val)
-			if err != nil {
-				return nil, err
+	if parsedParams != nil {
+		for _, param := range parsedParams.Values {
+			if nameMapping, ok := f.nameMapping[param.Name]; ok {
+				val := reflect.New(nameMapping.paramType).Elem()
+				err := parseInputIntoValue(req, param.Value, val)
+				if err != nil {
+					return nil, err
+				}
+				paramValues[nameMapping.paramIndex] = val
+				delete(requiredParams, param.Name)
 			}
-			paramValues[nameMapping.paramIndex] = val
-			delete(requiredParams, param.Name)
 		}
 	}
+
 	if len(requiredParams) > 0 {
 		missingParams := []string{}
 		for paramName := range requiredParams {
@@ -194,9 +197,9 @@ func (f *GraphFunction) getCallParamsNamedStruct(ctx context.Context, req *Reque
 func parseInputIntoValue(req *Request, inValue GenericValue, targetValue reflect.Value) (err error) {
 	// Catch panics and return them as errors.
 	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("panic: %v", r)
-		}
+		//if r := recover(); r != nil {
+		//	err = fmt.Errorf("panic: %v", r)
+		//}
 	}()
 
 	if inValue.Variable != nil {
@@ -286,10 +289,12 @@ func parseFloatIntoValue(f float64, targetValue reflect.Value) {
 // parseIdentifierIntoValue attempts to interpret an identifier and assign its corresponding value to targetValue. It supports
 // EnumUnmarshaler interface and strings. Returns an error if it cannot unmarshal the identifier.
 func parseIdentifierIntoValue(identifier string, value reflect.Value) error {
+	// TODO: This doesn't handle pointers to values well -- it should.
 	if value.Kind() == reflect.Ptr {
 		// If the value is a pointer, dereference it.
 		value = value.Elem()
 	}
+
 	// Make a pointer to the value type in case the receiver is a pointer.
 	valueType := value.Type()
 	valuePtr := reflect.New(valueType)
@@ -303,7 +308,9 @@ func parseIdentifierIntoValue(identifier string, value reflect.Value) error {
 		}
 		value.Set(reflect.ValueOf(val))
 		return nil
-	} else if value.Kind() == reflect.Bool {
+	}
+
+	if value.Kind() == reflect.Bool {
 		// If the value is a bool, set it.
 		if identifier == "true" {
 			value.SetBool(true)
@@ -313,11 +320,14 @@ func parseIdentifierIntoValue(identifier string, value reflect.Value) error {
 			return fmt.Errorf("cannot unmarshal identifier %s into type: %v", identifier, value.Type())
 		}
 		return nil
-	} else if value.Kind() == reflect.String {
+	}
+
+	if value.Kind() == reflect.String {
 		// If the value is a string, set it.
 		value.SetString(identifier)
 		return nil
 	}
+
 	return fmt.Errorf("cannot unmarshal identifier %s into type: %v", identifier, value.Type())
 }
 

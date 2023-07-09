@@ -19,7 +19,7 @@ func (e MyEnum) String() string {
 	return string(e)
 }
 
-func (e MyEnum) UnmarshalString(input string) (interface{}, error) {
+func (e *MyEnum) UnmarshalString(input string) (interface{}, error) {
 	switch input {
 	case "EnumVal1":
 		return EnumVal1, nil

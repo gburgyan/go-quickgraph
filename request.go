@@ -128,6 +128,16 @@ func (g *Graphy) addTypeVariables(typ *TypeLookup, filter *ResultFilter, variabl
 	}
 
 	for _, field := range filter.Fields {
+		if typ == nil {
+			return fmt.Errorf("type is nil")
+		}
+		if typ.fields == nil {
+			return fmt.Errorf("type has no fields")
+		}
+		if field.Name == "__typename" {
+			// This is a virtual field that is always present.
+			continue
+		}
 		if pf, ok := typ.fields[field.Name]; ok {
 			var commandField *ResultField
 			for _, resultField := range filter.Fields {
@@ -183,6 +193,7 @@ func (g *Graphy) validateGraphFunctionParameters(commandField *ResultField, gf *
 
 func (g *Graphy) validateAnonymousFunctionParams(commandField *ResultField, gf *GraphFunction, variableTypeMap map[string]RequestVariable) error {
 	// Ensure that the number of parameters is correct.
+	// TODO: If the parameters are all pointers, then they are optional.
 	if commandField.Params == nil && gf.function.Type().NumIn() != 1 {
 		return fmt.Errorf("missing parameters")
 	}

@@ -108,15 +108,23 @@ func (f *GraphFunction) getCallParamsAnonymousInline(ctx context.Context, req *R
 			continue
 		} else {
 			// This is a normal parameter, fill it in from the command.
-			if normalParamCount >= len(params.Values) {
-				return nil, fmt.Errorf("too many parameters provided %d", normalParamCount)
-			}
 			val := reflect.New(gft.In(i)).Elem()
-			err := parseInputIntoValue(req, params.Values[normalParamCount].Value, val)
-			if err != nil {
-				return nil, err
-			}
 			paramValues[i] = val
+
+			if params == nil {
+				if val.Type().Kind() != reflect.Ptr {
+					return nil, fmt.Errorf("missing parameter in function")
+				}
+			} else {
+				if normalParamCount >= len(params.Values) {
+					return nil, fmt.Errorf("too many parameters provided %d", normalParamCount)
+				}
+				err := parseInputIntoValue(req, params.Values[normalParamCount].Value, val)
+				if err != nil {
+					return nil, err
+				}
+			}
+
 		}
 		normalParamCount++
 	}
@@ -289,46 +297,71 @@ func parseFloatIntoValue(f float64, targetValue reflect.Value) {
 // parseIdentifierIntoValue attempts to interpret an identifier and assign its corresponding value to targetValue. It supports
 // EnumUnmarshaler interface and strings. Returns an error if it cannot unmarshal the identifier.
 func parseIdentifierIntoValue(identifier string, value reflect.Value) error {
-	// TODO: This doesn't handle pointers to values well -- it should.
-	if value.Kind() == reflect.Ptr {
-		// If the value is a pointer, dereference it.
-		value = value.Elem()
+
+	done, err := unmarshalWithEnumUnmarshaler(identifier, value)
+	if done {
+		return err
 	}
 
-	// Make a pointer to the value type in case the receiver is a pointer.
-	valueType := value.Type()
-	valuePtr := reflect.New(valueType)
-
-	if ok := valuePtr.CanConvert(enumUnmarshalerType); ok {
-		// If it supports the EnumUnmarshaler interface, use that.
-		enumUnmarshaler := valuePtr.Convert(enumUnmarshalerType).Interface().(EnumUnmarshaler)
-		val, err := enumUnmarshaler.UnmarshalString(identifier)
-		if err != nil {
-			return err
-		}
-		value.Set(reflect.ValueOf(val))
-		return nil
+	ptr := false
+	kind := value.Kind()
+	if kind == reflect.Ptr {
+		kind = value.Type().Elem().Kind()
+		ptr = true
 	}
 
-	if value.Kind() == reflect.Bool {
+	if kind == reflect.Bool {
 		// If the value is a bool, set it.
+		var b bool
 		if identifier == "true" {
-			value.SetBool(true)
+			b = true
 		} else if identifier == "false" {
-			value.SetBool(false)
+			b = false
 		} else {
 			return fmt.Errorf("cannot unmarshal identifier %s into type: %v", identifier, value.Type())
 		}
+		if ptr {
+			value.Set(reflect.ValueOf(&b))
+		} else {
+			value.SetBool(b)
+		}
 		return nil
 	}
 
-	if value.Kind() == reflect.String {
+	if kind == reflect.String {
 		// If the value is a string, set it.
-		value.SetString(identifier)
+		if ptr {
+			value.Set(reflect.ValueOf(&identifier))
+		} else {
+			value.SetString(identifier)
+		}
 		return nil
 	}
 
 	return fmt.Errorf("cannot unmarshal identifier %s into type: %v", identifier, value.Type())
+}
+
+func unmarshalWithEnumUnmarshaler(identifier string, value reflect.Value) (bool, error) {
+	// Make a pointer to the value type in case the receiver is a pointer.
+	interfaceVal := value
+	valueType := interfaceVal.Type()
+	if interfaceVal.Kind() == reflect.Ptr {
+		// If the value is a pointer, dereference it.
+		valueType = interfaceVal.Type().Elem()
+		interfaceVal = interfaceVal.Elem()
+	}
+	destinationVal := reflect.New(valueType)
+	if ok := value.CanConvert(enumUnmarshalerType); ok {
+		// If it supports the EnumUnmarshaler interface, use that.
+		enumUnmarshaler := destinationVal.Convert(enumUnmarshalerType).Interface().(EnumUnmarshaler)
+		val, err := enumUnmarshaler.UnmarshalString(identifier)
+		if err != nil {
+			return true, err
+		}
+		interfaceVal.Set(reflect.ValueOf(val))
+		return true, nil
+	}
+	return false, nil
 }
 
 // parseListIntoValue assigns a list of GenericValues to targetValue. Each item in the list is parsed into a value and assigned

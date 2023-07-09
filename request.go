@@ -194,8 +194,20 @@ func (g *Graphy) validateGraphFunctionParameters(commandField *ResultField, gf *
 func (g *Graphy) validateAnonymousFunctionParams(commandField *ResultField, gf *GraphFunction, variableTypeMap map[string]RequestVariable) error {
 	// Ensure that the number of parameters is correct.
 	// TODO: If the parameters are all pointers, then they are optional.
+
 	if commandField.Params == nil && gf.function.Type().NumIn() != 1 {
-		return fmt.Errorf("missing parameters")
+		// If all of the parameters are pointers, then they are optional and we're OK.
+		allOptional := true
+		for i := 1; i < gf.function.Type().NumIn(); i++ {
+			if gf.function.Type().In(i).Kind() != reflect.Ptr {
+				allOptional = false
+				break
+			}
+		}
+		if !allOptional {
+			return fmt.Errorf("missing parameters")
+		}
+		return nil
 	}
 	paramCount := 0
 	if commandField.Params != nil {

@@ -32,8 +32,11 @@ func roundToPrecision(number float64, precision int) float64 {
 	return math.Round(number*scale) / scale
 }
 
-func (h *human) Height(units string) float64 {
-	if units == "FOOT" {
+func (h *human) Height(units *string) float64 {
+	if units == nil {
+		return h.HeightMeters
+	}
+	if *units == "FOOT" {
 		return roundToPrecision(h.HeightMeters*3.28084, 7)
 	}
 	return h.HeightMeters
@@ -140,7 +143,7 @@ func TestArguments(t *testing.T) {
 {
   human(id: "1000") {
     name
-    Height(unit: METER)
+    Height
   }
 }`
 

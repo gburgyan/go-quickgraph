@@ -137,29 +137,27 @@ func TestArguments(t *testing.T) {
 	g := Graphy{}
 	g.RegisterProcessorWithParamNames(ctx, "human", getHumanProvider, "id")
 
-	// TODO: input to Height should be optional
-	// TODO: The "Height" function should have a way to call with lower case.
 	input := `
 {
   human(id: "1000") {
     name
-    Height
+    height
   }
 }`
 
 	resultAny, err := g.ProcessRequest(ctx, input, "")
 	assert.NoError(t, err)
-	assert.Equal(t, `{"data":{"human":{"Height":1.72,"name":"Luke Skywalker"}}}`, resultAny)
+	assert.Equal(t, `{"data":{"human":{"height":1.72,"name":"Luke Skywalker"}}}`, resultAny)
 
 	input = `
 {
   human(id: "1000") {
     name
-    Height(unit: FOOT)
+    height(unit: FOOT)
   }
 }`
 
 	resultAny, err = g.ProcessRequest(ctx, input, "")
 	assert.NoError(t, err)
-	assert.Equal(t, `{"data":{"human":{"Height":5.6430448,"name":"Luke Skywalker"}}}`, resultAny)
+	assert.Equal(t, `{"data":{"human":{"height":5.6430448,"name":"Luke Skywalker"}}}`, resultAny)
 }

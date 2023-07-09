@@ -138,7 +138,7 @@ func (g *Graphy) addTypeVariables(typ *TypeLookup, filter *ResultFilter, variabl
 			// This is a virtual field that is always present.
 			continue
 		}
-		if pf, ok := typ.fields[field.Name]; ok {
+		if pf, ok := typ.GetField(field.Name); ok {
 			var commandField *ResultField
 			for _, resultField := range filter.Fields {
 				if resultField.Name == field.Name {

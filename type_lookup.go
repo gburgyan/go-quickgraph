@@ -23,7 +23,16 @@ type FieldLookup struct {
 }
 
 type TypeLookup struct {
-	fields map[string]FieldLookup
+	fields          map[string]FieldLookup
+	fieldsLowercase map[string]FieldLookup
+}
+
+func (tl *TypeLookup) GetField(name string) (FieldLookup, bool) {
+	result, ok := tl.fields[name]
+	if !ok {
+		result, ok = tl.fieldsLowercase[strings.ToLower(name)]
+	}
+	return result, ok
 }
 
 // MakeTypeFieldLookup creates a lookup of fields for a given type. It performs
@@ -34,7 +43,8 @@ func MakeTypeFieldLookup(typ reflect.Type) *TypeLookup {
 	// Include the anonymous fields in this search and treat them as if
 	// they were part of the current type in a flattened manner.
 	result := &TypeLookup{
-		fields: make(map[string]FieldLookup),
+		fields:          make(map[string]FieldLookup),
+		fieldsLowercase: map[string]FieldLookup{},
 	}
 	processFieldLookup(typ, nil, result)
 	return result
@@ -83,6 +93,11 @@ func processFieldLookup(typ reflect.Type, prevIndex []int, tl *TypeLookup) {
 				fieldType:    FieldTypeField,
 			}
 			tl.fields[fieldName] = tfl
+			// If the lowercase version of the field name is not already in the map,
+			// add it.
+			if _, ok := tl.fieldsLowercase[strings.ToLower(fieldName)]; !ok {
+				tl.fieldsLowercase[strings.ToLower(fieldName)] = tfl
+			}
 		}
 	}
 
@@ -137,6 +152,11 @@ func addGraphMethodsForType(typ reflect.Type, tl *TypeLookup) {
 				graphFunction: &gf,
 			}
 			tl.fields[m.Name] = tfl
+			// If the lowercase version of the field name is not already in the map,
+			// add it.
+			if _, ok := tl.fieldsLowercase[strings.ToLower(m.Name)]; !ok {
+				tl.fieldsLowercase[strings.ToLower(m.Name)] = tfl
+			}
 		}
 	}
 }

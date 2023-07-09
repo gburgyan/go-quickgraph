@@ -44,6 +44,9 @@ func MakeTypeFieldLookup(typ reflect.Type) *TypeLookup {
 // a given type, populating the result map with field lookups. It takes into account JSON
 // tags for naming and field exclusion.
 func processFieldLookup(typ reflect.Type, prevIndex []int, tl *TypeLookup) {
+	// List of functions to process for the anonymous fields.
+	var deferredAnonymous []func()
+
 	for i := 0; i < typ.NumField(); i++ {
 		field := typ.Field(i)
 		// If there's a json tag on the field, use that for the name of the field.
@@ -68,7 +71,10 @@ func processFieldLookup(typ reflect.Type, prevIndex []int, tl *TypeLookup) {
 		}
 		index := append(prevIndex, i)
 		if field.Anonymous {
-			processFieldLookup(field.Type, index, tl)
+			// Queue up the anonymous field for processing later.
+			deferredAnonymous = append(deferredAnonymous, func() {
+				processFieldLookup(field.Type, index, tl)
+			})
 		} else {
 			tfl := FieldLookup{
 				name:         fieldName,
@@ -79,8 +85,6 @@ func processFieldLookup(typ reflect.Type, prevIndex []int, tl *TypeLookup) {
 			tl.fields[fieldName] = tfl
 		}
 	}
-
-	// TODO: Handle functions as well as those can fulfil parameterized calls.
 
 	// A function is more complicated. In all cases a function may take a context
 	// parameter and must return some concrete type. The function may also return an
@@ -100,6 +104,11 @@ func processFieldLookup(typ reflect.Type, prevIndex []int, tl *TypeLookup) {
 	} else if typ.Kind() == reflect.Ptr {
 		typ = typ.Elem()
 		addGraphMethodsForType(typ, tl)
+	}
+
+	// Process the anonymous fields.
+	for _, fn := range deferredAnonymous {
+		fn()
 	}
 }
 

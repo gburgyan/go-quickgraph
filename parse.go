@@ -18,8 +18,9 @@ type OperationName struct {
 }
 
 type VariableDef struct {
-	Name string `@Variable ":"`
-	Type string `"["? @Ident "!"? "]"? "!"?`
+	Name  string       `@Variable ":"`
+	Type  string       `"["? @Ident "!"? "]"? "!"?`
+	Value GenericValue `("=" @@)?`
 }
 
 // Command is a GraphQL command. This will be "query" or "mutation".

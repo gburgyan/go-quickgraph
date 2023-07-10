@@ -211,6 +211,9 @@ func parseInputIntoValue(req *Request, inValue GenericValue, targetValue reflect
 	}()
 
 	if inValue.Variable != nil {
+		if req == nil {
+			return fmt.Errorf("variable %s provided but no request", *inValue.Variable)
+		}
 		// Strip the $ from the variable name.
 		variableName := (*inValue.Variable)[1:]
 		err = parseVariableIntoValue(req, variableName, targetValue)

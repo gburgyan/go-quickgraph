@@ -21,14 +21,15 @@ type RequestStub struct {
 	Graphy    *Graphy
 	Mode      RequestType
 	Commands  []Command
-	Variables map[string]RequestVariable
+	Variables map[string]*RequestVariable
 	Fragments map[string]Fragment
 }
 
 // RequestVariable represents a variable in a GraphQL-like request. It contains the variable name and its type.
 type RequestVariable struct {
-	Name string
-	Type reflect.Type
+	Name    string
+	Type    reflect.Type
+	Default *GenericValue
 }
 
 // Request represents a complete GraphQL-like request. It contains the Graphy instance, the request stub,
@@ -82,14 +83,14 @@ func (g *Graphy) NewRequestStub(request string) (*RequestStub, error) {
 
 // GatherRequestVariables gathers and validates the variables used in a GraphQL request.
 // It ensures that the variables used across different commands are of the same type.
-func (g *Graphy) GatherRequestVariables(parsedCall Wrapper) (map[string]RequestVariable, error) {
+func (g *Graphy) GatherRequestVariables(parsedCall Wrapper) (map[string]*RequestVariable, error) {
 	// TODO: Look at the parsed arguments, find their types, then later verify that
 	// they are correct.
 
 	// Find the commands in the request that use variables, extract the types
 	// of the variables, and convert the variables to the correct type. Ensure that
 	// there is consistency with the types in case two commands use the same variable.
-	variableTypeMap := map[string]RequestVariable{}
+	variableTypeMap := map[string]*RequestVariable{}
 	for _, command := range parsedCall.Commands {
 		graphFunc, ok := g.processors[command.Name]
 		if !ok {
@@ -100,7 +101,7 @@ func (g *Graphy) GatherRequestVariables(parsedCall Wrapper) (map[string]RequestV
 			for _, parameter := range command.Parameters.Values {
 				if parameter.Value.Variable != nil {
 					varName := *parameter.Value.Variable
-					// String the leading $ from the variable name.
+					// Strip the leading $ from the variable name.
 					varName = varName[1:]
 					paramTarget := graphFunc.nameMapping[parameter.Name]
 					targetType := paramTarget.paramType
@@ -109,7 +110,7 @@ func (g *Graphy) GatherRequestVariables(parsedCall Wrapper) (map[string]RequestV
 							return nil, fmt.Errorf("variable %s is used with different types", varName)
 						}
 					} else {
-						variableTypeMap[varName] = RequestVariable{
+						variableTypeMap[varName] = &RequestVariable{
 							Name: varName,
 							Type: targetType,
 						}
@@ -120,17 +121,39 @@ func (g *Graphy) GatherRequestVariables(parsedCall Wrapper) (map[string]RequestV
 
 		// TODO: Dive into the result filter and find variables there.
 
-		// Depth first search into the result filter.
+		// Depth-first search into the result filter.
 		typeLookup := g.TypeLookup(graphFunc.returnType)
 		err := g.addTypeVariables(typeLookup, command.ResultFilter, variableTypeMap)
 		if err != nil {
 			return nil, err
 		}
 	}
+
+	if parsedCall.OperationDef != nil {
+		// Ensure that all the variables used in the operation definition are present.
+		opVars := map[string]VariableDef{}
+		for _, variable := range parsedCall.OperationDef.Variables {
+			// Trim off the leading $.
+			name := variable.Name[1:]
+			variable := variable
+			opVars[name] = variable
+		}
+
+		for key, variable := range variableTypeMap {
+			if reqVar, found := opVars[variable.Name]; found {
+				// TODO: Validate the variable type.
+				variableTypeMap[key].Default = reqVar.Value
+				variable.Default = reqVar.Value
+			} else {
+				return nil, fmt.Errorf("variable %s is not defined in the operation", variable.Name)
+			}
+		}
+	}
+
 	return variableTypeMap, nil
 }
 
-func (g *Graphy) addTypeVariables(typ *TypeLookup, filter *ResultFilter, variableTypeMap map[string]RequestVariable) error {
+func (g *Graphy) addTypeVariables(typ *TypeLookup, filter *ResultFilter, variableTypeMap map[string]*RequestVariable) error {
 
 	if filter == nil {
 		return nil
@@ -141,6 +164,7 @@ func (g *Graphy) addTypeVariables(typ *TypeLookup, filter *ResultFilter, variabl
 			return fmt.Errorf("type is nil")
 		}
 		if typ.fields == nil {
+			// TODO: Is this needed?
 			return fmt.Errorf("type has no fields")
 		}
 		if field.Name == "__typename" {
@@ -159,7 +183,7 @@ func (g *Graphy) addTypeVariables(typ *TypeLookup, filter *ResultFilter, variabl
 				// Todo: Warning?
 				continue
 			}
-			// Todo: handle union types
+			// Todo: handle fragment types
 			var childType *TypeLookup
 			if pf.fieldType == FieldTypeField {
 				childType = g.TypeLookup(pf.resultType)
@@ -188,7 +212,7 @@ func (g *Graphy) addTypeVariables(typ *TypeLookup, filter *ResultFilter, variabl
 	return nil
 }
 
-func (g *Graphy) validateGraphFunctionParameters(commandField *ResultField, gf *GraphFunction, variableTypeMap map[string]RequestVariable) error {
+func (g *Graphy) validateGraphFunctionParameters(commandField *ResultField, gf *GraphFunction, variableTypeMap map[string]*RequestVariable) error {
 	// Validate the parameters.
 	switch gf.mode {
 	case AnonymousParamsInline:
@@ -200,7 +224,7 @@ func (g *Graphy) validateGraphFunctionParameters(commandField *ResultField, gf *
 	}
 }
 
-func (g *Graphy) validateAnonymousFunctionParams(commandField *ResultField, gf *GraphFunction, variableTypeMap map[string]RequestVariable) error {
+func (g *Graphy) validateAnonymousFunctionParams(commandField *ResultField, gf *GraphFunction, variableTypeMap map[string]*RequestVariable) error {
 	// Ensure that the number of parameters is correct.
 	// TODO: If the parameters are all pointers, then they are optional.
 
@@ -252,7 +276,7 @@ func (g *Graphy) validateAnonymousFunctionParams(commandField *ResultField, gf *
 	return nil
 }
 
-func (g *Graphy) validateNamedFunctionParams(commandField *ResultField, gf *GraphFunction, variableTypeMap map[string]RequestVariable) error {
+func (g *Graphy) validateNamedFunctionParams(commandField *ResultField, gf *GraphFunction, variableTypeMap map[string]*RequestVariable) error {
 	neededField := map[string]bool{}
 	for _, param := range gf.nameMapping {
 		neededField[param.name] = true
@@ -287,13 +311,13 @@ func (g *Graphy) validateNamedFunctionParams(commandField *ResultField, gf *Grap
 	return nil
 }
 
-func (g *Graphy) validateFunctionVarParam(variableTypeMap map[string]RequestVariable, varName string, targetType reflect.Type) error {
+func (g *Graphy) validateFunctionVarParam(variableTypeMap map[string]*RequestVariable, varName string, targetType reflect.Type) error {
 	if existingVariable, found := variableTypeMap[varName]; found {
 		if existingVariable.Type != targetType {
 			return fmt.Errorf("variable %s is used with different types", varName)
 		}
 	} else {
-		variableTypeMap[varName] = RequestVariable{
+		variableTypeMap[varName] = &RequestVariable{
 			Name: varName,
 			Type: targetType,
 		}
@@ -317,16 +341,21 @@ func (rs *RequestStub) NewRequest(variableJson string) (*Request, error) {
 	for varName, variable := range rs.Variables {
 		// Get the RawMessage for the variable. Create a new instance of the variable type using reflection.
 		// Then unmarshal the variable from JSON.
-		variableJson, found := rawVariables[varName]
-		if !found {
+		variableValue := reflect.New(variable.Type)
+		if variableJson, found := rawVariables[varName]; found {
+			err := json.Unmarshal(variableJson, variableValue.Interface())
+			if err != nil {
+				return nil, fmt.Errorf("variable %s into type %s: %s", varName, variable.Type.Name(), err)
+			}
+			variables[varName] = variableValue.Elem()
+		} else if variable.Default != nil {
+			err := parseInputIntoValue(nil, *variable.Default, variableValue.Elem())
+			if err != nil {
+				return nil, fmt.Errorf("variable %s into type %s: %s", varName, variable.Type.Name(), err)
+			}
+		} else {
 			return nil, fmt.Errorf("variable %s not provided", varName)
 		}
-		variableValue := reflect.New(variable.Type)
-		err := json.Unmarshal(variableJson, variableValue.Interface())
-		if err != nil {
-			return nil, fmt.Errorf("variable %s into type %s: %s", varName, variable.Type.Name(), err)
-		}
-		variables[varName] = variableValue.Elem()
 	}
 
 	return &Request{

@@ -7,21 +7,21 @@ import (
 
 // Wrapper is the top-level GraphQL wrapper.
 type Wrapper struct {
-	Mode      string         `@Ident?`
-	Variables *OperationName `@@?`
-	Commands  []Command      `( "{" @@+ "}" )+`
-	Fragments []Fragment     `(FragmentToken @@)*`
+	Mode         string        `@Ident?`
+	OperationDef *OperationDef `@@?`
+	Commands     []Command     `( "{" @@+ "}" )+`
+	Fragments    []Fragment    `(FragmentToken @@)*`
 }
 
-type OperationName struct {
+type OperationDef struct {
 	Name      string        `@Ident`
 	Variables []VariableDef `("(" @@ ("," @@)* ")")?`
 }
 
 type VariableDef struct {
-	Name  string       `@Variable ":"`
-	Type  string       `"["? @Ident "!"? "]"? "!"?`
-	Value GenericValue `("=" @@)?`
+	Name  string        `@Variable ":"`
+	Type  string        `"["? @Ident "!"? "]"? "!"?`
+	Value *GenericValue `("=" @@)?`
 }
 
 // Command is a GraphQL command. This will be "query" or "mutation."

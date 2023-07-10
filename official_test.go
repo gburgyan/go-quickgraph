@@ -259,3 +259,42 @@ fragment comparisonFields on Character {
 	assert.NoError(t, err)
 	assert.Equal(t, `{"data":{"leftComparison":{"appearsIn":["NEWHOPE","EMPIRE","JEDI"],"friends":[{"name":"Han Solo"},{"name":"Leia Organa"},{"name":"C-3PO"},{"name":"R2-D2"}],"name":"Luke Skywalker"},"rightComparison":{"appearsIn":["NEWHOPE","EMPIRE","JEDI"],"friends":[{"name":"Luke Skywalker"},{"name":"Han Solo"},{"name":"Leia Organa"}],"name":"R2-D2"}}}`, resultAny)
 }
+
+func TestVariableDefaultValue(t *testing.T) {
+	var h = Character{
+		Name: "R2-D2",
+		Friends: []*Character{
+			{
+				Name: "Luke Skywalker",
+			},
+			{
+				Name: "Han Solo",
+			},
+			{
+				Name: "Leia Organa",
+			},
+		},
+	}
+
+	heroProvider := func(ctx context.Context, ep episode) *Character {
+		return &h
+	}
+
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterProcessorWithParamNames(ctx, "hero", heroProvider, "episode")
+
+	input := `
+query HeroNameAndFriends($episode: Episode = JEDI) {
+  hero(episode: $episode) {
+    name
+    friends {
+      name
+    }
+  }
+}`
+
+	resultAny, err := g.ProcessRequest(ctx, input, "")
+	assert.NoError(t, err)
+	assert.Equal(t, `{"data":{"hero":{"friends":[{"name":"Luke Skywalker"},{"name":"Han Solo"},{"name":"Leia Organa"}],"name":"R2-D2"}}}`, resultAny)
+}

@@ -276,7 +276,7 @@ func TestVariableDefaultValue(t *testing.T) {
 		},
 	}
 
-	heroProvider := func(ctx context.Context, ep episode) *Character {
+	heroProvider := func(ctx context.Context, ep string) *Character {
 		return &h
 	}
 

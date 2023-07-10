@@ -331,7 +331,8 @@ func parseIdentifierIntoValue(identifier string, value reflect.Value) error {
 		return nil
 	}
 
-	if kind == reflect.String {
+	stringType := reflect.TypeOf("")
+	if value.Type() == stringType {
 		// If the value is a string, set it.
 		if ptr {
 			value.Set(reflect.ValueOf(&identifier))
@@ -339,6 +340,14 @@ func parseIdentifierIntoValue(identifier string, value reflect.Value) error {
 			value.SetString(identifier)
 		}
 		return nil
+	} else {
+		strValue := reflect.New(value.Type()).Elem()
+		if ptr {
+			strValue.Set(reflect.ValueOf(&identifier))
+		} else {
+			strValue.SetString(identifier)
+		}
+		value.Set(strValue)
 	}
 
 	return fmt.Errorf("cannot unmarshal identifier %s into type: %v", identifier, value.Type())

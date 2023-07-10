@@ -18,6 +18,11 @@ func (f *GraphFunction) processCallOutput(ctx context.Context, req *Request, fil
 		return nil, fmt.Errorf("error calling function: %v", callResult.Convert(errorType).Interface().(error))
 	}
 
+	if kind == reflect.Interface {
+		callResult = callResult.Elem()
+		kind = callResult.Kind()
+	}
+
 	if (kind == reflect.Pointer) && !callResult.IsNil() {
 		// If this is a pointer, dereference it.
 		callResult = callResult.Elem()
@@ -86,9 +91,15 @@ func (f *GraphFunction) processOutputStruct(ctx context.Context, req *Request, f
 	for _, field := range filter.Fields {
 		fieldsToProcess = append(fieldsToProcess, field)
 	}
-	for _, union := range filter.UnionLookup {
-		if union.TypeName == typeName {
-			for _, field := range union.Fields.Fields {
+	for _, fragmentCall := range filter.Fragments {
+		var f *FragmentDef
+		if fragmentCall.Inline != nil {
+			f = fragmentCall.Inline
+		} else if fragmentCall.FragmentRef != nil {
+			f = req.Stub.Fragments[*fragmentCall.FragmentRef].Definition
+		}
+		if fieldMap.ImplementsInterface(f.TypeName) {
+			for _, field := range f.Filter.Fields {
 				fieldsToProcess = append(fieldsToProcess, field)
 			}
 		}

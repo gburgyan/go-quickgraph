@@ -7,11 +7,11 @@ import (
 	"testing"
 )
 
-type character struct {
-	Id        string      `json:"id"`
-	Name      string      `json:"name"`
-	Friends   []character `json:"friends"`
-	AppearsIn []episode   `json:"appearsIn"`
+type Character struct {
+	Id        string       `json:"id"`
+	Name      string       `json:"name"`
+	Friends   []*Character `json:"friends"`
+	AppearsIn []episode    `json:"appearsIn"`
 }
 
 type episode string
@@ -22,9 +22,14 @@ const (
 	Jedi    episode = "JEDI"
 )
 
-type human struct {
-	character
+type Human struct {
+	Character
 	HeightMeters float64 `json:"HeightMeters"`
+}
+
+type Droid struct {
+	Character
+	PrimaryFunction string `json:"primaryFunction"`
 }
 
 func roundToPrecision(number float64, precision int) float64 {
@@ -32,7 +37,7 @@ func roundToPrecision(number float64, precision int) float64 {
 	return math.Round(number*scale) / scale
 }
 
-func (h *human) Height(units *string) float64 {
+func (h *Human) Height(units *string) float64 {
 	if units == nil {
 		return h.HeightMeters
 	}
@@ -43,11 +48,11 @@ func (h *human) Height(units *string) float64 {
 }
 
 func TestSimpleFields1(t *testing.T) {
-	var h = character{
+	var h = Character{
 		Name: "R2-D2",
 	}
 
-	heroProvider := func(ctx context.Context) *character {
+	heroProvider := func(ctx context.Context) *Character {
 		return &h
 	}
 
@@ -69,9 +74,9 @@ func TestSimpleFields1(t *testing.T) {
 }
 
 func TestSimpleFields2(t *testing.T) {
-	var h = character{
+	var h = Character{
 		Name: "R2-D2",
-		Friends: []character{
+		Friends: []*Character{
 			{
 				Name: "Luke Skywalker",
 			},
@@ -84,7 +89,7 @@ func TestSimpleFields2(t *testing.T) {
 		},
 	}
 
-	heroProvider := func(ctx context.Context) *character {
+	heroProvider := func(ctx context.Context) *Character {
 		return &h
 	}
 
@@ -122,24 +127,24 @@ func TestSimpleFields2(t *testing.T) {
 }
 
 func TestArguments(t *testing.T) {
-	var h = human{
-		character: character{
+	var h = Human{
+		Character: Character{
 			Name: "Luke Skywalker",
 		},
 		HeightMeters: 1.72,
 	}
 
-	getHumanProvider := func(ctx context.Context, id string) *human {
+	getHumanProvider := func(ctx context.Context, id string) *Human {
 		return &h
 	}
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessorWithParamNames(ctx, "human", getHumanProvider, "id")
+	g.RegisterProcessorWithParamNames(ctx, "Human", getHumanProvider, "id")
 
 	input := `
 {
-  human(id: "1000") {
+  Human(id: "1000") {
     name
     height
   }
@@ -147,11 +152,11 @@ func TestArguments(t *testing.T) {
 
 	resultAny, err := g.ProcessRequest(ctx, input, "")
 	assert.NoError(t, err)
-	assert.Equal(t, `{"data":{"human":{"height":1.72,"name":"Luke Skywalker"}}}`, resultAny)
+	assert.Equal(t, `{"data":{"Human":{"height":1.72,"name":"Luke Skywalker"}}}`, resultAny)
 
 	input = `
 {
-  human(id: "1000") {
+  Human(id: "1000") {
     name
     height(unit: FOOT)
   }
@@ -159,5 +164,98 @@ func TestArguments(t *testing.T) {
 
 	resultAny, err = g.ProcessRequest(ctx, input, "")
 	assert.NoError(t, err)
-	assert.Equal(t, `{"data":{"human":{"height":5.6430448,"name":"Luke Skywalker"}}}`, resultAny)
+	assert.Equal(t, `{"data":{"Human":{"height":5.6430448,"name":"Luke Skywalker"}}}`, resultAny)
+}
+
+func TestFragments1(t *testing.T) {
+	var luke = Human{
+		Character: Character{
+			Name: "Luke Skywalker",
+			AppearsIn: []episode{
+				NewHope,
+				Empire,
+				Jedi,
+			},
+			Friends: []*Character{
+				{
+					Name: "Han Solo",
+				},
+				{
+					Name: "Leia Organa",
+				},
+				{
+					Name: "C-3PO",
+				},
+				{
+					Name: "R2-D2",
+				},
+			},
+		},
+	}
+
+	var r2d2 = Droid{
+		Character: Character{
+			Name: "R2-D2",
+			AppearsIn: []episode{
+				NewHope,
+				Empire,
+				Jedi,
+			},
+			Friends: []*Character{
+				{
+					Name: "Luke Skywalker",
+				},
+				{
+					Name: "Han Solo",
+				},
+				{
+					Name: "Leia Organa",
+				},
+			},
+		},
+	}
+
+	getHumanProvider := func(ctx context.Context, ep episode) any {
+		if ep == Empire {
+			return &luke
+		} else if ep == Jedi {
+			return &r2d2
+		}
+		return nil
+	}
+
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterProcessorWithParamNames(ctx, "hero", getHumanProvider, "episode")
+
+	//	input := `
+	//{
+	//  hero() {
+	//    field
+	//  }
+	//}
+	//
+	//`
+
+	input := `
+{
+  leftComparison: hero(episode: EMPIRE) {
+    ...comparisonFields
+  }
+  rightComparison: hero(episode: JEDI) {
+    ...comparisonFields
+  }
+}
+
+fragment comparisonFields on Character {
+  name
+  appearsIn
+  friends {
+    name
+  }
+}`
+
+	resultAny, err := g.ProcessRequest(ctx, input, "")
+	assert.NoError(t, err)
+	assert.Equal(t, `{"data":{"leftComparison":{"appearsIn":["NEWHOPE","EMPIRE","JEDI"],"friends":[{"name":"Han Solo"},{"name":"Leia Organa"},{"name":"C-3PO"},{"name":"R2-D2"}],"name":"Luke Skywalker"},"rightComparison":{"appearsIn":["NEWHOPE","EMPIRE","JEDI"],"friends":[{"name":"Luke Skywalker"},{"name":"Han Solo"},{"name":"Leia Organa"}],"name":"R2-D2"}}}`, resultAny)
 }

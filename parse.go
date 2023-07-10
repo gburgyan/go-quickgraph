@@ -9,7 +9,8 @@ import (
 type Wrapper struct {
 	Mode      string         `@Ident?`
 	Variables *OperationName `@@?`
-	Commands  []Command      `"{" @@+ "}"`
+	Commands  []Command      `( "{" @@+ "}" )+`
+	Fragments []Fragment     `(FragmentToken @@)*`
 }
 
 type OperationName struct {
@@ -23,7 +24,7 @@ type VariableDef struct {
 	Value GenericValue `("=" @@)?`
 }
 
-// Command is a GraphQL command. This will be "query" or "mutation".
+// Command is a GraphQL command. This will be "query" or "mutation."
 type Command struct {
 	Alias        *string        `(@Ident ":")?`
 	Name         string         `@Ident`
@@ -55,8 +56,8 @@ type GenericValue struct {
 
 // ResultFilter is a filter for the result.
 type ResultFilter struct {
-	Fields      []ResultField `@@+`
-	UnionLookup []UnionLookup `(TypeLookup @@)*`
+	Fields    []ResultField  `@@*`
+	Fragments []FragmentCall `(FragmentStart @@)*`
 }
 
 // ResultField is a field in the result to be returned.
@@ -67,9 +68,19 @@ type ResultField struct {
 	SubParts   *ResultFilter  `("{" @@ "}")?`
 }
 
-type UnionLookup struct {
-	TypeName string        `@Ident "{"`
-	Fields   *ResultFilter `@@* "}"`
+type FragmentCall struct {
+	Inline      *FragmentDef `@@`
+	FragmentRef *string      `| @Ident `
+}
+
+type Fragment struct {
+	Name       string       `@Ident`
+	Definition *FragmentDef `@@`
+}
+
+type FragmentDef struct {
+	TypeName string        `"on" @Ident`
+	Filter   *ResultFilter `"{" @@ "}"`
 }
 
 type Directive struct {
@@ -79,7 +90,8 @@ type Directive struct {
 
 var (
 	graphQLLexer = lexer.MustSimple([]lexer.SimpleRule{
-		{"TypeLookup", `\.\.\.\W*on`},
+		{"FragmentStart", `\.\.\.`},
+		{"FragmentToken", `fragment`},
 		{"Ident", `[a-zA-Z_]\w*`},
 		//{"TypeName", `[a-zA-Z]\w*`},
 		{"Variable", `\$[a-zA-Z]\w*`},

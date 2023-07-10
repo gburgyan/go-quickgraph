@@ -23,8 +23,10 @@ type FieldLookup struct {
 }
 
 type TypeLookup struct {
-	fields          map[string]FieldLookup
-	fieldsLowercase map[string]FieldLookup
+	fields              map[string]FieldLookup
+	fieldsLowercase     map[string]FieldLookup
+	implements          map[string]bool
+	implementsLowercase map[string]bool
 }
 
 func (tl *TypeLookup) GetField(name string) (FieldLookup, bool) {
@@ -35,6 +37,11 @@ func (tl *TypeLookup) GetField(name string) (FieldLookup, bool) {
 	return result, ok
 }
 
+func (tl *TypeLookup) ImplementsInterface(name string) bool {
+	_, found := tl.implementsLowercase[strings.ToLower(name)]
+	return found
+}
+
 // MakeTypeFieldLookup creates a lookup of fields for a given type. It performs
 // a depth-first search of the type, including anonymous fields. It creates the lookup
 // using either the json tag name or the field name.
@@ -43,8 +50,10 @@ func MakeTypeFieldLookup(typ reflect.Type) *TypeLookup {
 	// Include the anonymous fields in this search and treat them as if
 	// they were part of the current type in a flattened manner.
 	result := &TypeLookup{
-		fields:          make(map[string]FieldLookup),
-		fieldsLowercase: map[string]FieldLookup{},
+		fields:              make(map[string]FieldLookup),
+		fieldsLowercase:     map[string]FieldLookup{},
+		implements:          map[string]bool{},
+		implementsLowercase: map[string]bool{},
 	}
 	processFieldLookup(typ, nil, result)
 	return result
@@ -85,6 +94,10 @@ func processFieldLookup(typ reflect.Type, prevIndex []int, tl *TypeLookup) {
 			deferredAnonymous = append(deferredAnonymous, func() {
 				processFieldLookup(field.Type, index, tl)
 			})
+			// Get the name of the type of the field.
+			name := field.Type.Name()
+			tl.implements[name] = true
+			tl.implementsLowercase[strings.ToLower(name)] = true
 		} else {
 			tfl := FieldLookup{
 				name:         fieldName,

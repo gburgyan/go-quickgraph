@@ -22,6 +22,7 @@ type RequestStub struct {
 	Mode      RequestType
 	Commands  []Command
 	Variables map[string]RequestVariable
+	Fragments map[string]Fragment
 }
 
 // RequestVariable represents a variable in a GraphQL-like request. It contains the variable name and its type.
@@ -47,6 +48,13 @@ func (g *Graphy) NewRequestStub(request string) (*RequestStub, error) {
 		return nil, err
 	}
 
+	fragments := map[string]Fragment{}
+	for _, fragment := range parsedCall.Fragments {
+		// TODO: Validate the fragments.
+		fragments[fragment.Name] = fragment
+	}
+
+	// TODO: Use the fragments in the variable gathering.
 	variableTypeMap, err := g.GatherRequestVariables(parsedCall)
 	if err != nil {
 		return nil, err
@@ -56,6 +64,7 @@ func (g *Graphy) NewRequestStub(request string) (*RequestStub, error) {
 		Graphy:    g,
 		Commands:  parsedCall.Commands,
 		Variables: variableTypeMap,
+		Fragments: fragments,
 	}
 
 	switch parsedCall.Mode {
@@ -330,30 +339,31 @@ func (rs *RequestStub) NewRequest(variableJson string) (*Request, error) {
 // Execute executes a GraphQL request. It looks up the appropriate processor for each command and invokes it.
 // It returns the result of the request as a JSON string.
 func (r *Request) Execute(ctx context.Context) (string, error) {
-	// TODO: Deal with all commands.
-	command := r.Stub.Commands[0]
-
 	result := map[string]any{}
 	data := map[string]any{}
 	result["data"] = data
 
-	// TODO: In query mode, we can run all these in parallel.
-
-	// Find the processor
-	if processor, ok := r.Graphy.processors[command.Name]; ok {
-		obj, err := processor.Call(ctx, r, command.Parameters, reflect.Value{})
-		if err != nil {
-			return "", err
+	for _, command := range r.Stub.Commands {
+		// TODO: In query mode, we can run all these in parallel.
+		// Find the processor
+		if processor, ok := r.Graphy.processors[command.Name]; ok {
+			obj, err := processor.Call(ctx, r, command.Parameters, reflect.Value{})
+			if err != nil {
+				return "", err
+			}
+			res, err := processor.GenerateResult(ctx, r, obj, command.ResultFilter)
+			if err != nil {
+				return "", err
+			}
+			name := command.Name
+			if command.Alias != nil {
+				name = *command.Alias
+			}
+			data[name] = res
+		} else {
+			// TODO: Make this better
+			return "", fmt.Errorf("unknown command %s", command.Name)
 		}
-		res, err := processor.GenerateResult(ctx, r, obj, command.ResultFilter)
-		if err != nil {
-			return "", err
-		}
-		name := command.Name
-		if command.Alias != nil {
-			name = *command.Alias
-		}
-		data[name] = res
 	}
 
 	// Serialize the result to JSON.

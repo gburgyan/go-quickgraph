@@ -211,6 +211,9 @@ func parseInputIntoValue(req *Request, inValue GenericValue, targetValue reflect
 	}()
 
 	if inValue.Variable != nil {
+		if req == nil {
+			return fmt.Errorf("variable %s provided but no request", *inValue.Variable)
+		}
 		// Strip the $ from the variable name.
 		variableName := (*inValue.Variable)[1:]
 		err = parseVariableIntoValue(req, variableName, targetValue)
@@ -328,13 +331,23 @@ func parseIdentifierIntoValue(identifier string, value reflect.Value) error {
 		return nil
 	}
 
-	if kind == reflect.String {
+	stringType := reflect.TypeOf("")
+	if value.Type() == stringType {
 		// If the value is a string, set it.
 		if ptr {
 			value.Set(reflect.ValueOf(&identifier))
 		} else {
 			value.SetString(identifier)
 		}
+		return nil
+	} else {
+		strValue := reflect.New(value.Type()).Elem()
+		if ptr {
+			strValue.Set(reflect.ValueOf(&identifier))
+		} else {
+			strValue.SetString(identifier)
+		}
+		value.Set(strValue)
 		return nil
 	}
 

@@ -353,6 +353,7 @@ func (rs *RequestStub) NewRequest(variableJson string) (*Request, error) {
 			if err != nil {
 				return nil, fmt.Errorf("variable %s into type %s: %s", varName, variable.Type.Name(), err)
 			}
+			variables[varName] = variableValue.Elem()
 		} else {
 			return nil, fmt.Errorf("variable %s not provided", varName)
 		}

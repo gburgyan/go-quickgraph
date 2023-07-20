@@ -348,6 +348,7 @@ func parseIdentifierIntoValue(identifier string, value reflect.Value) error {
 			strValue.SetString(identifier)
 		}
 		value.Set(strValue)
+		return nil
 	}
 
 	return fmt.Errorf("cannot unmarshal identifier %s into type: %v", identifier, value.Type())

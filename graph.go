@@ -21,19 +21,19 @@ var anyType = reflect.TypeOf((*any)(nil)).Elem()
 
 func (g *Graphy) RegisterProcessorWithParamNames(ctx context.Context, name string, mutatorFunc any, names ...string) {
 	g.ensureInitialized()
-	gf := NewGraphFunctionWithNames(name, reflect.ValueOf(mutatorFunc), names...)
+	gf := g.NewGraphFunctionWithNames(name, reflect.ValueOf(mutatorFunc), names...)
 	g.processors[name] = gf
 }
 
 func (g *Graphy) RegisterProcessor(ctx context.Context, name string, mutatorFunc any) {
 	g.ensureInitialized()
-	gf := NewGraphFunction(name, mutatorFunc, false)
+	gf := g.NewGraphFunction(name, mutatorFunc, false)
 	g.processors[name] = gf
 }
 
 func (g *Graphy) RegisterAnyType(ctx context.Context, types ...any) {
 	for _, t := range types {
-		tl := MakeTypeFieldLookup(reflect.TypeOf(t))
+		tl := g.MakeTypeFieldLookup(reflect.TypeOf(t))
 		g.anyTypes = append(g.anyTypes, tl)
 	}
 }
@@ -80,7 +80,7 @@ func (g *Graphy) TypeLookup(typ reflect.Type) *TypeLookup {
 		typ = typ.Elem()
 	}
 	if typ.Kind() == reflect.Struct {
-		tl := MakeTypeFieldLookup(typ)
+		tl := g.MakeTypeFieldLookup(typ)
 		g.typeLookups[typ] = tl
 		return tl
 	}

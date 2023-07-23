@@ -15,6 +15,7 @@ const (
 )
 
 type GraphFunction struct {
+	g           *Graphy
 	name        string
 	mode        GraphFunctionMode
 	function    reflect.Value
@@ -36,13 +37,13 @@ type FunctionNameMapping struct {
 // type func and the names provided should match the count of parameters. It
 // panics if the function is not a func type, the number of names doesn't match
 // parameters, or if unsupported parameters like map are provided.
-func NewGraphFunctionWithNames(name string, graphFunc reflect.Value, names ...string) GraphFunction {
+func (g *Graphy) NewGraphFunctionWithNames(name string, graphFunc reflect.Value, names ...string) GraphFunction {
 	mft := graphFunc.Type()
 	if mft.Kind() != reflect.Func {
 		panic("graphFunc must be a func")
 	}
 
-	if !isValidGraphFunction(graphFunc, false) {
+	if !g.isValidGraphFunction(graphFunc, false) {
 		panic("not valid graph function")
 	}
 
@@ -89,6 +90,7 @@ func NewGraphFunctionWithNames(name string, graphFunc reflect.Value, names ...st
 	}
 
 	gf := GraphFunction{
+		g:           g,
 		name:        name,
 		function:    graphFunc,
 		nameMapping: nameMapping,
@@ -98,7 +100,7 @@ func NewGraphFunctionWithNames(name string, graphFunc reflect.Value, names ...st
 	return gf
 }
 
-func isValidGraphFunction(graphFunc reflect.Value, method bool) bool {
+func (g *Graphy) isValidGraphFunction(graphFunc reflect.Value, method bool) bool {
 	// A valid graph function must be a func type. It's inputs must be zero or more
 	// serializable types. If it's a method, the first parameter must be a pointer to
 	// a struct for the receiver. It may, optionally, take a context.Context
@@ -147,7 +149,7 @@ func isValidGraphFunction(graphFunc reflect.Value, method bool) bool {
 	return true
 }
 
-func NewGraphFunction(name string, graphFunc any, method bool) GraphFunction {
+func (g *Graphy) NewGraphFunction(name string, graphFunc any, method bool) GraphFunction {
 	// This form of the graph function needs to be able to figure out the params
 	// only from the function signature. This is tricky because Go doesn't have
 	// named parameters. To get around this, we can operate in two modes:
@@ -181,7 +183,7 @@ func NewGraphFunction(name string, graphFunc any, method bool) GraphFunction {
 		funcTyp = funcVal.Type()
 	}
 
-	if !isValidGraphFunction(funcVal, method) {
+	if !g.isValidGraphFunction(funcVal, method) {
 		panic("not valid graph function")
 	}
 
@@ -205,30 +207,31 @@ func NewGraphFunction(name string, graphFunc any, method bool) GraphFunction {
 		// This is fine -- this case is used primarily in result generation. If a field's
 		// output is expensive to get, it can be hidden behind a function to ensure it's
 		// only invoked if it is asked for.
-		return newAnonymousGraphFunction(name, funcVal, inputTypes, method)
+		return g.newAnonymousGraphFunction(name, funcVal, inputTypes, method)
 	} else if len(inputTypes) > 1 {
 		// We are in the case where there are multiple parameters. We will use the
 		// types of the parameters to create anonymous arguments.
 		// Invoke option 2
-		return newAnonymousGraphFunction(name, funcVal, inputTypes, method)
+		return g.newAnonymousGraphFunction(name, funcVal, inputTypes, method)
 	} else {
 		// A single parameter. We will use the name of the parameter if it is a
 		// struct, otherwise we will use an anonymous argument.
 		paramType := inputTypes[0]
 		if paramType.Kind() == reflect.Struct {
 			// Invoke option 1
-			return newStructGraphFunction(name, funcVal, paramType, method)
+			return g.newStructGraphFunction(name, funcVal, paramType, method)
 		}
-		return newAnonymousGraphFunction(name, funcVal, inputTypes, method)
+		return g.newAnonymousGraphFunction(name, funcVal, inputTypes, method)
 	}
 }
 
-func newAnonymousGraphFunction(name string, graphFunc reflect.Value, types []reflect.Type, method bool) GraphFunction {
+func (g *Graphy) newAnonymousGraphFunction(name string, graphFunc reflect.Value, types []reflect.Type, method bool) GraphFunction {
 	// We are in the case where there are multiple parameters. We will use the
 	// types of the parameters to create anonymous arguments. We won't have any named
 	// parameters as we don't have any names to use.
 
 	gf := GraphFunction{
+		g:        g,
 		name:     name,
 		mode:     AnonymousParamsInline,
 		function: graphFunc,
@@ -265,7 +268,7 @@ func newAnonymousGraphFunction(name string, graphFunc reflect.Value, types []ref
 	return gf
 }
 
-func newStructGraphFunction(name string, graphFunc reflect.Value, paramType reflect.Type, method bool) GraphFunction {
+func (g *Graphy) newStructGraphFunction(name string, graphFunc reflect.Value, paramType reflect.Type, method bool) GraphFunction {
 	// We are in the case where there is a single struct parameter. We will use
 	// the names of the struct fields as the parameter names.
 

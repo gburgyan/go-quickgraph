@@ -97,8 +97,10 @@ func (g *Graphy) TypeLookup(typ reflect.Type) *TypeLookup {
 			result.union[at.name] = at
 			result.unionLowercase[strings.ToLower(at.name)] = at
 		}
+		g.typeLookups[typ] = result
 		return result
 	}
+	g.typeLookups[typ] = nil
 	return nil
 }
 

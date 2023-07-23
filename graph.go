@@ -27,10 +27,24 @@ func (g *Graphy) RegisterProcessorWithParamNames(ctx context.Context, name strin
 
 func (g *Graphy) RegisterProcessor(ctx context.Context, name string, f any) {
 	g.ensureInitialized()
-	gf := g.newGraphFunction(name, f, false)
+	gf := g.newGraphFunction(FunctionDefinition{
+		Name:     name,
+		Function: f,
+	}, false)
 	g.processors[name] = gf
 }
 
+func (g *Graphy) RegisterFunction(ctx context.Context, def FunctionDefinition) {
+	g.ensureInitialized()
+	gf := g.newGraphFunction(def, false)
+	g.processors[def.Name] = gf
+}
+
+// RegisterAnyType registers a type that is potentially used as a return type for a function
+// that returns `any`. This isn't critical to use all cases, but it can be needed for results
+// that contain functions that can be called. Without this, those functions would not be
+// found -- this it needed to infer the types of parameters in cases those are fulfilled with
+// variables.
 func (g *Graphy) RegisterAnyType(ctx context.Context, types ...any) {
 	for _, t := range types {
 		tl := g.typeLookup(reflect.TypeOf(t))

@@ -59,7 +59,7 @@ func TestGraphFunction_Struct(t *testing.T) {
 	g := Graphy{}
 	g.RegisterProcessor(ctx, "f", f)
 
-	gf := g.newGraphFunction("f", f, false)
+	gf := g.newGraphFunction(FunctionDefinition{Name: "f", Function: f}, false)
 	assert.Equal(t, "f", gf.name)
 	assert.Equal(t, NamedParamsStruct, gf.mode)
 
@@ -87,7 +87,7 @@ func TestGraphFunction_Anonymous(t *testing.T) {
 	g := Graphy{}
 	g.RegisterProcessor(ctx, "f", f)
 
-	gf := g.newGraphFunction("f", f, false)
+	gf := g.newGraphFunction(FunctionDefinition{Name: "f", Function: f}, false)
 	assert.Equal(t, "f", gf.name)
 	assert.Equal(t, AnonymousParamsInline, gf.mode)
 
@@ -135,7 +135,7 @@ func TestGraphFunction_FuncReturn(t *testing.T) {
 	g := Graphy{}
 	g.RegisterProcessor(ctx, "f", f)
 
-	gf := g.newGraphFunction("f", f, false)
+	gf := g.newGraphFunction(FunctionDefinition{Name: "f", Function: f}, false)
 	assert.Equal(t, "f", gf.name)
 	assert.Equal(t, NamedParamsStruct, gf.mode)
 
@@ -163,7 +163,7 @@ func TestGraphFunction_PointerFuncReturn(t *testing.T) {
 	g := Graphy{}
 	g.RegisterProcessor(ctx, "f", f)
 
-	gf := g.newGraphFunction("f", f, false)
+	gf := g.newGraphFunction(FunctionDefinition{Name: "f", Function: f}, false)
 	assert.Equal(t, "f", gf.name)
 	assert.Equal(t, NamedParamsStruct, gf.mode)
 
@@ -191,7 +191,7 @@ func TestGraphFunction_FuncParamReturn(t *testing.T) {
 	g := Graphy{}
 	g.RegisterProcessor(ctx, "f", f)
 
-	gf := g.newGraphFunction("f", f, false)
+	gf := g.newGraphFunction(FunctionDefinition{Name: "f", Function: f}, false)
 	assert.Equal(t, "f", gf.name)
 	assert.Equal(t, NamedParamsStruct, gf.mode)
 
@@ -219,7 +219,7 @@ func TestGraphFunction_FuncVariableParamReturn(t *testing.T) {
 	g := Graphy{}
 	g.RegisterProcessor(ctx, "f", f)
 
-	gf := g.newGraphFunction("f", f, false)
+	gf := g.newGraphFunction(FunctionDefinition{Name: "f", Function: f}, false)
 	assert.Equal(t, "f", gf.name)
 	assert.Equal(t, NamedParamsStruct, gf.mode)
 

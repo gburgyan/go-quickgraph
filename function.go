@@ -14,6 +14,25 @@ const (
 	AnonymousParamsInline
 )
 
+type FunctionDefinition struct {
+	// Name is the name of the function.
+	// This is used to map the function to the GraphQL query.
+	Name string
+
+	// Function is the function to call.
+	Function any
+
+	// ParameterNames is a list of parameter names to use for the function. Since reflection
+	// doesn't provide parameter names, this is needed to map the parameters to the function.
+	// This is used when the function can have anonymous parameters otherwise.
+	ParameterNames []string
+
+	// ReturnAnyOverride is a list of types that may be returned as `any` when returned from
+	// the function. This is a function-specific override to the global `any` types that are
+	// on the base Graphy instance.
+	ReturnAnyOverride []any
+}
+
 type GraphFunction struct {
 	g           *Graphy
 	name        string
@@ -149,7 +168,7 @@ func (g *Graphy) isValidGraphFunction(graphFunc reflect.Value, method bool) bool
 	return true
 }
 
-func (g *Graphy) newGraphFunction(name string, graphFunc any, method bool) GraphFunction {
+func (g *Graphy) newGraphFunction(def FunctionDefinition, method bool) GraphFunction {
 	// This form of the graph function needs to be able to figure out the params
 	// only from the function signature. This is tricky because Go doesn't have
 	// named parameters. To get around this, we can operate in two modes:
@@ -175,11 +194,11 @@ func (g *Graphy) newGraphFunction(name string, graphFunc any, method bool) Graph
 	var funcVal reflect.Value
 
 	// Todo: This feels awkward. Is there a better way to do this?
-	if rVal, ok := graphFunc.(reflect.Value); ok {
+	if rVal, ok := def.Function.(reflect.Value); ok {
 		funcVal = rVal
 		funcTyp = funcVal.Type()
 	} else {
-		funcVal = reflect.ValueOf(graphFunc)
+		funcVal = reflect.ValueOf(def.Function)
 		funcTyp = funcVal.Type()
 	}
 
@@ -207,21 +226,21 @@ func (g *Graphy) newGraphFunction(name string, graphFunc any, method bool) Graph
 		// This is fine -- this case is used primarily in result generation. If a field's
 		// output is expensive to get, it can be hidden behind a function to ensure it's
 		// only invoked if it is asked for.
-		return g.newAnonymousGraphFunction(name, funcVal, inputTypes, method)
+		return g.newAnonymousGraphFunction(def.Name, funcVal, inputTypes, method)
 	} else if len(inputTypes) > 1 {
 		// We are in the case where there are multiple parameters. We will use the
 		// types of the parameters to create anonymous arguments.
 		// Invoke option 2
-		return g.newAnonymousGraphFunction(name, funcVal, inputTypes, method)
+		return g.newAnonymousGraphFunction(def.Name, funcVal, inputTypes, method)
 	} else {
 		// A single parameter. We will use the name of the parameter if it is a
 		// struct, otherwise we will use an anonymous argument.
 		paramType := inputTypes[0]
 		if paramType.Kind() == reflect.Struct {
 			// Invoke option 1
-			return g.newStructGraphFunction(name, funcVal, paramType, method)
+			return g.newStructGraphFunction(def.Name, funcVal, paramType, method)
 		}
-		return g.newAnonymousGraphFunction(name, funcVal, inputTypes, method)
+		return g.newAnonymousGraphFunction(def.Name, funcVal, inputTypes, method)
 	}
 }
 

@@ -212,7 +212,10 @@ func (g *Graphy) addGraphMethodsForType(typ reflect.Type, tl *TypeLookup) {
 
 		if g.isValidGraphFunction(m.Func, true) {
 			// Todo: Make this take a reflect.Type instead of an any.
-			gf := g.newGraphFunction(m.Name, m.Func, true)
+			gf := g.newGraphFunction(FunctionDefinition{
+				Name:     m.Name,
+				Function: m.Func,
+			}, true)
 			tfl := FieldLookup{
 				name:          m.Name,
 				resultType:    m.Type,

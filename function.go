@@ -20,7 +20,7 @@ type GraphFunction struct {
 	mode        GraphFunctionMode
 	function    reflect.Value
 	nameMapping map[string]FunctionNameMapping
-	returnType  reflect.Type
+	returnType  *TypeLookup
 	method      bool
 }
 
@@ -32,12 +32,12 @@ type FunctionNameMapping struct {
 	anonymousArgument bool
 }
 
-// NewGraphFunctionWithNames creates a new graph function given a name, function,
+// newGraphFunctionWithNames creates a new graph function given a name, function,
 // and an optional list of parameter names. The function provided must be of the
 // type func and the names provided should match the count of parameters. It
 // panics if the function is not a func type, the number of names doesn't match
 // parameters, or if unsupported parameters like map are provided.
-func (g *Graphy) NewGraphFunctionWithNames(name string, graphFunc reflect.Value, names ...string) GraphFunction {
+func (g *Graphy) newGraphFunctionWithNames(name string, graphFunc reflect.Value, names ...string) GraphFunction {
 	mft := graphFunc.Type()
 	if mft.Kind() != reflect.Func {
 		panic("graphFunc must be a func")
@@ -94,7 +94,7 @@ func (g *Graphy) NewGraphFunctionWithNames(name string, graphFunc reflect.Value,
 		name:        name,
 		function:    graphFunc,
 		nameMapping: nameMapping,
-		returnType:  returnType,
+		returnType:  g.typeLookup(returnType),
 		mode:        NamedParamsInline,
 	}
 	return gf
@@ -149,7 +149,7 @@ func (g *Graphy) isValidGraphFunction(graphFunc reflect.Value, method bool) bool
 	return true
 }
 
-func (g *Graphy) NewGraphFunction(name string, graphFunc any, method bool) GraphFunction {
+func (g *Graphy) newGraphFunction(name string, graphFunc any, method bool) GraphFunction {
 	// This form of the graph function needs to be able to figure out the params
 	// only from the function signature. This is tricky because Go doesn't have
 	// named parameters. To get around this, we can operate in two modes:
@@ -243,7 +243,7 @@ func (g *Graphy) newAnonymousGraphFunction(name string, graphFunc reflect.Value,
 	if err != nil {
 		panic(err)
 	}
-	gf.returnType = returnType
+	gf.returnType = g.typeLookup(returnType)
 
 	// Iterate over the parameters and create the anonymous arguments.
 	anonymousArgs := []FunctionNameMapping{}
@@ -273,6 +273,7 @@ func (g *Graphy) newStructGraphFunction(name string, graphFunc reflect.Value, pa
 	// the names of the struct fields as the parameter names.
 
 	gf := GraphFunction{
+		g:        g,
 		name:     name,
 		mode:     NamedParamsStruct,
 		function: graphFunc,
@@ -284,7 +285,7 @@ func (g *Graphy) newStructGraphFunction(name string, graphFunc reflect.Value, pa
 	if err != nil {
 		panic(err)
 	}
-	gf.returnType = returnType
+	gf.returnType = g.typeLookup(returnType)
 
 	// The parameter type must be a pointer to a struct. We will panic if it is
 	// not.

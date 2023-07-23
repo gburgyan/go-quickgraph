@@ -113,7 +113,7 @@ func (g *Graphy) GatherRequestVariables(parsedCall Wrapper, fragments map[string
 		}
 
 		// Depth-first search into the result filter.
-		typeLookup := g.TypeLookup(graphFunc.returnType)
+		typeLookup := graphFunc.returnType
 		// TODO: Dive into the result filter and find variables there.
 
 		err := g.addAndValidateResultVariables(typeLookup, command.ResultFilter, variableTypeMap, fragments)
@@ -195,11 +195,11 @@ func (g *Graphy) addAndValidateResultVariables(typ *TypeLookup, filter *ResultFi
 
 			var childType *TypeLookup
 			if pf.fieldType == FieldTypeField {
-				childType = g.TypeLookup(pf.resultType)
+				childType = g.typeLookup(pf.resultType)
 				// Recurse
 			} else if pf.fieldType == FieldTypeGraphFunction {
 				gf := pf.graphFunction
-				childType = g.TypeLookup(gf.returnType)
+				childType = gf.returnType
 
 				err := g.validateGraphFunctionParameters(commandField, gf, variableTypeMap)
 				if err != nil {

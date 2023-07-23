@@ -335,8 +335,8 @@ func TestFragmentVariable(t *testing.T) {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessorWithParamNames(ctx, "hero", getHumanProvider, "episode")
 	g.RegisterAnyType(ctx, Human{}, Droid{})
+	g.RegisterProcessorWithParamNames(ctx, "hero", getHumanProvider, "episode")
 
 	input := `
 query HeroComparison($first: Int = 3) {

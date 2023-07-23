@@ -19,21 +19,21 @@ var errorType = reflect.TypeOf((*error)(nil)).Elem()
 var stringType = reflect.TypeOf((*string)(nil)).Elem()
 var anyType = reflect.TypeOf((*any)(nil)).Elem()
 
-func (g *Graphy) RegisterProcessorWithParamNames(ctx context.Context, name string, mutatorFunc any, names ...string) {
+func (g *Graphy) RegisterProcessorWithParamNames(ctx context.Context, name string, f any, names ...string) {
 	g.ensureInitialized()
-	gf := g.NewGraphFunctionWithNames(name, reflect.ValueOf(mutatorFunc), names...)
+	gf := g.newGraphFunctionWithNames(name, reflect.ValueOf(f), names...)
 	g.processors[name] = gf
 }
 
-func (g *Graphy) RegisterProcessor(ctx context.Context, name string, mutatorFunc any) {
+func (g *Graphy) RegisterProcessor(ctx context.Context, name string, f any) {
 	g.ensureInitialized()
-	gf := g.NewGraphFunction(name, mutatorFunc, false)
+	gf := g.newGraphFunction(name, f, false)
 	g.processors[name] = gf
 }
 
 func (g *Graphy) RegisterAnyType(ctx context.Context, types ...any) {
 	for _, t := range types {
-		tl := g.MakeTypeFieldLookup(reflect.TypeOf(t))
+		tl := g.typeLookup(reflect.TypeOf(t))
 		g.anyTypes = append(g.anyTypes, tl)
 	}
 }
@@ -61,15 +61,15 @@ func (g *Graphy) ProcessRequest(ctx context.Context, request string, variableJso
 	return newRequest.Execute(ctx)
 }
 
-func (g *Graphy) TypeLookup(typ reflect.Type) *TypeLookup {
+func (g *Graphy) typeLookup(typ reflect.Type) *TypeLookup {
 	g.m.Lock()
-	defer g.m.Unlock()
 
 	if g.typeLookups == nil {
 		g.typeLookups = map[reflect.Type]*TypeLookup{}
 	}
 
 	if tl, ok := g.typeLookups[typ]; ok {
+		g.m.Unlock()
 		return tl
 	}
 
@@ -80,8 +80,11 @@ func (g *Graphy) TypeLookup(typ reflect.Type) *TypeLookup {
 		typ = typ.Elem()
 	}
 	if typ.Kind() == reflect.Struct {
-		tl := g.MakeTypeFieldLookup(typ)
+		g.m.Unlock()
+		tl := g.makeTypeFieldLookup(typ)
+		g.m.Lock()
 		g.typeLookups[typ] = tl
+		g.m.Unlock()
 		return tl
 	}
 	if typ == anyType {
@@ -98,9 +101,11 @@ func (g *Graphy) TypeLookup(typ reflect.Type) *TypeLookup {
 			result.unionLowercase[strings.ToLower(at.name)] = at
 		}
 		g.typeLookups[typ] = result
+		g.m.Unlock()
 		return result
 	}
 	g.typeLookups[typ] = nil
+	g.m.Unlock()
 	return nil
 }
 

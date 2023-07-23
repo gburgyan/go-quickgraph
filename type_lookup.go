@@ -65,10 +65,10 @@ func (tl *TypeLookup) ImplementsInterface(name string) (bool, *TypeLookup) {
 	return false, nil
 }
 
-// MakeTypeFieldLookup creates a lookup of fields for a given type. It performs
+// makeTypeFieldLookup creates a lookup of fields for a given type. It performs
 // a depth-first search of the type, including anonymous fields. It creates the lookup
 // using either the json tag name or the field name.
-func (g *Graphy) MakeTypeFieldLookup(typ reflect.Type) *TypeLookup {
+func (g *Graphy) makeTypeFieldLookup(typ reflect.Type) *TypeLookup {
 	// Do a depth-first search of the type to find all of the fields.
 	// Include the anonymous fields in this search and treat them as if
 	// they were part of the current type in a flattened manner.
@@ -85,7 +85,7 @@ func (g *Graphy) MakeTypeFieldLookup(typ reflect.Type) *TypeLookup {
 	return result
 }
 
-// processFieldLookup is a helper function for MakeTypeFieldLookup. It recursively processes
+// processFieldLookup is a helper function for makeTypeFieldLookup. It recursively processes
 // a given type, populating the result map with field lookups. It takes into account JSON
 // tags for naming and field exclusion.
 func (g *Graphy) processFieldLookup(typ reflect.Type, prevIndex []int, tl *TypeLookup) {
@@ -108,7 +108,7 @@ func (g *Graphy) processUnionFieldLookup(typ reflect.Type, prevIndex []int, tl *
 			continue
 		}
 		fieldType := field.Type
-		fieldTypeLookup := g.MakeTypeFieldLookup(fieldType)
+		fieldTypeLookup := g.typeLookup(fieldType)
 		tl.union[name] = fieldTypeLookup
 		// If the lowercase version of the field name is not already in the map,
 		// add it.
@@ -212,7 +212,7 @@ func (g *Graphy) addGraphMethodsForType(typ reflect.Type, tl *TypeLookup) {
 
 		if g.isValidGraphFunction(m.Func, true) {
 			// Todo: Make this take a reflect.Type instead of an any.
-			gf := g.NewGraphFunction(m.Name, m.Func, true)
+			gf := g.newGraphFunction(m.Name, m.Func, true)
 			tfl := FieldLookup{
 				name:          m.Name,
 				resultType:    m.Type,

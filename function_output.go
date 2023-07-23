@@ -85,7 +85,7 @@ func (f *GraphFunction) processOutputStruct(ctx context.Context, req *Request, f
 
 	t := reflect.TypeOf(anyStruct)
 	typeName := t.Name()
-	fieldMap := f.g.MakeTypeFieldLookup(t)
+	fieldMap := f.g.typeLookup(t)
 
 	fieldsToProcess := []ResultField{}
 	for _, field := range filter.Fields {

@@ -56,7 +56,7 @@ func (g *Graphy) NewRequestStub(request string) (*RequestStub, error) {
 	}
 
 	// TODO: Use the fragments in the variable gathering.
-	variableTypeMap, err := g.GatherRequestVariables(parsedCall)
+	variableTypeMap, err := g.GatherRequestVariables(parsedCall, fragments)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func (g *Graphy) NewRequestStub(request string) (*RequestStub, error) {
 
 // GatherRequestVariables gathers and validates the variables used in a GraphQL request.
 // It ensures that the variables used across different commands are of the same type.
-func (g *Graphy) GatherRequestVariables(parsedCall Wrapper) (map[string]*RequestVariable, error) {
+func (g *Graphy) GatherRequestVariables(parsedCall Wrapper, fragments map[string]Fragment) (map[string]*RequestVariable, error) {
 	// TODO: Look at the parsed arguments, find their types, then later verify that
 	// they are correct.
 
@@ -101,29 +101,22 @@ func (g *Graphy) GatherRequestVariables(parsedCall Wrapper) (map[string]*Request
 			for _, parameter := range command.Parameters.Values {
 				if parameter.Value.Variable != nil {
 					varName := *parameter.Value.Variable
-					// Strip the leading $ from the variable name.
-					varName = varName[1:]
 					paramTarget := graphFunc.nameMapping[parameter.Name]
 					targetType := paramTarget.paramType
-					if existingVariable, found := variableTypeMap[varName]; found {
-						if existingVariable.Type != targetType {
-							return nil, fmt.Errorf("variable %s is used with different types", varName)
-						}
-					} else {
-						variableTypeMap[varName] = &RequestVariable{
-							Name: varName,
-							Type: targetType,
-						}
+
+					err := g.addTypedInputVariable(varName, variableTypeMap, targetType)
+					if err != nil {
+						return nil, err
 					}
 				}
 			}
 		}
 
-		// TODO: Dive into the result filter and find variables there.
-
 		// Depth-first search into the result filter.
 		typeLookup := g.TypeLookup(graphFunc.returnType)
-		err := g.addTypeVariables(typeLookup, command.ResultFilter, variableTypeMap)
+		// TODO: Dive into the result filter and find variables there.
+
+		err := g.addAndValidateResultVariables(typeLookup, command.ResultFilter, variableTypeMap, fragments)
 		if err != nil {
 			return nil, err
 		}
@@ -153,7 +146,23 @@ func (g *Graphy) GatherRequestVariables(parsedCall Wrapper) (map[string]*Request
 	return variableTypeMap, nil
 }
 
-func (g *Graphy) addTypeVariables(typ *TypeLookup, filter *ResultFilter, variableTypeMap map[string]*RequestVariable) error {
+func (g *Graphy) addTypedInputVariable(varName string, variableTypeMap map[string]*RequestVariable, targetType reflect.Type) error {
+	// Strip the leading $ from the variable name.
+	varName = varName[1:]
+	if existingVariable, found := variableTypeMap[varName]; found {
+		if existingVariable.Type != targetType {
+			return fmt.Errorf("variable %s is used with different types", varName)
+		}
+	} else {
+		variableTypeMap[varName] = &RequestVariable{
+			Name: varName,
+			Type: targetType,
+		}
+	}
+	return nil
+}
+
+func (g *Graphy) addAndValidateResultVariables(typ *TypeLookup, filter *ResultFilter, variableTypeMap map[string]*RequestVariable, fragments map[string]Fragment) error {
 
 	if filter == nil {
 		return nil
@@ -183,7 +192,7 @@ func (g *Graphy) addTypeVariables(typ *TypeLookup, filter *ResultFilter, variabl
 				// Todo: Warning?
 				continue
 			}
-			// Todo: handle fragment types
+
 			var childType *TypeLookup
 			if pf.fieldType == FieldTypeField {
 				childType = g.TypeLookup(pf.resultType)
@@ -200,7 +209,7 @@ func (g *Graphy) addTypeVariables(typ *TypeLookup, filter *ResultFilter, variabl
 
 			if childType != nil {
 				// Recurse
-				err := g.addTypeVariables(childType, field.SubParts, variableTypeMap)
+				err := g.addAndValidateResultVariables(childType, field.SubParts, variableTypeMap, nil)
 				if err != nil {
 					return err
 				}
@@ -209,6 +218,27 @@ func (g *Graphy) addTypeVariables(typ *TypeLookup, filter *ResultFilter, variabl
 			return fmt.Errorf("unknown field %s", field.Name)
 		}
 	}
+
+	// Recurse into the fragments.
+	// Todo: handle fragment types
+	for _, fragment := range filter.Fragments {
+		var fragmentDef *FragmentDef
+		if fragment.Inline != nil {
+			fragmentDef = fragment.Inline
+		} else if fragment.FragmentRef != nil {
+			fragmentDef = fragments[*fragment.FragmentRef].Definition
+		} else {
+			return fmt.Errorf("unknown fragment type")
+		}
+		if found, subTyp := typ.ImplementsInterface(fragmentDef.TypeName); found {
+			err := g.addAndValidateResultVariables(subTyp, fragmentDef.Filter, variableTypeMap, fragments)
+			if err != nil {
+				// Todo: Wrap the error with the fragment name.
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 

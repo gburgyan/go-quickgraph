@@ -3,18 +3,21 @@ package quickgraph
 import (
 	"context"
 	"reflect"
+	"strings"
 	"sync"
 )
 
 type Graphy struct {
 	processors  map[string]GraphFunction
 	typeLookups map[reflect.Type]*TypeLookup
+	anyTypes    []*TypeLookup
 	m           sync.Mutex
 }
 
 var contextType = reflect.TypeOf((*context.Context)(nil)).Elem()
 var errorType = reflect.TypeOf((*error)(nil)).Elem()
 var stringType = reflect.TypeOf((*string)(nil)).Elem()
+var anyType = reflect.TypeOf((*any)(nil)).Elem()
 
 func (g *Graphy) RegisterProcessorWithParamNames(ctx context.Context, name string, mutatorFunc any, names ...string) {
 	g.ensureInitialized()
@@ -26,6 +29,13 @@ func (g *Graphy) RegisterProcessor(ctx context.Context, name string, mutatorFunc
 	g.ensureInitialized()
 	gf := NewGraphFunction(name, mutatorFunc, false)
 	g.processors[name] = gf
+}
+
+func (g *Graphy) RegisterAnyType(ctx context.Context, types ...any) {
+	for _, t := range types {
+		tl := MakeTypeFieldLookup(reflect.TypeOf(t))
+		g.anyTypes = append(g.anyTypes, tl)
+	}
 }
 
 func (g *Graphy) ensureInitialized() {
@@ -73,6 +83,21 @@ func (g *Graphy) TypeLookup(typ reflect.Type) *TypeLookup {
 		tl := MakeTypeFieldLookup(typ)
 		g.typeLookups[typ] = tl
 		return tl
+	}
+	if typ == anyType {
+		result := &TypeLookup{
+			fields:              make(map[string]FieldLookup),
+			fieldsLowercase:     map[string]FieldLookup{},
+			implements:          map[string]bool{},
+			implementsLowercase: map[string]bool{},
+			union:               map[string]*TypeLookup{},
+			unionLowercase:      map[string]*TypeLookup{},
+		}
+		for _, at := range g.anyTypes {
+			result.union[at.name] = at
+			result.unionLowercase[strings.ToLower(at.name)] = at
+		}
+		return result
 	}
 	return nil
 }

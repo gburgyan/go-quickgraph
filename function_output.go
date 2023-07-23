@@ -98,7 +98,8 @@ func (f *GraphFunction) processOutputStruct(ctx context.Context, req *Request, f
 		} else if fragmentCall.FragmentRef != nil {
 			f = req.Stub.Fragments[*fragmentCall.FragmentRef].Definition
 		}
-		if fieldMap.ImplementsInterface(f.TypeName) {
+		if found, tl := fieldMap.ImplementsInterface(f.TypeName); found {
+			fieldMap = tl
 			for _, field := range f.Filter.Fields {
 				fieldsToProcess = append(fieldsToProcess, field)
 			}

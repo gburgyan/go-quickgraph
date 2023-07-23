@@ -12,6 +12,7 @@ type FieldType int
 const (
 	FieldTypeField FieldType = iota
 	FieldTypeGraphFunction
+	FieldTypeUnion
 )
 
 type FieldLookup struct {
@@ -23,10 +24,13 @@ type FieldLookup struct {
 }
 
 type TypeLookup struct {
+	name                string
 	fields              map[string]FieldLookup
 	fieldsLowercase     map[string]FieldLookup
 	implements          map[string]bool
 	implementsLowercase map[string]bool
+	union               map[string]*TypeLookup
+	unionLowercase      map[string]*TypeLookup
 }
 
 func (tl *TypeLookup) GetField(name string) (FieldLookup, bool) {
@@ -35,11 +39,30 @@ func (tl *TypeLookup) GetField(name string) (FieldLookup, bool) {
 		result, ok = tl.fieldsLowercase[strings.ToLower(name)]
 	}
 	return result, ok
+	//if ok {
+	//	return result, ok
+	//}
+	//for _, tl := range tl.union {
+	//	result, ok = tl.GetField(name)
+	//	if ok {
+	//		return result, ok
+	//	}
+	//}
+	//return FieldLookup{}, false
 }
 
-func (tl *TypeLookup) ImplementsInterface(name string) bool {
+func (tl *TypeLookup) ImplementsInterface(name string) (bool, *TypeLookup) {
 	_, found := tl.implementsLowercase[strings.ToLower(name)]
-	return found
+	if found {
+		return true, tl
+	}
+	for _, tl := range tl.union {
+		found, tl := tl.ImplementsInterface(name)
+		if found {
+			return true, tl
+		}
+	}
+	return false, nil
 }
 
 // MakeTypeFieldLookup creates a lookup of fields for a given type. It performs
@@ -50,10 +73,13 @@ func MakeTypeFieldLookup(typ reflect.Type) *TypeLookup {
 	// Include the anonymous fields in this search and treat them as if
 	// they were part of the current type in a flattened manner.
 	result := &TypeLookup{
+		name:                typ.Name(),
 		fields:              make(map[string]FieldLookup),
 		fieldsLowercase:     map[string]FieldLookup{},
 		implements:          map[string]bool{},
 		implementsLowercase: map[string]bool{},
+		union:               map[string]*TypeLookup{},
+		unionLowercase:      map[string]*TypeLookup{},
 	}
 	processFieldLookup(typ, nil, result)
 	return result
@@ -63,6 +89,36 @@ func MakeTypeFieldLookup(typ reflect.Type) *TypeLookup {
 // a given type, populating the result map with field lookups. It takes into account JSON
 // tags for naming and field exclusion.
 func processFieldLookup(typ reflect.Type, prevIndex []int, tl *TypeLookup) {
+	name := typ.Name()
+	if strings.HasSuffix(name, "Union") {
+		processUnionFieldLookup(typ, prevIndex, tl, name)
+	} else {
+		processBaseTypeFieldLookup(typ, prevIndex, tl)
+	}
+}
+
+func processUnionFieldLookup(typ reflect.Type, prevIndex []int, tl *TypeLookup, name string) {
+	name = name[:len(name)-5]
+	// The convention for this is to have anonymous fields for each type in the union.
+
+	for i := 0; i < typ.NumField(); i++ {
+		field := typ.Field(i)
+		if !field.Anonymous {
+			// For union types, we only care about the anonymous fields.
+			continue
+		}
+		fieldType := field.Type
+		fieldTypeLookup := MakeTypeFieldLookup(fieldType)
+		tl.union[name] = fieldTypeLookup
+		// If the lowercase version of the field name is not already in the map,
+		// add it.
+		if _, ok := tl.unionLowercase[strings.ToLower(name)]; !ok {
+			tl.unionLowercase[strings.ToLower(name)] = fieldTypeLookup
+		}
+	}
+}
+
+func processBaseTypeFieldLookup(typ reflect.Type, prevIndex []int, tl *TypeLookup) {
 	// List of functions to process for the anonymous fields.
 	var deferredAnonymous []func()
 

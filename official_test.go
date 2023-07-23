@@ -14,6 +14,31 @@ type Character struct {
 	AppearsIn []episode    `json:"appearsIn"`
 }
 
+type ConnectionEdge struct {
+	Node *Character `json:"node"`
+}
+
+type FriendsConnection struct {
+	TotalCount int               `json:"totalCount"`
+	Edges      []*ConnectionEdge `json:"edges"`
+}
+
+func (c *Character) FriendsConnection(first int) *FriendsConnection {
+	result := &FriendsConnection{
+		TotalCount: len(c.Friends),
+		Edges:      make([]*ConnectionEdge, 0, len(c.Friends)),
+	}
+	for i, f := range c.Friends {
+		if i >= first {
+			break
+		}
+		result.Edges = append(result.Edges, &ConnectionEdge{
+			Node: f,
+		})
+	}
+	return result
+}
+
 type episode string
 
 const (
@@ -228,15 +253,6 @@ func TestFragments1(t *testing.T) {
 	g := Graphy{}
 	g.RegisterProcessorWithParamNames(ctx, "hero", getHumanProvider, "episode")
 
-	//	input := `
-	//{
-	//  hero() {
-	//    field
-	//  }
-	//}
-	//
-	//`
-
 	input := `
 {
   leftComparison: hero(episode: EMPIRE) {
@@ -258,6 +274,95 @@ fragment comparisonFields on Character {
 	resultAny, err := g.ProcessRequest(ctx, input, "")
 	assert.NoError(t, err)
 	assert.Equal(t, `{"data":{"leftComparison":{"appearsIn":["NEWHOPE","EMPIRE","JEDI"],"friends":[{"name":"Han Solo"},{"name":"Leia Organa"},{"name":"C-3PO"},{"name":"R2-D2"}],"name":"Luke Skywalker"},"rightComparison":{"appearsIn":["NEWHOPE","EMPIRE","JEDI"],"friends":[{"name":"Luke Skywalker"},{"name":"Han Solo"},{"name":"Leia Organa"}],"name":"R2-D2"}}}`, resultAny)
+}
+
+func TestFragmentVariable(t *testing.T) {
+	var luke = Human{
+		Character: Character{
+			Name: "Luke Skywalker",
+			AppearsIn: []episode{
+				NewHope,
+				Empire,
+				Jedi,
+			},
+			Friends: []*Character{
+				{
+					Name: "Han Solo",
+				},
+				{
+					Name: "Leia Organa",
+				},
+				{
+					Name: "C-3PO",
+				},
+				{
+					Name: "R2-D2",
+				},
+			},
+		},
+	}
+
+	var r2d2 = Droid{
+		Character: Character{
+			Name: "R2-D2",
+			AppearsIn: []episode{
+				NewHope,
+				Empire,
+				Jedi,
+			},
+			Friends: []*Character{
+				{
+					Name: "Luke Skywalker",
+				},
+				{
+					Name: "Han Solo",
+				},
+				{
+					Name: "Leia Organa",
+				},
+			},
+		},
+	}
+
+	getHumanProvider := func(ctx context.Context, ep episode) any {
+		if ep == Empire {
+			return &luke
+		} else if ep == Jedi {
+			return &r2d2
+		}
+		return nil
+	}
+
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterProcessorWithParamNames(ctx, "hero", getHumanProvider, "episode")
+	g.RegisterAnyType(ctx, Human{}, Droid{})
+
+	input := `
+query HeroComparison($first: Int = 3) {
+  leftComparison: hero(episode: EMPIRE) {
+    ...comparisonFields
+  }
+  rightComparison: hero(episode: JEDI) {
+    ...comparisonFields
+  }
+}
+
+fragment comparisonFields on Character {
+  name
+  friendsConnection(first: $first) {
+    totalCount
+    edges {
+      node {
+        name
+      }
+    }
+  }
+}`
+
+	resultAny, err := g.ProcessRequest(ctx, input, "")
+	assert.NoError(t, err)
+	assert.Equal(t, `{"data":{"leftComparison":{"friendsConnection":{"edges":[{"node":{"name":"Han Solo"}},{"node":{"name":"Leia Organa"}},{"node":{"name":"C-3PO"}}],"totalCount":4},"name":"Luke Skywalker"},"rightComparison":{"friendsConnection":{"edges":[{"node":{"name":"Luke Skywalker"}},{"node":{"name":"Han Solo"}},{"node":{"name":"Leia Organa"}}],"totalCount":3},"name":"R2-D2"}}}`, resultAny)
 }
 
 func TestVariableDefaultValue(t *testing.T) {

@@ -41,6 +41,7 @@ type GraphFunction struct {
 	nameMapping map[string]FunctionNameMapping
 	returnType  *TypeLookup
 	method      bool
+	returnAny   []any
 }
 
 type FunctionNameMapping struct {
@@ -49,74 +50,6 @@ type FunctionNameMapping struct {
 	paramType         reflect.Type
 	required          bool
 	anonymousArgument bool
-}
-
-// newGraphFunctionWithNames creates a new graph function given a name, function,
-// and an optional list of parameter names. The function provided must be of the
-// type func and the names provided should match the count of parameters. It
-// panics if the function is not a func type, the number of names doesn't match
-// parameters, or if unsupported parameters like map are provided.
-func (g *Graphy) newGraphFunctionWithNames(name string, graphFunc reflect.Value, names ...string) GraphFunction {
-	mft := graphFunc.Type()
-	if mft.Kind() != reflect.Func {
-		panic("graphFunc must be a func")
-	}
-
-	if !g.isValidGraphFunction(graphFunc, false) {
-		panic("not valid graph function")
-	}
-
-	returnType, err := validateFunctionReturnTypes(mft)
-	if err != nil {
-		panic(fmt.Sprintf("invalid return type: %s", err.Error()))
-	}
-
-	// Check the parameters of the graphFunc. The count of names must match the count
-	// of parameters. Note that context.Context is not a parameter that is counted.
-	nameMapping := map[string]FunctionNameMapping{}
-	for i := 0; i < mft.NumIn(); i++ {
-		funcParam := mft.In(i)
-		if funcParam.ConvertibleTo(contextType) {
-			continue
-		}
-
-		if len(nameMapping) >= len(names) {
-			panic("too few names provided")
-		}
-
-		name := names[len(nameMapping)]
-
-		required := true
-		switch funcParam.Kind() {
-		case reflect.Ptr:
-			required = false
-
-		case reflect.Map:
-			panic("map parameters are not supported")
-		}
-
-		mapping := FunctionNameMapping{
-			name:       name,
-			paramIndex: i,
-			paramType:  funcParam,
-			required:   required,
-		}
-
-		nameMapping[name] = mapping
-	}
-	if len(nameMapping) != len(names) {
-		panic("the count of names must match the count of parameters")
-	}
-
-	gf := GraphFunction{
-		g:           g,
-		name:        name,
-		function:    graphFunc,
-		nameMapping: nameMapping,
-		returnType:  g.typeLookup(returnType),
-		mode:        NamedParamsInline,
-	}
-	return gf
 }
 
 func (g *Graphy) isValidGraphFunction(graphFunc reflect.Value, method bool) bool {
@@ -212,14 +145,19 @@ func (g *Graphy) newGraphFunction(def FunctionDefinition, method bool) GraphFunc
 	}
 	// Gather the parameter types, ignoring the context.Context if it is
 	// present.
-	inputTypes := []reflect.Type{}
+	var inputTypes []FunctionNameMapping
+
 	for i := startParam; i < funcTyp.NumIn(); i++ {
 		in := funcTyp.In(i)
 		if in.ConvertibleTo(contextType) {
 			// Skip this parameter if it is a context.Context.
 			continue
 		}
-		inputTypes = append(inputTypes, in)
+		fnm := FunctionNameMapping{
+			paramIndex: i,
+			paramType:  in,
+		}
+		inputTypes = append(inputTypes, fnm)
 	}
 
 	if len(inputTypes) == 0 {
@@ -235,7 +173,7 @@ func (g *Graphy) newGraphFunction(def FunctionDefinition, method bool) GraphFunc
 	} else {
 		// A single parameter. We will use the name of the parameter if it is a
 		// struct, otherwise we will use an anonymous argument.
-		paramType := inputTypes[0]
+		paramType := inputTypes[0].paramType
 		if paramType.Kind() == reflect.Struct {
 			// Invoke option 1
 			return g.newStructGraphFunction(def, funcVal, paramType, method)
@@ -244,17 +182,19 @@ func (g *Graphy) newGraphFunction(def FunctionDefinition, method bool) GraphFunc
 	}
 }
 
-func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc reflect.Value, types []reflect.Type, method bool) GraphFunction {
+func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc reflect.Value, inputs []FunctionNameMapping, method bool) GraphFunction {
 	// We are in the case where there are multiple parameters. We will use the
 	// types of the parameters to create anonymous arguments. We won't have any named
 	// parameters as we don't have any names to use.
 
 	gf := GraphFunction{
-		g:        g,
-		name:     def.Name,
-		mode:     AnonymousParamsInline,
-		function: graphFunc,
-		method:   method,
+		g:           g,
+		name:        def.Name,
+		mode:        AnonymousParamsInline,
+		function:    graphFunc,
+		method:      method,
+		returnAny:   def.ReturnAnyOverride,
+		nameMapping: map[string]FunctionNameMapping{},
 	}
 
 	mft := graphFunc.Type()
@@ -264,24 +204,33 @@ func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc ref
 	}
 	gf.returnType = g.typeLookup(returnType)
 
+	hasNames := false
+	if len(def.ParameterNames) > 0 {
+		if len(def.ParameterNames) != len(inputs) {
+			panic("parameter names count must match parameter count")
+		}
+		hasNames = true
+	}
+
 	// Iterate over the parameters and create the anonymous arguments.
-	anonymousArgs := []FunctionNameMapping{}
-	for i, paramType := range types {
-		mapping := FunctionNameMapping{
-			name:              fmt.Sprintf("arg%d", i),
-			paramIndex:        i,
-			paramType:         paramType,
-			anonymousArgument: true,
+	for i, mapping := range inputs {
+		mapping := mapping
+
+		if hasNames {
+			gf.nameMapping[def.ParameterNames[i]] = mapping
+			mapping.name = def.ParameterNames[i]
+			mapping.anonymousArgument = false
+		} else {
+			mapping.name = fmt.Sprintf("arg%d", mapping.paramIndex)
+			mapping.anonymousArgument = true
 		}
 
 		// If the field is a pointer, it is optional.
-		if paramType.Kind() == reflect.Ptr {
+		if mapping.paramType.Kind() == reflect.Ptr {
 			mapping.required = false
 		} else {
 			mapping.required = true
 		}
-
-		anonymousArgs = append(anonymousArgs, mapping)
 	}
 
 	return gf
@@ -292,11 +241,12 @@ func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflec
 	// the names of the struct fields as the parameter names.
 
 	gf := GraphFunction{
-		g:        g,
-		name:     def.Name,
-		mode:     NamedParamsStruct,
-		function: graphFunc,
-		method:   method,
+		g:         g,
+		name:      def.Name,
+		mode:      NamedParamsStruct,
+		function:  graphFunc,
+		method:    method,
+		returnAny: def.ReturnAnyOverride,
 	}
 
 	mft := graphFunc.Type()

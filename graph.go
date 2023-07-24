@@ -21,7 +21,12 @@ var anyType = reflect.TypeOf((*any)(nil)).Elem()
 
 func (g *Graphy) RegisterProcessorWithParamNames(ctx context.Context, name string, f any, names ...string) {
 	g.ensureInitialized()
-	gf := g.newGraphFunctionWithNames(name, reflect.ValueOf(f), names...)
+	//gf := g.newGraphFunctionWithNames(name, reflect.ValueOf(f), names...)
+	gf := g.newGraphFunction(FunctionDefinition{
+		Name:           name,
+		Function:       f,
+		ParameterNames: names,
+	}, false)
 	g.processors[name] = gf
 }
 

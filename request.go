@@ -101,6 +101,7 @@ func (g *Graphy) GatherRequestVariables(parsedCall Wrapper, fragments map[string
 			for _, parameter := range command.Parameters.Values {
 				if parameter.Value.Variable != nil {
 					varName := *parameter.Value.Variable
+					// TODO: Deal with anonymous functions -- this will fail on those presently.
 					paramTarget := graphFunc.nameMapping[parameter.Name]
 					targetType := paramTarget.paramType
 

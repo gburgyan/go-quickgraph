@@ -226,32 +226,32 @@ func (g *Graphy) newGraphFunction(def FunctionDefinition, method bool) GraphFunc
 		// This is fine -- this case is used primarily in result generation. If a field's
 		// output is expensive to get, it can be hidden behind a function to ensure it's
 		// only invoked if it is asked for.
-		return g.newAnonymousGraphFunction(def.Name, funcVal, inputTypes, method)
+		return g.newAnonymousGraphFunction(def, funcVal, inputTypes, method)
 	} else if len(inputTypes) > 1 {
 		// We are in the case where there are multiple parameters. We will use the
 		// types of the parameters to create anonymous arguments.
 		// Invoke option 2
-		return g.newAnonymousGraphFunction(def.Name, funcVal, inputTypes, method)
+		return g.newAnonymousGraphFunction(def, funcVal, inputTypes, method)
 	} else {
 		// A single parameter. We will use the name of the parameter if it is a
 		// struct, otherwise we will use an anonymous argument.
 		paramType := inputTypes[0]
 		if paramType.Kind() == reflect.Struct {
 			// Invoke option 1
-			return g.newStructGraphFunction(def.Name, funcVal, paramType, method)
+			return g.newStructGraphFunction(def, funcVal, paramType, method)
 		}
-		return g.newAnonymousGraphFunction(def.Name, funcVal, inputTypes, method)
+		return g.newAnonymousGraphFunction(def, funcVal, inputTypes, method)
 	}
 }
 
-func (g *Graphy) newAnonymousGraphFunction(name string, graphFunc reflect.Value, types []reflect.Type, method bool) GraphFunction {
+func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc reflect.Value, types []reflect.Type, method bool) GraphFunction {
 	// We are in the case where there are multiple parameters. We will use the
 	// types of the parameters to create anonymous arguments. We won't have any named
 	// parameters as we don't have any names to use.
 
 	gf := GraphFunction{
 		g:        g,
-		name:     name,
+		name:     def.Name,
 		mode:     AnonymousParamsInline,
 		function: graphFunc,
 		method:   method,
@@ -287,13 +287,13 @@ func (g *Graphy) newAnonymousGraphFunction(name string, graphFunc reflect.Value,
 	return gf
 }
 
-func (g *Graphy) newStructGraphFunction(name string, graphFunc reflect.Value, paramType reflect.Type, method bool) GraphFunction {
+func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflect.Value, paramType reflect.Type, method bool) GraphFunction {
 	// We are in the case where there is a single struct parameter. We will use
 	// the names of the struct fields as the parameter names.
 
 	gf := GraphFunction{
 		g:        g,
-		name:     name,
+		name:     def.Name,
 		mode:     NamedParamsStruct,
 		function: graphFunc,
 		method:   method,

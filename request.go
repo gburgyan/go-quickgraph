@@ -85,7 +85,7 @@ func (g *Graphy) NewRequestStub(request string) (*RequestStub, error) {
 // It ensures that the variables used across different commands are of the same type.
 func (g *Graphy) GatherRequestVariables(parsedCall Wrapper, fragments map[string]Fragment) (map[string]*RequestVariable, error) {
 	// TODO: Look at the parsed arguments, find their types, then later verify that
-	// they are correct.
+	//  they are correct.
 
 	// Find the commands in the request that use variables, extract the types
 	// of the variables, and convert the variables to the correct type. Ensure that
@@ -300,9 +300,9 @@ func (g *Graphy) validateAnonymousFunctionParams(commandField *ResultField, gf *
 			}
 		}
 		// Todo: Consider parsing, validating, and caching the value for value types. The
-		// special consideration that is needed is that pointers to objects are
-		// allowed -- and we have to ensure that objects that are cached are not
-		// changed between calls. Short-term, we can just not cache value types.
+		//  special consideration that is needed is that pointers to objects are
+		//  allowed -- and we have to ensure that objects that are cached are not
+		//  changed between calls. Short-term, we can just not cache value types.
 	}
 	return nil
 }

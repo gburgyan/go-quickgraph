@@ -69,7 +69,7 @@ func (tl *TypeLookup) ImplementsInterface(name string) (bool, *TypeLookup) {
 // a depth-first search of the type, including anonymous fields. It creates the lookup
 // using either the json tag name or the field name.
 func (g *Graphy) makeTypeFieldLookup(typ reflect.Type) *TypeLookup {
-	// Do a depth-first search of the type to find all of the fields.
+	// Do a depth-first search of the type to find all the fields.
 	// Include the anonymous fields in this search and treat them as if
 	// they were part of the current type in a flattened manner.
 	result := &TypeLookup{
@@ -127,7 +127,7 @@ func (g *Graphy) processBaseTypeFieldLookup(typ reflect.Type, prevIndex []int, t
 		// If there's a json tag on the field, use that for the name of the field.
 		// Otherwise, use the name of the field.
 		// If there's a json tag with a "-" value, ignore the field.
-		// If there's a json tag with a "omitempty" value, ignore the field.
+		// If there's a json tag with an "omitempty" value, ignore the field.
 		fieldName := field.Name
 		jsonTag := field.Tag.Get("json")
 		if jsonTag != "" {
@@ -201,8 +201,8 @@ func (g *Graphy) addGraphMethodsForType(typ reflect.Type, tl *TypeLookup) {
 		m := typ.Method(i)
 
 		// Gather the inputs and outputs of the function.
-		inTypes := []reflect.Type{}
-		outTypes := []reflect.Type{}
+		var inTypes []reflect.Type
+		var outTypes []reflect.Type
 		for j := 0; j < m.Type.NumIn(); j++ {
 			inTypes = append(inTypes, m.Type.In(j))
 		}

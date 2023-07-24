@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 )
 
 type GraphFunctionMode int
@@ -41,7 +42,6 @@ type GraphFunction struct {
 	nameMapping map[string]FunctionNameMapping
 	returnType  *TypeLookup
 	method      bool
-	returnAny   []any
 }
 
 type FunctionNameMapping struct {
@@ -193,7 +193,6 @@ func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc ref
 		mode:        AnonymousParamsInline,
 		function:    graphFunc,
 		method:      method,
-		returnAny:   def.ReturnAnyOverride,
 		nameMapping: map[string]FunctionNameMapping{},
 	}
 
@@ -202,7 +201,11 @@ func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc ref
 	if err != nil {
 		panic(err)
 	}
-	gf.returnType = g.typeLookup(returnType)
+	if returnType == anyType && len(def.ReturnAnyOverride) > 0 {
+		gf.returnType = g.convertAnySlice(def.ReturnAnyOverride)
+	} else {
+		gf.returnType = g.typeLookup(returnType)
+	}
 
 	hasNames := false
 	if len(def.ParameterNames) > 0 {
@@ -241,12 +244,11 @@ func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflec
 	// the names of the struct fields as the parameter names.
 
 	gf := GraphFunction{
-		g:         g,
-		name:      def.Name,
-		mode:      NamedParamsStruct,
-		function:  graphFunc,
-		method:    method,
-		returnAny: def.ReturnAnyOverride,
+		g:        g,
+		name:     def.Name,
+		mode:     NamedParamsStruct,
+		function: graphFunc,
+		method:   method,
 	}
 
 	mft := graphFunc.Type()
@@ -254,7 +256,11 @@ func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflec
 	if err != nil {
 		panic(err)
 	}
-	gf.returnType = g.typeLookup(returnType)
+	if returnType == anyType && len(def.ReturnAnyOverride) > 0 {
+		gf.returnType = g.convertAnySlice(def.ReturnAnyOverride)
+	} else {
+		gf.returnType = g.typeLookup(returnType)
+	}
 
 	// The parameter type must be a pointer to a struct. We will panic if it is
 	// not.
@@ -297,6 +303,23 @@ func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflec
 	gf.nameMapping = nameMapping
 
 	return gf
+}
+
+func (g *Graphy) convertAnySlice(types []any) *TypeLookup {
+	result := &TypeLookup{
+		fields:              make(map[string]FieldLookup),
+		fieldsLowercase:     map[string]FieldLookup{},
+		implements:          map[string]bool{},
+		implementsLowercase: map[string]bool{},
+		union:               map[string]*TypeLookup{},
+		unionLowercase:      map[string]*TypeLookup{},
+	}
+	for _, typ := range types {
+		at := g.typeLookup(reflect.TypeOf(typ))
+		result.union[at.name] = at
+		result.unionLowercase[strings.ToLower(at.name)] = at
+	}
+	return result
 }
 
 // validateFunctionReturnTypes validates the return types of the function passed. It requires the function

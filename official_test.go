@@ -324,7 +324,7 @@ func TestFragmentVariable(t *testing.T) {
 		},
 	}
 
-	getHumanProvider := func(ctx context.Context, ep episode) any {
+	getHeroFunction := func(ctx context.Context, ep episode) any {
 		if ep == Empire {
 			return &luke
 		} else if ep == Jedi {
@@ -335,8 +335,12 @@ func TestFragmentVariable(t *testing.T) {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterAnyType(ctx, Human{}, Droid{})
-	g.RegisterProcessorWithParamNames(ctx, "hero", getHumanProvider, "episode")
+	//g.RegisterProcessorWithParamNames(ctx, "hero", getHeroFunction, "episode")
+	g.RegisterFunction(ctx, FunctionDefinition{
+		Name:              "hero",
+		Function:          getHeroFunction,
+		ReturnAnyOverride: []any{Human{}, Droid{}},
+	})
 
 	input := `
 query HeroComparison($first: Int = 3) {

@@ -32,12 +32,18 @@ type FunctionDefinition struct {
 	// the function. This is a function-specific override to the global `any` types that are
 	// on the base Graphy instance.
 	ReturnAnyOverride []any
+
+	// Mutator is true if the function is a mutator. Mutators are functions that change the
+	// state of the system. They will be called sequentionally and in the order they are referred
+	// to in the query.
+	Mutator bool
 }
 
 type GraphFunction struct {
 	g           *Graphy
 	name        string
 	mode        GraphFunctionMode
+	mutator     bool
 	function    reflect.Value
 	nameMapping map[string]FunctionNameMapping
 	returnType  *TypeLookup
@@ -191,6 +197,7 @@ func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc ref
 		g:           g,
 		name:        def.Name,
 		mode:        AnonymousParamsInline,
+		mutator:     def.Mutator,
 		function:    graphFunc,
 		method:      method,
 		nameMapping: map[string]FunctionNameMapping{},
@@ -247,6 +254,7 @@ func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflec
 		g:        g,
 		name:     def.Name,
 		mode:     NamedParamsStruct,
+		mutator:  def.Mutator,
 		function: graphFunc,
 		method:   method,
 	}

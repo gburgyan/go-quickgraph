@@ -13,9 +13,11 @@ const (
 	FieldTypeField FieldType = iota
 	FieldTypeGraphFunction
 	FieldTypeUnion
+	FieldTypeEnum
 )
 
 type FieldLookup struct {
+	// TODO: Add support for enums.
 	fieldType     FieldType
 	name          string
 	resultType    reflect.Type

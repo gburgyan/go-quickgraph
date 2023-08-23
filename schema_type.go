@@ -6,7 +6,39 @@ import (
 	"strings"
 )
 
-func (g *Graphy) schemaForType(t *TypeLookup) (string, error) {
+func (g *Graphy) schemaForTypes(types ...*TypeLookup) (string, error) {
+
+	completed := make(map[string]bool)
+
+	typeQueue := make([]*TypeLookup, len(types))
+	copy(typeQueue, types)
+
+	sb := strings.Builder{}
+	for i := 0; i < len(typeQueue); i++ {
+		if completed[typeQueue[i].name] {
+			continue
+		}
+		completed[typeQueue[i].name] = true
+		t := typeQueue[i]
+		schema, extra, err := g.schemataForType(t)
+		if err != nil {
+			return "", err
+		}
+		for _, et := range extra {
+			etl := g.typeLookup(et)
+			if !completed[et.Name()] {
+				typeQueue = append(typeQueue, etl)
+			}
+		}
+		sb.WriteString(schema)
+		sb.WriteString("\n")
+	}
+	return sb.String(), nil
+}
+
+func (g *Graphy) schemataForType(t *TypeLookup) (string, []reflect.Type, error) {
+	var extraTypes []reflect.Type
+
 	sb := strings.Builder{}
 	sb.WriteString("type ")
 	sb.WriteString(t.name)
@@ -22,18 +54,24 @@ func (g *Graphy) schemaForType(t *TypeLookup) (string, error) {
 	for _, name := range fieldNames {
 		field := t.fieldsLowercase[name]
 		if field.fieldType == FieldTypeField {
+			typeString, extraType := g.schemaForTypeLookup(field.resultType)
+			if extraType != nil {
+				extraTypes = append(extraTypes, extraType)
+			}
 			sb.WriteString("\t")
 			sb.WriteString(field.name)
 			sb.WriteString(": ")
-			sb.WriteString(g.schemaForTypeLookup(field.resultType))
+			sb.WriteString(typeString)
 			sb.WriteString("\n")
 		}
 	}
 	sb.WriteString("}\n")
-	return sb.String(), nil
+	return sb.String(), extraTypes, nil
 }
 
-func (g *Graphy) schemaForTypeLookup(t reflect.Type) string {
+func (g *Graphy) schemaForTypeLookup(t reflect.Type) (string, reflect.Type) {
+	var extraType reflect.Type
+
 	optional := false
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
@@ -74,6 +112,7 @@ func (g *Graphy) schemaForTypeLookup(t reflect.Type) string {
 		baseType = "Boolean"
 
 	case reflect.Struct:
+		extraType = t
 		tl := g.typeLookup(t)
 		if tl != nil {
 			// TODO: Handle same type name in different packages.
@@ -95,5 +134,5 @@ func (g *Graphy) schemaForTypeLookup(t reflect.Type) string {
 		work = work + "!"
 	}
 
-	return work
+	return work, extraType
 }

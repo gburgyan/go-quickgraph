@@ -11,6 +11,8 @@ func (g *Graphy) schemataForTypes(types ...*TypeLookup) (string, error) {
 	completed := make(map[string]bool)
 
 	typeQueue := make([]*TypeLookup, len(types))
+	var enumQueue []reflect.Type
+
 	copy(typeQueue, types)
 
 	sb := strings.Builder{}
@@ -25,15 +27,52 @@ func (g *Graphy) schemataForTypes(types ...*TypeLookup) (string, error) {
 			return "", err
 		}
 		for _, et := range extra {
-			etl := g.typeLookup(et)
-			if !completed[et.Name()] {
-				typeQueue = append(typeQueue, etl)
+			if et.AssignableTo(stringEnumValuesType) {
+				enumQueue = append(enumQueue, et)
+			} else {
+				etl := g.typeLookup(et)
+				if !completed[et.Name()] {
+					typeQueue = append(typeQueue, etl)
+				}
 			}
 		}
 		sb.WriteString(schema)
 		sb.WriteString("\n")
 	}
+
+	for _, et := range enumQueue {
+		enumName := et.String()
+		if completed[enumName] {
+			continue
+		}
+		completed[enumName] = true
+
+		sb.WriteString(g.schemaForEnum(et))
+		sb.WriteString("\n")
+	}
+
 	return sb.String(), nil
+}
+
+func (g *Graphy) schemaForEnum(et reflect.Type) string {
+
+	sb := strings.Builder{}
+
+	enumValue := reflect.New(et)
+	sev := enumValue.Convert(stringEnumValuesType)
+	se := sev.Interface().(StringEnumValues)
+
+	sb.WriteString("enum ")
+	sb.WriteString(et.Name())
+	sb.WriteString(" {\n")
+
+	for _, s := range se.EnumValues() {
+		sb.WriteString("\t")
+		sb.WriteString(s)
+		sb.WriteString("\n")
+	}
+	sb.WriteString("}\n")
+	return sb.String()
 }
 
 func (g *Graphy) schemaForType(t *TypeLookup) (string, []reflect.Type, error) {
@@ -88,18 +127,16 @@ func (g *Graphy) schemaForTypeLookup(t reflect.Type) (string, reflect.Type) {
 		}
 	}
 
-	//if t.AssignableTo(stringEnumValuesType) {
-	//	sb.WriteString("\t")
-	//	sb.WriteString(field.name)
-	//	sb.WriteString(": ")
-	//	sb.WriteString(field.resultType.Name())
-	//	sb.WriteString("\n")
-	//}
-
 	var baseType string
 	switch t.Kind() {
 	case reflect.String:
-		baseType = "String"
+		if t.AssignableTo(stringEnumValuesType) {
+			extraType = t
+			baseType = t.Name()
+		} else {
+			baseType = "String"
+		}
+
 	case reflect.Int:
 	case reflect.Int8:
 	case reflect.Int16:

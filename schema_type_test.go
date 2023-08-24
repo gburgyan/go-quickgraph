@@ -35,10 +35,16 @@ func TestGraphy_schemataForTypes(t *testing.T) {
 	schema, err := g.schemataForTypes(cl)
 	assert.NoError(t, err)
 	expected := `type Character {
-	appearsIn: [String!]
+	appearsIn: [episode!]
 	friends: [Character]
 	id: String!
 	name: String!
+}
+
+enum episode {
+	NEWHOPE
+	EMPIRE
+	JEDI
 }
 
 `

@@ -6,12 +6,12 @@ import (
 	"testing"
 )
 
-func TestGraphy_schemataForType(t *testing.T) {
+func TestGraphy_schemaForType(t *testing.T) {
 	g := Graphy{}
 	c := Character{}
 
 	cl := g.typeLookup(reflect.TypeOf(c))
-	schema, extraTypes, err := g.schemataForType(cl)
+	schema, extraTypes, err := g.schemaForType(cl)
 	assert.NoError(t, err)
 	expected := `type Character {
 	appearsIn: [String!]
@@ -26,13 +26,13 @@ func TestGraphy_schemataForType(t *testing.T) {
 	assert.Equal(t, charType, extraTypes[0])
 }
 
-func TestGraphy_schemaForTypes(t *testing.T) {
+func TestGraphy_schemataForTypes(t *testing.T) {
 	g := Graphy{}
 	c := Character{}
 
 	cl := g.typeLookup(reflect.TypeOf(c))
 
-	schema, err := g.schemaForTypes(cl)
+	schema, err := g.schemataForTypes(cl)
 	assert.NoError(t, err)
 	expected := `type Character {
 	appearsIn: [String!]

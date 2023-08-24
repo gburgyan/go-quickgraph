@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func (g *Graphy) schemaForTypes(types ...*TypeLookup) (string, error) {
+func (g *Graphy) schemataForTypes(types ...*TypeLookup) (string, error) {
 
 	completed := make(map[string]bool)
 
@@ -20,7 +20,7 @@ func (g *Graphy) schemaForTypes(types ...*TypeLookup) (string, error) {
 		}
 		completed[typeQueue[i].name] = true
 		t := typeQueue[i]
-		schema, extra, err := g.schemataForType(t)
+		schema, extra, err := g.schemaForType(t)
 		if err != nil {
 			return "", err
 		}
@@ -36,7 +36,7 @@ func (g *Graphy) schemaForTypes(types ...*TypeLookup) (string, error) {
 	return sb.String(), nil
 }
 
-func (g *Graphy) schemataForType(t *TypeLookup) (string, []reflect.Type, error) {
+func (g *Graphy) schemaForType(t *TypeLookup) (string, []reflect.Type, error) {
 	var extraTypes []reflect.Type
 
 	sb := strings.Builder{}

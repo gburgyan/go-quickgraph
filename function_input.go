@@ -11,7 +11,7 @@ import (
 // The parameters are returned as a slice of reflect.Value that can be used to call the function.
 // The request and command are used to populate the parameters to the function.
 func (f *GraphFunction) getCallParameters(ctx context.Context, req *Request, paramList *ParameterList, target reflect.Value) ([]reflect.Value, error) {
-	switch f.mode {
+	switch f.paramType {
 	case NamedParamsInline:
 		return f.getCallParamsNamedInline(ctx, req, paramList, target)
 
@@ -21,7 +21,7 @@ func (f *GraphFunction) getCallParameters(ctx context.Context, req *Request, par
 	case NamedParamsStruct:
 		return f.getCallParamsNamedStruct(ctx, req, paramList, target)
 	}
-	return nil, fmt.Errorf("unknown function mode: %v", f.mode)
+	return nil, fmt.Errorf("unknown function paramType: %v", f.paramType)
 }
 
 func (f *GraphFunction) getCallParamsNamedInline(ctx context.Context, req *Request, params *ParameterList, target reflect.Value) ([]reflect.Value, error) {

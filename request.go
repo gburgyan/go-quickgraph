@@ -11,8 +11,8 @@ import (
 type RequestType int
 
 const (
-	Query RequestType = iota
-	Mutation
+	RequestQuery RequestType = iota
+	RequestMutation
 )
 
 // RequestStub represents a stub of a GraphQL-like request. It contains the Graphy instance,
@@ -71,11 +71,11 @@ func (g *Graphy) NewRequestStub(request string) (*RequestStub, error) {
 	switch parsedCall.Mode {
 	case "":
 	case "query":
-		rs.Mode = Query
+		rs.Mode = RequestQuery
 	case "mutation":
-		rs.Mode = Mutation
+		rs.Mode = RequestMutation
 	default:
-		return nil, fmt.Errorf("unknown mode %s", parsedCall.Mode)
+		return nil, fmt.Errorf("unknown paramType %s", parsedCall.Mode)
 	}
 
 	return &rs, nil
@@ -245,13 +245,13 @@ func (g *Graphy) addAndValidateResultVariables(typ *TypeLookup, filter *ResultFi
 
 func (g *Graphy) validateGraphFunctionParameters(commandField *ResultField, gf *GraphFunction, variableTypeMap map[string]*RequestVariable) error {
 	// Validate the parameters.
-	switch gf.mode {
+	switch gf.paramType {
 	case AnonymousParamsInline:
 		return g.validateAnonymousFunctionParams(commandField, gf, variableTypeMap)
 	case NamedParamsStruct:
 		return g.validateNamedFunctionParams(commandField, gf, variableTypeMap)
 	default:
-		return fmt.Errorf("unknown function mode %d", gf.mode)
+		return fmt.Errorf("unknown function paramType %d", gf.paramType)
 	}
 }
 

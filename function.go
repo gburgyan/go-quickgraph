@@ -7,12 +7,20 @@ import (
 	"strings"
 )
 
+type GraphFunctionParamType int
+
+const (
+	NamedParamsStruct GraphFunctionParamType = iota
+	NamedParamsInline
+	AnonymousParamsInline
+)
+
+// TODO: Should this be unified with the function definition?
 type GraphFunctionMode int
 
 const (
-	NamedParamsStruct GraphFunctionMode = iota
-	NamedParamsInline
-	AnonymousParamsInline
+	ModeQuery GraphFunctionMode = iota
+	ModeMutation
 )
 
 type FunctionDefinition struct {
@@ -33,17 +41,18 @@ type FunctionDefinition struct {
 	// on the base Graphy instance.
 	ReturnAnyOverride []any
 
-	// Mutator is true if the function is a mutator. Mutators are functions that change the
-	// state of the system. They will be called sequentionally and in the order they are referred
-	// to in the query.
-	Mutator bool
+	// Mode controls how the function is to be run. Mutators are functions that change the
+	// state of the system. They will be called sequentially and in the order they are referred
+	// to in the query. Regular queries are functions that do not change the state of the
+	// system. They will be called in parallel.
+	Mode GraphFunctionMode
 }
 
 type GraphFunction struct {
 	g           *Graphy
 	name        string
+	paramType   GraphFunctionParamType
 	mode        GraphFunctionMode
-	mutator     bool
 	function    reflect.Value
 	nameMapping map[string]FunctionNameMapping
 	returnType  *TypeLookup
@@ -196,8 +205,8 @@ func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc ref
 	gf := GraphFunction{
 		g:           g,
 		name:        def.Name,
-		mode:        AnonymousParamsInline,
-		mutator:     def.Mutator,
+		paramType:   AnonymousParamsInline,
+		mode:        def.Mode,
 		function:    graphFunc,
 		method:      method,
 		nameMapping: map[string]FunctionNameMapping{},
@@ -251,12 +260,12 @@ func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflec
 	// the names of the struct fields as the parameter names.
 
 	gf := GraphFunction{
-		g:        g,
-		name:     def.Name,
-		mode:     NamedParamsStruct,
-		mutator:  def.Mutator,
-		function: graphFunc,
-		method:   method,
+		g:         g,
+		name:      def.Name,
+		paramType: NamedParamsStruct,
+		mode:      def.Mode,
+		function:  graphFunc,
+		method:    method,
 	}
 
 	mft := graphFunc.Type()

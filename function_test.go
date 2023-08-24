@@ -61,7 +61,7 @@ func TestGraphFunction_Struct(t *testing.T) {
 
 	gf := g.newGraphFunction(FunctionDefinition{Name: "f", Function: f}, false)
 	assert.Equal(t, "f", gf.name)
-	assert.Equal(t, NamedParamsStruct, gf.mode)
+	assert.Equal(t, NamedParamsStruct, gf.paramType)
 
 	gql := `
 query {
@@ -89,7 +89,7 @@ func TestGraphFunction_Anonymous(t *testing.T) {
 
 	gf := g.newGraphFunction(FunctionDefinition{Name: "f", Function: f}, false)
 	assert.Equal(t, "f", gf.name)
-	assert.Equal(t, AnonymousParamsInline, gf.mode)
+	assert.Equal(t, AnonymousParamsInline, gf.paramType)
 
 	gql := `
 query {
@@ -137,7 +137,7 @@ func TestGraphFunction_FuncReturn(t *testing.T) {
 
 	gf := g.newGraphFunction(FunctionDefinition{Name: "f", Function: f}, false)
 	assert.Equal(t, "f", gf.name)
-	assert.Equal(t, NamedParamsStruct, gf.mode)
+	assert.Equal(t, NamedParamsStruct, gf.paramType)
 
 	gql := `
 query {
@@ -165,7 +165,7 @@ func TestGraphFunction_PointerFuncReturn(t *testing.T) {
 
 	gf := g.newGraphFunction(FunctionDefinition{Name: "f", Function: f}, false)
 	assert.Equal(t, "f", gf.name)
-	assert.Equal(t, NamedParamsStruct, gf.mode)
+	assert.Equal(t, NamedParamsStruct, gf.paramType)
 
 	gql := `
 query {
@@ -193,7 +193,7 @@ func TestGraphFunction_FuncParamReturn(t *testing.T) {
 
 	gf := g.newGraphFunction(FunctionDefinition{Name: "f", Function: f}, false)
 	assert.Equal(t, "f", gf.name)
-	assert.Equal(t, NamedParamsStruct, gf.mode)
+	assert.Equal(t, NamedParamsStruct, gf.paramType)
 
 	gql := `
 query {
@@ -221,7 +221,7 @@ func TestGraphFunction_FuncVariableParamReturn(t *testing.T) {
 
 	gf := g.newGraphFunction(FunctionDefinition{Name: "f", Function: f}, false)
 	assert.Equal(t, "f", gf.name)
-	assert.Equal(t, NamedParamsStruct, gf.mode)
+	assert.Equal(t, NamedParamsStruct, gf.paramType)
 
 	gql := `
 query {

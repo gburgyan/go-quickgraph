@@ -41,6 +41,14 @@ func (c *Character) FriendsConnection(first int) *FriendsConnection {
 
 type episode string
 
+func (e episode) EnumValues() []string {
+	return []string{
+		"NEWHOPE",
+		"EMPIRE",
+		"JEDI",
+	}
+}
+
 const (
 	NewHope episode = "NEWHOPE"
 	Empire  episode = "EMPIRE"

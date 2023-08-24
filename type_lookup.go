@@ -157,6 +157,9 @@ func (g *Graphy) processBaseTypeFieldLookup(typ reflect.Type, prevIndex []int, t
 			tl.implements[name] = true
 			tl.implementsLowercase[strings.ToLower(name)] = true
 		} else {
+			// TODO: Add enum support here. Special processing for strings that implement
+			//  the StringEnumValues interface.
+
 			tfl := FieldLookup{
 				name:         fieldName,
 				resultType:   field.Type,

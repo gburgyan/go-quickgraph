@@ -7,12 +7,6 @@ import (
 	"strings"
 )
 
-type EnumUnmarshaler interface {
-	UnmarshalString(input string) (interface{}, error)
-}
-
-var enumUnmarshalerType = reflect.TypeOf((*EnumUnmarshaler)(nil)).Elem()
-
 // getCallParameters returns the parameters to use when calling the function represented by this GraphFunction.
 // The parameters are returned as a slice of reflect.Value that can be used to call the function.
 // The request and command are used to populate the parameters to the function.

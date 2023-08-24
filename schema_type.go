@@ -88,6 +88,14 @@ func (g *Graphy) schemaForTypeLookup(t reflect.Type) (string, reflect.Type) {
 		}
 	}
 
+	//if t.AssignableTo(stringEnumValuesType) {
+	//	sb.WriteString("\t")
+	//	sb.WriteString(field.name)
+	//	sb.WriteString(": ")
+	//	sb.WriteString(field.resultType.Name())
+	//	sb.WriteString("\n")
+	//}
+
 	var baseType string
 	switch t.Kind() {
 	case reflect.String:

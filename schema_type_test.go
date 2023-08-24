@@ -14,16 +14,20 @@ func TestGraphy_schemaForType(t *testing.T) {
 	schema, extraTypes, err := g.schemaForType(cl)
 	assert.NoError(t, err)
 	expected := `type Character {
-	appearsIn: [String!]
+	appearsIn: [episode!]
 	friends: [Character]
 	id: String!
 	name: String!
 }
 `
 	assert.Equal(t, expected, schema)
-	assert.Len(t, extraTypes, 1)
+	assert.Len(t, extraTypes, 2)
+
+	episodeType := reflect.TypeOf(episode(""))
 	charType := reflect.TypeOf(Character{})
-	assert.Equal(t, charType, extraTypes[0])
+
+	assert.Equal(t, episodeType, extraTypes[0])
+	assert.Equal(t, charType, extraTypes[1])
 }
 
 func TestGraphy_schemataForTypes(t *testing.T) {

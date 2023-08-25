@@ -127,5 +127,3 @@ func (g *Graphy) typeLookup(typ reflect.Type) *TypeLookup {
 	g.m.Unlock()
 	return nil
 }
-
-// TODO: Generate the schema from the registered processors.

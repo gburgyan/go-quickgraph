@@ -2,6 +2,9 @@ package quickgraph
 
 import (
 	"context"
+	"fmt"
+	"reflect"
+	"slices"
 	"strings"
 )
 
@@ -20,6 +23,7 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) (string, error) {
 	}
 
 	outputTypes := []*TypeLookup{}
+	enumTypes := []reflect.Type{}
 
 	for mode, functions := range procByMode {
 
@@ -38,9 +42,14 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) (string, error) {
 			sb.WriteString("\t")
 			sb.WriteString(function.name)
 			sb.WriteString("(")
-			//for i, param := range function. {
-			//
-			//}
+
+			funcParams, fEnums, err := g.schemaForFunctionParameters(function)
+			if err != nil {
+				return "", err
+			}
+			enumTypes = append(enumTypes, fEnums...)
+			sb.WriteString(funcParams)
+
 			sb.WriteString("): ")
 			schemaRef, _ := g.schemaRefForType(function.returnType.typ)
 			outputTypes = append(outputTypes, function.returnType)
@@ -50,10 +59,11 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) (string, error) {
 		sb.WriteString("}\n\n")
 	}
 
-	outputSchema, enumTypes, err := g.schemaForOutputTypes(outputTypes...)
+	outputSchema, oEnumTypes, err := g.schemaForOutputTypes(outputTypes...)
 	if err != nil {
 		return "", err
 	}
+	enumTypes = append(enumTypes, oEnumTypes...)
 
 	sb.WriteString(outputSchema)
 
@@ -64,4 +74,32 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) (string, error) {
 	sb.WriteString(enumSchema)
 
 	return sb.String(), nil
+}
+
+func (g *Graphy) schemaForFunctionParameters(f *GraphFunction) (string, []reflect.Type, error) {
+	sb := strings.Builder{}
+
+	if f.paramType == AnonymousParamsInline {
+		mappings := []*FunctionNameMapping{}
+		for _, param := range f.nameMapping {
+			mappings = append(mappings, &param)
+		}
+		// Sort by index
+		slices.SortFunc(mappings, func(i, j *FunctionNameMapping) int {
+			return i.paramIndex - i.paramIndex
+		})
+
+		for i, param := range mappings {
+			if i > 0 {
+				sb.WriteString(", ")
+			}
+			sb.WriteString(fmt.Sprintf("In%d", i))
+			sb.WriteString(": ")
+			schemaRef, _ := g.schemaRefForType(param.paramType)
+			sb.WriteString(schemaRef)
+		}
+
+	}
+
+	return sb.String(), nil, nil
 }

@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func (g *Graphy) schemaForOutputTypes(types ...*TypeLookup) (string, error) {
+func (g *Graphy) schemaForOutputTypes(types ...*TypeLookup) (string, []reflect.Type, error) {
 
 	completed := make(map[string]bool)
 
@@ -24,7 +24,7 @@ func (g *Graphy) schemaForOutputTypes(types ...*TypeLookup) (string, error) {
 		t := typeQueue[i]
 		schema, extra, err := g.schemaForOutputType(t)
 		if err != nil {
-			return "", err
+			return "", nil, err
 		}
 		for _, et := range extra {
 			if et.AssignableTo(stringEnumValuesType) {
@@ -40,7 +40,15 @@ func (g *Graphy) schemaForOutputTypes(types ...*TypeLookup) (string, error) {
 		sb.WriteString("\n")
 	}
 
-	for _, et := range enumQueue {
+	return sb.String(), enumQueue, nil
+}
+
+func (g *Graphy) schemaForEnumTypes(types ...reflect.Type) (string, error) {
+	sb := strings.Builder{}
+
+	completed := make(map[string]bool)
+
+	for _, et := range types {
 		enumName := et.String()
 		if completed[enumName] {
 			continue

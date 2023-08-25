@@ -50,12 +50,18 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) (string, error) {
 		sb.WriteString("}\n\n")
 	}
 
-	types, err := g.schemaForOutputTypes(outputTypes...)
+	outputSchema, enumTypes, err := g.schemaForOutputTypes(outputTypes...)
 	if err != nil {
 		return "", err
 	}
 
-	sb.WriteString(types)
+	sb.WriteString(outputSchema)
+
+	enumSchema, err := g.schemaForEnumTypes(enumTypes...)
+	if err != nil {
+		return "", err
+	}
+	sb.WriteString(enumSchema)
 
 	return sb.String(), nil
 }

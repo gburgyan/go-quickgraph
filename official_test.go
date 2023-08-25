@@ -2,6 +2,7 @@ package quickgraph
 
 import (
 	"context"
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"math"
 	"testing"
@@ -414,4 +415,7 @@ query HeroNameAndFriends($episode: Episode = JEDI) {
 	resultAny, err := g.ProcessRequest(ctx, input, "")
 	assert.NoError(t, err)
 	assert.Equal(t, `{"data":{"hero":{"friends":[{"name":"Luke Skywalker"},{"name":"Han Solo"},{"name":"Leia Organa"}],"name":"R2-D2"}}}`, resultAny)
+
+	definition, err := g.SchemaDefinition(ctx)
+	fmt.Println(definition)
 }

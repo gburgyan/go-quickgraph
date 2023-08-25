@@ -11,7 +11,7 @@ func TestGraphy_schemaForType(t *testing.T) {
 	c := Character{}
 
 	cl := g.typeLookup(reflect.TypeOf(c))
-	schema, extraTypes, err := g.schemaForType(cl)
+	schema, extraTypes, err := g.schemaForOutputType(cl)
 	assert.NoError(t, err)
 	expected := `type Character {
 	appearsIn: [episode!]
@@ -36,7 +36,7 @@ func TestGraphy_schemataForTypes(t *testing.T) {
 
 	cl := g.typeLookup(reflect.TypeOf(c))
 
-	schema, err := g.schemataForTypes(cl)
+	schema, err := g.schemaForOutputTypes(cl)
 	assert.NoError(t, err)
 	expected := `type Character {
 	appearsIn: [episode!]

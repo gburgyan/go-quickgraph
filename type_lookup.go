@@ -26,6 +26,7 @@ type FieldLookup struct {
 }
 
 type TypeLookup struct {
+	typ                 reflect.Type
 	name                string
 	fields              map[string]FieldLookup
 	fieldsLowercase     map[string]FieldLookup
@@ -75,6 +76,7 @@ func (g *Graphy) makeTypeFieldLookup(typ reflect.Type) *TypeLookup {
 	// Include the anonymous fields in this search and treat them as if
 	// they were part of the current type in a flattened manner.
 	result := &TypeLookup{
+		typ:                 typ,
 		name:                typ.Name(),
 		fields:              make(map[string]FieldLookup),
 		fieldsLowercase:     map[string]FieldLookup{},

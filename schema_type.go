@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func (g *Graphy) schemataForTypes(types ...*TypeLookup) (string, error) {
+func (g *Graphy) schemaForOutputTypes(types ...*TypeLookup) (string, error) {
 
 	completed := make(map[string]bool)
 
@@ -22,7 +22,7 @@ func (g *Graphy) schemataForTypes(types ...*TypeLookup) (string, error) {
 		}
 		completed[typeQueue[i].name] = true
 		t := typeQueue[i]
-		schema, extra, err := g.schemaForType(t)
+		schema, extra, err := g.schemaForOutputType(t)
 		if err != nil {
 			return "", err
 		}
@@ -75,7 +75,7 @@ func (g *Graphy) schemaForEnum(et reflect.Type) string {
 	return sb.String()
 }
 
-func (g *Graphy) schemaForType(t *TypeLookup) (string, []reflect.Type, error) {
+func (g *Graphy) schemaForOutputType(t *TypeLookup) (string, []reflect.Type, error) {
 	var extraTypes []reflect.Type
 
 	sb := strings.Builder{}
@@ -93,7 +93,7 @@ func (g *Graphy) schemaForType(t *TypeLookup) (string, []reflect.Type, error) {
 	for _, name := range fieldNames {
 		field := t.fieldsLowercase[name]
 		if field.fieldType == FieldTypeField {
-			typeString, extraType := g.schemaForTypeLookup(field.resultType)
+			typeString, extraType := g.schemaRefForType(field.resultType)
 			if extraType != nil {
 				extraTypes = append(extraTypes, extraType)
 			}
@@ -108,7 +108,7 @@ func (g *Graphy) schemaForType(t *TypeLookup) (string, []reflect.Type, error) {
 	return sb.String(), extraTypes, nil
 }
 
-func (g *Graphy) schemaForTypeLookup(t reflect.Type) (string, reflect.Type) {
+func (g *Graphy) schemaRefForType(t reflect.Type) (string, reflect.Type) {
 	var extraType reflect.Type
 
 	optional := false

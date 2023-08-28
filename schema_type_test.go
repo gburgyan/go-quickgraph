@@ -36,8 +36,14 @@ func TestGraphy_schemataForTypes(t *testing.T) {
 
 	cl := g.typeLookup(reflect.TypeOf(c))
 
-	schema, _, err := g.schemaForOutputTypes(cl)
+	schema, enums, err := g.schemaForOutputTypes(cl)
 	assert.NoError(t, err)
+
+	types, err := g.schemaForEnumTypes(enums...)
+	assert.NoError(t, err)
+
+	schema += types
+
 	expected := `type Character {
 	appearsIn: [episode!]
 	friends: [Character]

@@ -30,8 +30,8 @@ type TypeLookup struct {
 	name                string
 	fields              map[string]FieldLookup
 	fieldsLowercase     map[string]FieldLookup
-	implements          map[string]bool
-	implementsLowercase map[string]bool
+	implements          map[string]*TypeLookup
+	implementsLowercase map[string]*TypeLookup
 	union               map[string]*TypeLookup
 	unionLowercase      map[string]*TypeLookup
 }
@@ -80,8 +80,8 @@ func (g *Graphy) makeTypeFieldLookup(typ reflect.Type) *TypeLookup {
 		name:                typ.Name(),
 		fields:              make(map[string]FieldLookup),
 		fieldsLowercase:     map[string]FieldLookup{},
-		implements:          map[string]bool{},
-		implementsLowercase: map[string]bool{},
+		implements:          map[string]*TypeLookup{},
+		implementsLowercase: map[string]*TypeLookup{},
 		union:               map[string]*TypeLookup{},
 		unionLowercase:      map[string]*TypeLookup{},
 	}
@@ -156,8 +156,11 @@ func (g *Graphy) processBaseTypeFieldLookup(typ reflect.Type, prevIndex []int, t
 			})
 			// Get the name of the type of the field.
 			name := field.Type.Name()
-			tl.implements[name] = true
-			tl.implementsLowercase[strings.ToLower(name)] = true
+
+			anonLookup := g.typeLookup(field.Type)
+
+			tl.implements[name] = anonLookup
+			tl.implementsLowercase[strings.ToLower(name)] = anonLookup
 		} else {
 			// TODO: Add enum support here. Special processing for strings that implement
 			//  the StringEnumValues interface.

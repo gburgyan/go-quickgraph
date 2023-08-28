@@ -110,8 +110,8 @@ func (g *Graphy) typeLookup(typ reflect.Type) *TypeLookup {
 		result := &TypeLookup{
 			fields:              make(map[string]FieldLookup),
 			fieldsLowercase:     map[string]FieldLookup{},
-			implements:          map[string]bool{},
-			implementsLowercase: map[string]bool{},
+			implements:          map[string]*TypeLookup{},
+			implementsLowercase: map[string]*TypeLookup{},
 			union:               map[string]*TypeLookup{},
 			unionLowercase:      map[string]*TypeLookup{},
 		}

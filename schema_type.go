@@ -89,6 +89,21 @@ func (g *Graphy) schemaForOutputType(t *TypeLookup) (string, []reflect.Type, err
 	sb := strings.Builder{}
 	sb.WriteString("type ")
 	sb.WriteString(t.name)
+
+	if len(t.implements) > 0 {
+		sb.WriteString(" implements")
+		interfaceCount := 0
+		for _, implementedType := range t.implements {
+			sb.WriteString(" ")
+			if interfaceCount > 0 {
+				sb.WriteString("& ")
+			}
+			interfaceCount++
+			sb.WriteString(implementedType.name)
+			extraTypes = append(extraTypes, implementedType.typ)
+		}
+	}
+
 	sb.WriteString(" {\n")
 
 	// Get the field names in alphabetical order.
@@ -101,6 +116,11 @@ func (g *Graphy) schemaForOutputType(t *TypeLookup) (string, []reflect.Type, err
 	for _, name := range fieldNames {
 		field := t.fieldsLowercase[name]
 		if field.fieldType == FieldTypeField {
+			if len(field.fieldIndexes) > 1 {
+				// These are going to be either union or implemented interfaces. These need
+				// to be handled differently.
+				continue
+			}
 			typeString, extraType := g.schemaRefForType(field.resultType)
 			if extraType != nil {
 				extraTypes = append(extraTypes, extraType)
@@ -112,6 +132,7 @@ func (g *Graphy) schemaForOutputType(t *TypeLookup) (string, []reflect.Type, err
 			sb.WriteString("\n")
 		}
 	}
+
 	sb.WriteString("}\n")
 	return sb.String(), extraTypes, nil
 }
@@ -177,13 +198,13 @@ func (g *Graphy) schemaRefForType(t reflect.Type) (string, reflect.Type) {
 	}
 
 	work := baseType
-	if !optionalInner {
-		work = work + "!"
-	}
 	if array {
+		if !optionalInner {
+			work = work + "!"
+		}
 		work = "[" + work + "]"
 	}
-	if optional {
+	if !optional {
 		work = work + "!"
 	}
 

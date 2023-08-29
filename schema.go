@@ -51,8 +51,8 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) (string, error) {
 			sb.WriteString(funcParams)
 
 			sb.WriteString("): ")
-			schemaRef, _ := g.schemaRefForType(function.returnType.typ)
-			outputTypes = append(outputTypes, function.returnType)
+			schemaRef, _ := g.schemaRefForType(function.rawReturnType)
+			outputTypes = append(outputTypes, function.baseReturnType)
 			sb.WriteString(schemaRef)
 			sb.WriteString("\n")
 		}

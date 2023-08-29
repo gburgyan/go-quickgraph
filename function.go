@@ -49,14 +49,15 @@ type FunctionDefinition struct {
 }
 
 type GraphFunction struct {
-	g           *Graphy
-	name        string
-	paramType   GraphFunctionParamType
-	mode        GraphFunctionMode
-	function    reflect.Value
-	nameMapping map[string]FunctionNameMapping
-	returnType  *TypeLookup
-	method      bool
+	g              *Graphy
+	name           string
+	paramType      GraphFunctionParamType
+	mode           GraphFunctionMode
+	function       reflect.Value
+	nameMapping    map[string]FunctionNameMapping
+	baseReturnType *TypeLookup
+	rawReturnType  reflect.Type
+	method         bool
 }
 
 type FunctionNameMapping struct {
@@ -218,9 +219,12 @@ func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc ref
 		panic(err)
 	}
 	if returnType == anyType && len(def.ReturnAnyOverride) > 0 {
-		gf.returnType = g.convertAnySlice(def.ReturnAnyOverride)
+		gf.baseReturnType = g.convertAnySlice(def.ReturnAnyOverride)
+		// We need special handling for the `any` type later.
+		gf.rawReturnType = returnType
 	} else {
-		gf.returnType = g.typeLookup(returnType)
+		gf.baseReturnType = g.typeLookup(returnType)
+		gf.rawReturnType = returnType
 	}
 
 	hasNames := false
@@ -274,9 +278,9 @@ func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflec
 		panic(err)
 	}
 	if returnType == anyType && len(def.ReturnAnyOverride) > 0 {
-		gf.returnType = g.convertAnySlice(def.ReturnAnyOverride)
+		gf.baseReturnType = g.convertAnySlice(def.ReturnAnyOverride)
 	} else {
-		gf.returnType = g.typeLookup(returnType)
+		gf.baseReturnType = g.typeLookup(returnType)
 	}
 
 	// The parameter type must be a pointer to a struct. We will panic if it is

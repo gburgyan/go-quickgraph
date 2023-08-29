@@ -27,9 +27,11 @@ func TestGraphy_schemaForType(t *testing.T) {
 
 	episodeType := reflect.TypeOf(episode(""))
 	charType := reflect.TypeOf(Character{})
+	FriendsConnectionType := reflect.TypeOf(&FriendsConnection{})
 
 	assert.Equal(t, episodeType, extraTypes[0])
 	assert.Equal(t, charType, extraTypes[1])
+	assert.Equal(t, FriendsConnectionType, extraTypes[2])
 }
 
 func TestGraphy_simpleSchema(t *testing.T) {

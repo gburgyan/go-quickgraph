@@ -279,8 +279,10 @@ func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflec
 	}
 	if returnType == anyType && len(def.ReturnAnyOverride) > 0 {
 		gf.baseReturnType = g.convertAnySlice(def.ReturnAnyOverride)
+		gf.rawReturnType = returnType
 	} else {
 		gf.baseReturnType = g.typeLookup(returnType)
+		gf.rawReturnType = returnType
 	}
 
 	// The parameter type must be a pointer to a struct. We will panic if it is

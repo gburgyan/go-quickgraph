@@ -110,21 +110,22 @@ func TestGraphy_enumSchema(t *testing.T) {
 
 	g.RegisterFunction(ctx, FunctionDefinition{
 		Name: "search",
-		Function: func() []SearchResultUnion {
+		Function: func(search string) []SearchResultUnion {
 			return []SearchResultUnion{
 				{
 					Human: &Human{},
 				},
 			}
 		},
-		Mode: ModeQuery,
+		Mode:           ModeQuery,
+		ParameterNames: []string{"search"},
 	})
 
 	schema, err := g.SchemaDefinition(ctx)
 	assert.NoError(t, err)
 
 	expected := `type Query {
-	search(): [SearchResult!]!
+	search(search: String!): [SearchResult!]!
 }
 
 union SearchResult = Droid | Human | Starship

@@ -2,7 +2,6 @@ package quickgraph
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"slices"
 	"strings"
@@ -80,12 +79,12 @@ func (g *Graphy) schemaForFunctionParameters(f *GraphFunction) (string, []reflec
 	sb := strings.Builder{}
 
 	if f.paramType == AnonymousParamsInline {
-		mappings := []*FunctionNameMapping{}
+		mappings := []FunctionNameMapping{}
 		for _, param := range f.nameMapping {
-			mappings = append(mappings, &param)
+			mappings = append(mappings, param)
 		}
 		// Sort by index
-		slices.SortFunc(mappings, func(i, j *FunctionNameMapping) int {
+		slices.SortFunc(mappings, func(i, j FunctionNameMapping) int {
 			return i.paramIndex - i.paramIndex
 		})
 
@@ -93,7 +92,7 @@ func (g *Graphy) schemaForFunctionParameters(f *GraphFunction) (string, []reflec
 			if i > 0 {
 				sb.WriteString(", ")
 			}
-			sb.WriteString(fmt.Sprintf("In%d", i))
+			sb.WriteString(param.name)
 			sb.WriteString(": ")
 			schemaRef, _ := g.schemaRefForType(param.paramType)
 			sb.WriteString(schemaRef)

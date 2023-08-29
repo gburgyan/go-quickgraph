@@ -239,20 +239,21 @@ func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc ref
 	for i, mapping := range inputs {
 		mapping := mapping
 
-		if hasNames {
-			gf.nameMapping[def.ParameterNames[i]] = mapping
-			mapping.name = def.ParameterNames[i]
-			mapping.anonymousArgument = false
-		} else {
-			mapping.name = fmt.Sprintf("arg%d", mapping.paramIndex)
-			mapping.anonymousArgument = true
-		}
-
 		// If the field is a pointer, it is optional.
 		if mapping.paramType.Kind() == reflect.Ptr {
 			mapping.required = false
 		} else {
 			mapping.required = true
+		}
+
+		if hasNames {
+			mapping.name = def.ParameterNames[i]
+			mapping.anonymousArgument = false
+			gf.nameMapping[def.ParameterNames[i]] = mapping
+		} else {
+			mapping.name = fmt.Sprintf("arg%d", mapping.paramIndex)
+			mapping.anonymousArgument = true
+			gf.nameMapping[mapping.name] = mapping
 		}
 	}
 

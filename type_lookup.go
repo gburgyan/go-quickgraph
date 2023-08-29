@@ -103,17 +103,17 @@ func (g *Graphy) processFieldLookup(typ reflect.Type, prevIndex []int, tl *TypeL
 
 func (g *Graphy) processUnionFieldLookup(typ reflect.Type, prevIndex []int, tl *TypeLookup, name string) {
 	name = name[:len(name)-5]
+	tl.name = name
+
 	// The convention for this is to have anonymous fields for each type in the union.
 
 	for i := 0; i < typ.NumField(); i++ {
 		field := typ.Field(i)
-		if !field.Anonymous {
-			// For union types, we only care about the anonymous fields.
-			continue
-		}
+
+		// TODO: Add some sanity checking here. Right now it's is bit too loose.
 		fieldType := field.Type
 		fieldTypeLookup := g.typeLookup(fieldType)
-		tl.union[name] = fieldTypeLookup
+		tl.union[fieldTypeLookup.name] = fieldTypeLookup
 		// If the lowercase version of the field name is not already in the map,
 		// add it.
 		if _, ok := tl.unionLowercase[strings.ToLower(name)]; !ok {

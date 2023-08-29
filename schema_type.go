@@ -86,6 +86,33 @@ func (g *Graphy) schemaForEnum(et reflect.Type) string {
 func (g *Graphy) schemaForOutputType(t *TypeLookup) (string, []reflect.Type, error) {
 	var extraTypes []reflect.Type
 
+	// TODO: this can use some refactoring -- the function seems too complex as it is.
+	if len(t.union) > 0 {
+		sb := strings.Builder{}
+		sb.WriteString("union ")
+		sb.WriteString(t.name)
+		sb.WriteString(" =")
+		unionCount := 0
+		// Get the union names in alphabetical order.
+		var unionNames []string
+		for n := range t.union {
+			unionNames = append(unionNames, n)
+		}
+		sort.Strings(unionNames)
+		for _, unionName := range unionNames {
+			unionType := t.union[unionName]
+			sb.WriteString(" ")
+			if unionCount > 0 {
+				sb.WriteString("| ")
+			}
+			unionCount++
+			sb.WriteString(unionType.name)
+			extraTypes = append(extraTypes, unionType.typ)
+		}
+		sb.WriteString("\n")
+		return sb.String(), extraTypes, nil
+	}
+
 	sb := strings.Builder{}
 	sb.WriteString("type ")
 	sb.WriteString(t.name)

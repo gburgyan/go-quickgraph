@@ -66,7 +66,7 @@ enum episode {
 	assert.Equal(t, expected, schema)
 }
 
-func TestGraphy_complexSchema(t *testing.T) {
+func TestGraphy_implementsSchema(t *testing.T) {
 	g := Graphy{}
 	ctx := context.Background()
 
@@ -85,6 +85,61 @@ func TestGraphy_complexSchema(t *testing.T) {
 
 type Human implements Character {
 	HeightMeters: Float!
+}
+
+type Character {
+	appearsIn: [episode!]!
+	friends: [Character]!
+	id: String!
+	name: String!
+}
+
+enum episode {
+	NEWHOPE
+	EMPIRE
+	JEDI
+}
+
+`
+	assert.Equal(t, expected, schema)
+}
+
+func TestGraphy_enumSchema(t *testing.T) {
+	g := Graphy{}
+	ctx := context.Background()
+
+	g.RegisterFunction(ctx, FunctionDefinition{
+		Name: "search",
+		Function: func() []SearchResultUnion {
+			return []SearchResultUnion{
+				{
+					Human: &Human{},
+				},
+			}
+		},
+		Mode: ModeQuery,
+	})
+
+	schema, err := g.SchemaDefinition(ctx)
+	assert.NoError(t, err)
+
+	expected := `type Query {
+	search(): [SearchResult!]!
+}
+
+union SearchResult = Droid | Human | Starship
+
+type Droid implements Character {
+	primaryFunction: String!
+}
+
+type Human implements Character {
+	HeightMeters: Float!
+}
+
+type Starship {
+	id: String!
+	name: String!
 }
 
 type Character {

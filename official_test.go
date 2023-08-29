@@ -24,6 +24,18 @@ type FriendsConnection struct {
 	Edges      []*ConnectionEdge `json:"edges"`
 }
 
+type Starship struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
+	// TODO: Add support for length.
+}
+
+type SearchResultUnion struct {
+	Human    *Human
+	Droid    *Droid
+	Starship *Starship
+}
+
 func (c *Character) FriendsConnection(first int) *FriendsConnection {
 	result := &FriendsConnection{
 		TotalCount: len(c.Friends),

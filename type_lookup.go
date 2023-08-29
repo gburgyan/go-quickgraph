@@ -189,15 +189,15 @@ func (g *Graphy) processBaseTypeFieldLookup(typ reflect.Type, prevIndex []int, t
 
 	// Loop through the methods of the type and find any that match the above criteria.
 
-	g.addGraphMethodsForType(typ, tl)
+	g.addGraphMethodsForType(typ, prevIndex, tl)
 
 	// if typ is a struct, make a pointer to it to account for receiver pointers.
 	if typ.Kind() == reflect.Struct {
 		typ = reflect.PtrTo(typ)
-		g.addGraphMethodsForType(typ, tl)
+		g.addGraphMethodsForType(typ, prevIndex, tl)
 	} else if typ.Kind() == reflect.Ptr {
 		typ = typ.Elem()
-		g.addGraphMethodsForType(typ, tl)
+		g.addGraphMethodsForType(typ, prevIndex, tl)
 	}
 
 	// Process the anonymous fields.
@@ -206,7 +206,7 @@ func (g *Graphy) processBaseTypeFieldLookup(typ reflect.Type, prevIndex []int, t
 	}
 }
 
-func (g *Graphy) addGraphMethodsForType(typ reflect.Type, tl *TypeLookup) {
+func (g *Graphy) addGraphMethodsForType(typ reflect.Type, index []int, tl *TypeLookup) {
 	for i := 0; i < typ.NumMethod(); i++ {
 		m := typ.Method(i)
 
@@ -226,10 +226,15 @@ func (g *Graphy) addGraphMethodsForType(typ reflect.Type, tl *TypeLookup) {
 				Name:     m.Name,
 				Function: m.Func,
 			}, true)
+			// TODO: There seems to be a reflection issue where functions from
+			//  an anonymous struct are not properly recognized as being from
+			//  that struct. We need to figure out what's going on so when emitting
+			//  the schema we can properly identify the type and not output the
+			//  function multiple times.
 			tfl := FieldLookup{
 				name:          m.Name,
 				resultType:    m.Type,
-				fieldIndexes:  nil,
+				fieldIndexes:  index,
 				fieldType:     FieldTypeGraphFunction,
 				graphFunction: &gf,
 			}

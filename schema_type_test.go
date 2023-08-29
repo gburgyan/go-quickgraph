@@ -17,12 +17,13 @@ func TestGraphy_schemaForType(t *testing.T) {
 	expected := `type Character {
 	appearsIn: [episode!]!
 	friends: [Character]!
+	FriendsConnection(arg1: Int!): FriendsConnection
 	id: String!
 	name: String!
 }
 `
 	assert.Equal(t, expected, schema)
-	assert.Len(t, extraTypes, 2)
+	assert.Len(t, extraTypes, 3)
 
 	episodeType := reflect.TypeOf(episode(""))
 	charType := reflect.TypeOf(Character{})
@@ -52,8 +53,18 @@ func TestGraphy_simpleSchema(t *testing.T) {
 type Character {
 	appearsIn: [episode!]!
 	friends: [Character]!
+	FriendsConnection(arg1: Int!): FriendsConnection
 	id: String!
 	name: String!
+}
+
+type FriendsConnection {
+	edges: [ConnectionEdge]!
+	totalCount: Int!
+}
+
+type ConnectionEdge {
+	node: Character
 }
 
 enum episode {
@@ -84,14 +95,26 @@ func TestGraphy_implementsSchema(t *testing.T) {
 }
 
 type Human implements Character {
+	FriendsConnection(arg1: Int!): FriendsConnection
+	Height(arg1: String): Float!
 	HeightMeters: Float!
 }
 
 type Character {
 	appearsIn: [episode!]!
 	friends: [Character]!
+	FriendsConnection(arg1: Int!): FriendsConnection
 	id: String!
 	name: String!
+}
+
+type FriendsConnection {
+	edges: [ConnectionEdge]!
+	totalCount: Int!
+}
+
+type ConnectionEdge {
+	node: Character
 }
 
 enum episode {
@@ -131,10 +154,13 @@ func TestGraphy_enumSchema(t *testing.T) {
 union SearchResult = Droid | Human | Starship
 
 type Droid implements Character {
+	FriendsConnection(arg1: Int!): FriendsConnection
 	primaryFunction: String!
 }
 
 type Human implements Character {
+	FriendsConnection(arg1: Int!): FriendsConnection
+	Height(arg1: String): Float!
 	HeightMeters: Float!
 }
 
@@ -146,8 +172,18 @@ type Starship {
 type Character {
 	appearsIn: [episode!]!
 	friends: [Character]!
+	FriendsConnection(arg1: Int!): FriendsConnection
 	id: String!
 	name: String!
+}
+
+type FriendsConnection {
+	edges: [ConnectionEdge]!
+	totalCount: Int!
+}
+
+type ConnectionEdge {
+	node: Character
 }
 
 enum episode {

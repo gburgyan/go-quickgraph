@@ -42,11 +42,18 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) (string, error) {
 			sb.WriteString(function.name)
 			sb.WriteString("(")
 
-			funcParams, fEnums, err := g.schemaForFunctionParameters(function)
+			funcParams, fOuput, err := g.schemaForFunctionParameters(function)
 			if err != nil {
 				return "", err
 			}
-			enumTypes = append(enumTypes, fEnums...)
+			for _, outType := range fOuput {
+				if outType.AssignableTo(stringEnumValuesType) {
+					enumTypes = append(enumTypes, outType)
+				} else {
+					outTypeLookup := g.typeLookup(outType)
+					outputTypes = append(outputTypes, outTypeLookup)
+				}
+			}
 			sb.WriteString(funcParams)
 
 			sb.WriteString("): ")
@@ -78,27 +85,28 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) (string, error) {
 func (g *Graphy) schemaForFunctionParameters(f *GraphFunction) (string, []reflect.Type, error) {
 	sb := strings.Builder{}
 
-	if f.paramType == AnonymousParamsInline {
-		mappings := []FunctionNameMapping{}
-		for _, param := range f.nameMapping {
-			mappings = append(mappings, param)
-		}
-		// Sort by index
-		slices.SortFunc(mappings, func(i, j FunctionNameMapping) int {
-			return i.paramIndex - i.paramIndex
-		})
+	mappings := []FunctionNameMapping{}
+	for _, param := range f.nameMapping {
+		mappings = append(mappings, param)
+	}
+	// Sort by index
+	slices.SortFunc(mappings, func(i, j FunctionNameMapping) int {
+		return i.paramIndex - i.paramIndex
+	})
 
-		for i, param := range mappings {
-			if i > 0 {
-				sb.WriteString(", ")
-			}
-			sb.WriteString(param.name)
-			sb.WriteString(": ")
-			schemaRef, _ := g.schemaRefForType(param.paramType)
-			sb.WriteString(schemaRef)
+	for i, param := range mappings {
+		if i > 0 {
+			sb.WriteString(", ")
 		}
-
+		sb.WriteString(param.name)
+		sb.WriteString(": ")
+		schemaRef, _ := g.schemaRefForType(param.paramType)
+		sb.WriteString(schemaRef)
 	}
 
-	return sb.String(), nil, nil
+	ret := []reflect.Type{
+		f.rawReturnType,
+	}
+
+	return sb.String(), ret, nil
 }

@@ -17,6 +17,10 @@ func (g *Graphy) schemaForOutputTypes(types ...*TypeLookup) (string, []reflect.T
 
 	sb := strings.Builder{}
 	for i := 0; i < len(typeQueue); i++ {
+		if typeQueue[i] == nil {
+			// TODO: WTF?
+			continue
+		}
 		if completed[typeQueue[i].name] {
 			continue
 		}
@@ -157,6 +161,27 @@ func (g *Graphy) schemaForOutputType(t *TypeLookup) (string, []reflect.Type, err
 			sb.WriteString(": ")
 			sb.WriteString(typeString)
 			sb.WriteString("\n")
+		} else if field.fieldType == FieldTypeGraphFunction {
+			if len(field.fieldIndexes) > 1 {
+				// These are going to be either union or implemented interfaces. These need
+				// to be handled differently.
+				continue
+			}
+			sb.WriteString("\t")
+			sb.WriteString(field.name)
+			sb.WriteString("(")
+			funcParams, fEnums, err := g.schemaForFunctionParameters(field.graphFunction)
+			if err != nil {
+				return "", nil, err
+			}
+			extraTypes = append(extraTypes, fEnums...)
+			sb.WriteString(funcParams)
+			sb.WriteString("): ")
+			schemaRef, _ := g.schemaRefForType(field.graphFunction.rawReturnType)
+			sb.WriteString(schemaRef)
+			sb.WriteString("\n")
+		} else {
+			panic("unknown field type")
 		}
 	}
 
@@ -193,20 +218,11 @@ func (g *Graphy) schemaRefForType(t reflect.Type) (string, reflect.Type) {
 			baseType = "String"
 		}
 
-	case reflect.Int:
-	case reflect.Int8:
-	case reflect.Int16:
-	case reflect.Int32:
-	case reflect.Int64:
-	case reflect.Uint:
-	case reflect.Uint8:
-	case reflect.Uint16:
-	case reflect.Uint32:
-	case reflect.Uint64:
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		baseType = "Int"
 
-	case reflect.Float32:
-	case reflect.Float64:
+	case reflect.Float32, reflect.Float64:
 		baseType = "Float"
 
 	case reflect.Bool:

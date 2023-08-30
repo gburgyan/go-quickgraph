@@ -3,7 +3,7 @@ package quickgraph
 import (
 	"context"
 	"reflect"
-	"slices"
+	"sort"
 	"strings"
 )
 
@@ -90,8 +90,8 @@ func (g *Graphy) schemaForFunctionParameters(f *GraphFunction) (string, []reflec
 		mappings = append(mappings, param)
 	}
 	// Sort by index
-	slices.SortFunc(mappings, func(i, j FunctionNameMapping) int {
-		return i.paramIndex - i.paramIndex
+	sort.Slice(mappings, func(i, j int) bool {
+		return mappings[i].paramIndex < mappings[j].paramIndex
 	})
 
 	for i, param := range mappings {

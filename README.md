@@ -72,6 +72,81 @@ Finally, we set up a `Graphy` object and tell it about the function that will pr
 
 In normal usage, we would initialize the `Graphy` object once, and then use it to process multiple requests. The `Graphy` object is thread-safe, so it can be used concurrently. It also caches all the reflection information that instructs it how to process the requests, so it is more efficient to reuse the same object. Additionally, it caches the parsed *queries* as well so if the same query is processed multiple times, it will be faster. This allows for the same query to be resused with different variable values.
 
+# Theory of Operation
+
+## Initialization of the Graphy Object
+
+As the above example illustrates, the first step is to create a `Graphy` object. The intent is that an instance of this object is set up at service initialization time, and then used to process requests. The `Graphy` object is thread-safe, so it can be used concurrently.
+
+The process is to add all the functions that can be used to service queries and mutations. The library will use reflection to figure out what the function signatures are, and will use that information to process the requests. The library will also use reflection to figure out what the types are of the parameters and return values, and will use that information to process the requests and generate the GraphQL schema.
+
+Functions are simple Go `func`s that handle the processing. There are two broad "flavors" of functions: struct-based and anonymous. Since Go doesn't permit reflection of the parameters of functions we a few options. If the function takes one non-`Context` `struct` parameter, it will be treated as struct-based. The fields of the `struct` will be used to figure out the function signature. Otherwise, the function is an anonymous function. During the addition of a function, the ordered listing of parameter names can be passed. This will be covered in more detail further in this `README`.
+
+Once all the functions are added, the `Graphy` object is ready to be used.
+
+## Processing of a Request
+
+Internally, a request is processed in three phases:
+
+### Query Processing:
+
+The inbound query is parsed into a `RequestStub` object. Since a request can have variables, the determination of the variable types can be done once, then cached. This is important because in complex cases, this can be an expensive operation as both the input and potential outputs must be considered.
+
+### Variable Processing
+
+If there are variables to be processed, they are unmarshalled using JSON. The result objects are then mapped into the variables that have been defined by the preceeding step. Variables can represent both simple scalar types and more complex object graphs.
+
+### Function Execution
+
+Once the variables have been defined, the query or mutator functions can be called. This will call a function that was initially registered with the `Graphy` instance. 
+
+### Output Generation
+
+The most complex part of the overall request processing is the generation of the result object graph. All aspects of the standard GraphQL query language are supported. See the section on the [type systems](#type-system) for more information about how this operates.
+
+Another aspect that GraphQL supports is operations that function on the returned data. This library models that as receiver functions on results variables:
+
+```go
+
+func (c *Character) FriendsConnection(first int) *FriendsConnection {
+	// Processing goes here...
+    return result
+}
+
+type FriendsConnection struct {
+    TotalCount int               `json:"totalCount"`
+    Edges      []*ConnectionEdge `json:"edges"`
+}
+```
+
+This, in addition to the earlier example, will expose a function on the result object that is represented by a schema such as:
+
+```graphql
+type Character {
+	appearsIn: [episode!]!
+	friends: [Character]!
+	FriendsConnection(arg1: Int!): FriendsConnection
+	id: String!
+	name: String!
+}
+```
+
+There are several important things here:
+
+* All public fields of the `Character` struct are reflected in the schema.
+* The `json` tags are respected for the field naming
+* The `FriendsConnection` receiver function is an [anonymous function](#anonymous-functions).
+
+There is a further discussion on [schemata](#schema-generation) later on.
+
+# Functions
+
+## Struct Functions 
+
+## Anonymous Functions
+
+## Helper Functions
+
 # Type System
 
 ## Enums
@@ -80,12 +155,11 @@ In normal usage, we would initialize the `Graphy` object once, and then use it t
 
 ## Unions
 
-# Functions
+# Schema Generation
 
-## Struct Functions vs. Anonymous Functions
-
-## Helper Functions
+## Limitations
 
 # Limitations
 
+## Validation of Input
 

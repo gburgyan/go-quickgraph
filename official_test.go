@@ -54,6 +54,11 @@ func (c *Character) FriendsConnection(first int) *FriendsConnection {
 
 type episode string
 
+type Review struct {
+	Stars      int     `json:"stars"`
+	Commentary *string `json:"commentary"`
+}
+
 func (e episode) EnumValues() []string {
 	return []string{
 		"NEWHOPE",
@@ -430,4 +435,59 @@ query HeroNameAndFriends($episode: Episode = JEDI) {
 
 	definition, err := g.SchemaDefinition(ctx)
 	fmt.Println(definition)
+}
+
+func TestMutatorWithComplexInput(t *testing.T) {
+
+	createReview := func(ctx context.Context, episode episode, review Review) Review {
+		return review
+	}
+
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterProcessorWithParamNames(ctx, "createReview", createReview, "episode", "review")
+
+	input := `
+mutation {
+  createReview(episode: "JEDI", review: {stars: 5, commentary: "This is a great movie!"}) {
+    stars
+    commentary
+  }
+}`
+
+	resultAny, err := g.ProcessRequest(ctx, input, "")
+	assert.NoError(t, err)
+	assert.Equal(t, `{"data":{"createReview":{"commentary":"This is a great movie!","stars":5}}}`, resultAny)
+}
+
+func TestMutatorWithComplexInputVars(t *testing.T) {
+
+	createReview := func(ctx context.Context, episode episode, review Review) Review {
+		return review
+	}
+
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterProcessorWithParamNames(ctx, "createReview", createReview, "episode", "review")
+
+	input := `
+mutation CreateReviewForEpisode($ep: Episode!, $review: ReviewInput!) {
+  createReview(episode: $ep, review: $review) {
+    stars
+    commentary
+  }
+}`
+
+	vars := `
+{
+  "ep": "JEDI",
+  "review": {
+    "stars": 5,
+    "commentary": "This is a great movie!"
+  }
+}`
+
+	resultAny, err := g.ProcessRequest(ctx, input, vars)
+	assert.NoError(t, err)
+	assert.Equal(t, `{"data":{"createReview":{"commentary":"This is a great movie!","stars":5}}}`, resultAny)
 }

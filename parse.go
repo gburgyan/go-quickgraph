@@ -7,86 +7,86 @@ import (
 
 // Wrapper is the top-level GraphQL wrapper.
 type Wrapper struct {
-	Mode         string        `@Ident?`
-	OperationDef *OperationDef `@@?`
-	Commands     []Command     `( "{" @@+ "}" )+`
-	Fragments    []Fragment    `(FragmentToken @@)*`
+	Mode         string        `parser:"@Ident?"`
+	OperationDef *OperationDef `parser:"@@?"`
+	Commands     []Command     `parser:"( '{' @@+ '}' )+"`
+	Fragments    []Fragment    `parser:"(FragmentToken @@)*"`
 }
 
 type OperationDef struct {
-	Name      string        `@Ident`
-	Variables []VariableDef `("(" @@ ("," @@)* ")")?`
+	Name      string        `parser:"@Ident"`
+	Variables []VariableDef `parser:"( '(' @@ (',' @@)* ')' )?"`
 }
 
 type VariableDef struct {
-	Name  string        `@Variable ":"`
-	Type  string        `"["? @Ident "!"? "]"? "!"?`
-	Value *GenericValue `("=" @@)?`
+	Name  string        `parser:"@Variable ':'"`
+	Type  string        `parser:"'['? @Ident '!'? ']'? '!'?"`
+	Value *GenericValue `parser:"('=' @@)?"`
 }
 
-// Command is a GraphQL command. This will be "query" or "mutation."
+// Command is a GraphQL command. This will be 'query' or 'mutation.'
 type Command struct {
-	Alias        *string        `(@Ident ":")?`
-	Name         string         `@Ident`
-	Parameters   *ParameterList `("(" @@ ")")?`
-	ResultFilter *ResultFilter  `("{" @@ "}")?`
+	Alias        *string        `parser:"(@Ident ':')?"`
+	Name         string         `parser:"@Ident"`
+	Parameters   *ParameterList `parser:"('(' @@ ')')?"`
+	ResultFilter *ResultFilter  `parser:"('{' @@ '}')?"`
 	Pos          lexer.Position
 }
 
 // ParameterList is a list of parameters for a call to a function.
 type ParameterList struct {
-	Values []NamedValue `(@@ ("," @@)*)?`
+	Values []NamedValue `parser:"(@@ (',' @@)*)?"`
 }
 
 // NamedValue is a named value. This is used for both parameters and object initialization.
 type NamedValue struct {
-	Name  string       `@Ident ":"`
-	Value GenericValue `@@`
+	Name  string       `parser:"@Ident ':'"`
+	Value GenericValue `parser:"@@"`
 }
 
 // GenericValue is a value of some type.
 type GenericValue struct {
-	Variable   *string        `@Variable`
-	Identifier *string        `| @Ident`
-	String     *string        `| @String`
-	Int        *int64         `| @Int`
-	Float      *float64       `| @Float`
-	Map        []NamedValue   `| "{" ( @@ ("," @@)*)? "}"`
-	List       []GenericValue `| "[" ( @@ ("," @@)*)? "]"`
+	Variable   *string        `parser:"@Variable"`
+	Identifier *string        `parser:"| @Ident"`
+	String     *string        `parser:"| @String"`
+	Int        *int64         `parser:"| @Int"`
+	Float      *float64       `parser:"| @Float"`
+	Map        []NamedValue   `parser:"| '{' ( @@ (',' @@)*)? '}'"`
+	List       []GenericValue `parser:"| '[' ( @@ (',' @@)*)? ']'"`
 }
 
 // ResultFilter is a filter for the result.
 type ResultFilter struct {
-	Fields    []ResultField  `@@*`
-	Fragments []FragmentCall `(FragmentStart @@)*`
+	Fields    []ResultField  `parser:"@@*"`
+	Fragments []FragmentCall `parser:"(FragmentStart @@)*"`
 }
 
 // ResultField is a field in the result to be returned.
 type ResultField struct {
-	Name       string         `@Ident`
-	Params     *ParameterList `("(" @@ ")")?`
-	Directives []Directive    `@@*`
-	SubParts   *ResultFilter  `("{" @@ "}")?`
+	Name       string         `parser:"@Ident"`
+	Params     *ParameterList `parser:"('(' @@ ')')?"`
+	Directives []Directive    `parser:"@@*"`
+	SubParts   *ResultFilter  `parser:"('{' @@ '}')?"`
 }
 
 type FragmentCall struct {
-	Inline      *FragmentDef `@@`
-	FragmentRef *string      `| @Ident `
+	Inline      *FragmentDef `parser:"@@"`
+	FragmentRef *string      `parser:"| @Ident "`
 }
 
 type Fragment struct {
-	Name       string       `@Ident`
-	Definition *FragmentDef `@@`
+	Name       string       `parser:"@Ident"`
+	Definition *FragmentDef `parser:"@@"`
 }
 
 type FragmentDef struct {
-	TypeName string        `"on" @Ident`
-	Filter   *ResultFilter `"{" @@ "}"`
+	TypeName string        `parser:"'on' @Ident"`
+	Filter   *ResultFilter `parser:"'{' @@ '}'"`
 }
 
 type Directive struct {
-	Name       string         `@Directive`
-	Parameters *ParameterList `("(" @@ ")")?`
+	Name       string         `parser:"@Directive"`
+	Parameters *ParameterList `parser:"('(' @@ ')')?"`
 }
 
 var (

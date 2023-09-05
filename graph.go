@@ -8,10 +8,11 @@ import (
 )
 
 type Graphy struct {
-	processors  map[string]GraphFunction
-	typeLookups map[reflect.Type]*TypeLookup
-	anyTypes    []*TypeLookup
-	m           sync.Mutex
+	processors   map[string]GraphFunction
+	typeLookups  map[reflect.Type]*TypeLookup
+	anyTypes     []*TypeLookup
+	m            sync.Mutex
+	RequestCache GraphRequestCache
 }
 
 var contextType = reflect.TypeOf((*context.Context)(nil)).Elem()
@@ -64,13 +65,7 @@ func (g *Graphy) ensureInitialized() {
 }
 
 func (g *Graphy) ProcessRequest(ctx context.Context, request string, variableJson string) (string, error) {
-	var err error
-
-	// TODO: Caching of the request stubs based on the request w/o the variables.
-	rs, err := g.NewRequestStub(request)
-	if err != nil {
-		return "", err
-	}
+	rs, err := g.GetRequestStub(request)
 
 	newRequest, err := rs.NewRequest(variableJson)
 	if err != nil {
@@ -126,4 +121,24 @@ func (g *Graphy) typeLookup(typ reflect.Type) *TypeLookup {
 	g.typeLookups[typ] = nil
 	g.m.Unlock()
 	return nil
+}
+
+func (g *Graphy) GetRequestStub(request string) (*RequestStub, error) {
+	if g.RequestCache == nil {
+		return g.NewRequestStub(request)
+	}
+
+	stub, err := g.RequestCache.GetRequestStub(request)
+	if err != nil {
+		return nil, err
+	}
+	if stub != nil {
+		return stub, nil
+	}
+	stub, err = g.NewRequestStub(request)
+	if err != nil {
+		return nil, err
+	}
+	g.RequestCache.SetRequestStub(request, stub)
+	return stub, nil
 }

@@ -32,6 +32,18 @@ type RequestVariable struct {
 	Default *GenericValue
 }
 
+// TODO: Generating the cache key for a request can be time consuming; this should
+//
+//	return an intermediate interface that can also be used to generate the cache key.
+type GraphRequestCache interface {
+	// GetRequestStub returns the request stub for a request. It should return nil if the request
+	// is not cached.
+	GetRequestStub(request string) (*RequestStub, error)
+
+	// SetRequestStub sets the request stub for a request.
+	SetRequestStub(request string, stub *RequestStub)
+}
+
 // Request represents a complete GraphQL-like request. It contains the Graphy instance, the request stub,
 // and the actual variables used in the request.
 type Request struct {

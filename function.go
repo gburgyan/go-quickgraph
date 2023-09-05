@@ -399,7 +399,7 @@ func (f *GraphFunction) Call(ctx context.Context, req *Request, params *Paramete
 	for _, callResult := range callResults {
 		if callResult.CanConvert(errorType) {
 			if !callResult.IsNil() {
-				return reflect.Value{}, fmt.Errorf("non-nil error: %w", callResult.Convert(errorType).Interface().(error))
+				return reflect.Value{}, callResult.Convert(errorType).Interface().(error)
 			}
 		} else {
 			resultValue = callResult

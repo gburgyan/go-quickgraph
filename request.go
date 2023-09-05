@@ -404,13 +404,39 @@ func (r *Request) Execute(ctx context.Context) (string, error) {
 	data := map[string]any{}
 	result["data"] = data
 
+	var retErr error
+
 	for _, command := range r.Stub.Commands {
 		// TODO: In query mode, we can run all these in parallel.
 		// Find the processor
 		if processor, ok := r.Graphy.processors[command.Name]; ok {
 			obj, err := processor.Call(ctx, r, command.Parameters, reflect.Value{})
+
 			if err != nil {
-				return "", fmt.Errorf("error calling %s (line %d, col: %d): %w", command.Name, command.Pos.Line, command.Pos.Column, err)
+				errCollAny, found := result["errors"]
+				var errColl []GraphError
+				if !found {
+					errColl = []GraphError{}
+					result["errors"] = errColl
+				} else {
+					errColl = errCollAny.([]GraphError)
+				}
+				graphError := GraphError{
+					Message: fmt.Sprintf("error calling %s: %s", command.Name, err.Error()),
+					Locations: []ErrorLocation{
+						{
+							Line:   command.Pos.Line,
+							Column: command.Pos.Column,
+						},
+					},
+					Path: nil, // TODO
+				}
+				errColl = append(errColl, graphError)
+				// TODO: Once this is run in parallel, there's a slight race condition here with reassigning the error.
+				result["errors"] = errColl
+
+				retErr = graphError
+				continue
 			}
 			res, err := processor.GenerateResult(ctx, r, obj, command.ResultFilter)
 			if err != nil {
@@ -432,5 +458,5 @@ func (r *Request) Execute(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(marshal), nil
+	return string(marshal), retErr
 }

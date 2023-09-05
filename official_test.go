@@ -527,7 +527,7 @@ mutation CreateReviewForEpisode($ep: Episode!, $review: ReviewInput!) {
 func TestMutatorWithComplexInputVarsWithErrorReturned(t *testing.T) {
 
 	createReview := func(ctx context.Context, episode episode, review Review) (Review, error) {
-		return review, fmt.Errorf("error")
+		return review, fmt.Errorf("fixed error message")
 	}
 
 	ctx := context.Background()
@@ -552,6 +552,6 @@ mutation CreateReviewForEpisode($ep: Episode!, $review: ReviewInput!) {
 }`
 
 	resultAny, err := g.ProcessRequest(ctx, input, vars)
-	assert.EqualError(t, err, "error calling createReview (line 3, col: 3): non-nil error: error")
-	assert.Empty(t, resultAny)
+	assert.EqualError(t, err, "error calling createReview: fixed error message [3:3]")
+	assert.Equal(t, `{"data":{},"errors":[{"message":"error calling createReview: fixed error message","locations":[{"line":3,"column":3}]}]}`, resultAny)
 }

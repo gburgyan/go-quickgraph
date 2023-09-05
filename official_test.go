@@ -555,3 +555,35 @@ mutation CreateReviewForEpisode($ep: Episode!, $review: ReviewInput!) {
 	assert.EqualError(t, err, "error calling createReview: fixed error message [3:3]")
 	assert.Equal(t, `{"data":{},"errors":[{"message":"error calling createReview: fixed error message","locations":[{"line":3,"column":3}]}]}`, resultAny)
 }
+
+func TestMutatorWithComplexInputVarsPanic(t *testing.T) {
+
+	createReview := func(ctx context.Context, episode episode, review Review) (Review, error) {
+		panic("fixed error message")
+	}
+
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterProcessorWithParamNames(ctx, "createReview", createReview, "episode", "review")
+
+	input := `
+mutation CreateReviewForEpisode($ep: Episode!, $review: ReviewInput!) {
+  createReview(episode: $ep, review: $review) {
+    stars
+    commentary
+  }
+}`
+
+	vars := `
+{
+  "ep": "JEDI",
+  "review": {
+    "stars": 5,
+    "commentary": "This is a great movie!"
+  }
+}`
+
+	resultAny, err := g.ProcessRequest(ctx, input, vars)
+	assert.EqualError(t, err, "error calling createReview: panic: fixed error message [3:3]")
+	assert.Equal(t, `{"data":{},"errors":[{"message":"error calling createReview: panic: fixed error message","locations":[{"line":3,"column":3}]}]}`, resultAny)
+}

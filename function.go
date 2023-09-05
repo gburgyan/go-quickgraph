@@ -381,7 +381,14 @@ func validateFunctionReturnTypes(mft reflect.Type) (reflect.Type, error) {
 // Call executes the graph function with a given context, request and command. It first prepares the
 // parameters for the function call, then invokes the function and processes the results. If the function
 // returns an error, it returns a formatted error. If the function returns no results, it returns nil.
-func (f *GraphFunction) Call(ctx context.Context, req *Request, params *ParameterList, methodTarget reflect.Value) (reflect.Value, error) {
+func (f *GraphFunction) Call(ctx context.Context, req *Request, params *ParameterList, methodTarget reflect.Value) (val reflect.Value, retErr error) {
+	// Catch panics and return them as errors.
+	defer func() {
+		if r := recover(); r != nil {
+			val = reflect.Value{}
+			retErr = fmt.Errorf("panic: %v", r)
+		}
+	}()
 
 	paramValues, err := f.getCallParameters(ctx, req, params, methodTarget)
 	if err != nil {

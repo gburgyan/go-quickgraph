@@ -15,7 +15,11 @@ import (
 func (f *GraphFunction) processCallOutput(ctx context.Context, req *Request, filter *ResultFilter, callResult reflect.Value) (any, error) {
 	kind := callResult.Kind()
 	if callResult.CanConvert(errorType) {
-		return nil, fmt.Errorf("error calling function: %v", callResult.Convert(errorType).Interface().(error))
+		if !callResult.IsNil() {
+			return nil, fmt.Errorf("function returned error: %w", callResult.Convert(errorType).Interface().(error))
+		} else {
+			return nil, nil
+		}
 	}
 
 	if kind == reflect.Interface {

@@ -398,7 +398,9 @@ func (f *GraphFunction) Call(ctx context.Context, req *Request, params *Paramete
 	// TODO: Tighten this up to deal with the return types better.
 	for _, callResult := range callResults {
 		if callResult.CanConvert(errorType) {
-			return reflect.Value{}, fmt.Errorf("error calling function: %v", callResult.Convert(errorType).Interface().(error))
+			if !callResult.IsNil() {
+				return reflect.Value{}, fmt.Errorf("non-nil error: %w", callResult.Convert(errorType).Interface().(error))
+			}
 		} else {
 			resultValue = callResult
 		}

@@ -410,7 +410,7 @@ func (r *Request) Execute(ctx context.Context) (string, error) {
 		if processor, ok := r.Graphy.processors[command.Name]; ok {
 			obj, err := processor.Call(ctx, r, command.Parameters, reflect.Value{})
 			if err != nil {
-				return "", err
+				return "", fmt.Errorf("error calling %s (line %d, col: %d): %w", command.Name, command.Pos.Line, command.Pos.Column, err)
 			}
 			res, err := processor.GenerateResult(ctx, r, obj, command.ResultFilter)
 			if err != nil {

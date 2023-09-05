@@ -491,3 +491,67 @@ mutation CreateReviewForEpisode($ep: Episode!, $review: ReviewInput!) {
 	assert.NoError(t, err)
 	assert.Equal(t, `{"data":{"createReview":{"commentary":"This is a great movie!","stars":5}}}`, resultAny)
 }
+
+func TestMutatorWithComplexInputVarsWithError(t *testing.T) {
+
+	createReview := func(ctx context.Context, episode episode, review Review) (Review, error) {
+		return review, nil
+	}
+
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterProcessorWithParamNames(ctx, "createReview", createReview, "episode", "review")
+
+	input := `
+mutation CreateReviewForEpisode($ep: Episode!, $review: ReviewInput!) {
+  createReview(episode: $ep, review: $review) {
+    stars
+    commentary
+  }
+}`
+
+	vars := `
+{
+  "ep": "JEDI",
+  "review": {
+    "stars": 5,
+    "commentary": "This is a great movie!"
+  }
+}`
+
+	resultAny, err := g.ProcessRequest(ctx, input, vars)
+	assert.NoError(t, err)
+	assert.Equal(t, `{"data":{"createReview":{"commentary":"This is a great movie!","stars":5}}}`, resultAny)
+}
+
+func TestMutatorWithComplexInputVarsWithErrorReturned(t *testing.T) {
+
+	createReview := func(ctx context.Context, episode episode, review Review) (Review, error) {
+		return review, fmt.Errorf("error")
+	}
+
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterProcessorWithParamNames(ctx, "createReview", createReview, "episode", "review")
+
+	input := `
+mutation CreateReviewForEpisode($ep: Episode!, $review: ReviewInput!) {
+  createReview(episode: $ep, review: $review) {
+    stars
+    commentary
+  }
+}`
+
+	vars := `
+{
+  "ep": "JEDI",
+  "review": {
+    "stars": 5,
+    "commentary": "This is a great movie!"
+  }
+}`
+
+	resultAny, err := g.ProcessRequest(ctx, input, vars)
+	assert.EqualError(t, err, "error calling createReview (line 3, col: 3): non-nil error: error")
+	assert.Empty(t, resultAny)
+}

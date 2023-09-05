@@ -30,6 +30,7 @@ type Command struct {
 	Name         string         `@Ident`
 	Parameters   *ParameterList `("(" @@ ")")?`
 	ResultFilter *ResultFilter  `("{" @@ "}")?`
+	Pos          lexer.Position
 }
 
 // ParameterList is a list of parameters for a call to a function.

@@ -426,28 +426,19 @@ func (r *Request) Execute(ctx context.Context) (string, error) {
 
 			if err != nil {
 				errCollAny, found := result["errors"]
-				var errColl []GraphError
+				var errColl []error
 				if !found {
-					errColl = []GraphError{}
+					errColl = []error{}
 					result["errors"] = errColl
 				} else {
-					errColl = errCollAny.([]GraphError)
+					errColl = errCollAny.([]error)
 				}
-				graphError := GraphError{
-					Message: fmt.Sprintf("error calling %s: %s", command.Name, err.Error()),
-					Locations: []ErrorLocation{
-						{
-							Line:   command.Pos.Line,
-							Column: command.Pos.Column,
-						},
-					},
-					Path: nil, // TODO
-				}
-				errColl = append(errColl, graphError)
+				gErr := AugmentGraphError(err, fmt.Sprintf("error calling %s: %s", command.Name, err.Error()), command.Pos)
+				errColl = append(errColl, gErr)
 				// TODO: Once this is run in parallel, there's a slight race condition here with reassigning the error.
 				result["errors"] = errColl
 
-				retErr = graphError
+				retErr = gErr
 				continue
 			}
 			res, err := processor.GenerateResult(ctx, r, obj, command.ResultFilter)

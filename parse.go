@@ -16,12 +16,14 @@ type Wrapper struct {
 type OperationDef struct {
 	Name      string        `parser:"@Ident"`
 	Variables []VariableDef `parser:"( '(' @@ (',' @@)* ')' )?"`
+	Pos       lexer.Position
 }
 
 type VariableDef struct {
 	Name  string        `parser:"@Variable ':'"`
 	Type  string        `parser:"'['? @Ident '!'? ']'? '!'?"`
 	Value *GenericValue `parser:"('=' @@)?"`
+	Pos   lexer.Position
 }
 
 // Command is a GraphQL command. This will be 'query' or 'mutation.'
@@ -42,6 +44,7 @@ type ParameterList struct {
 type NamedValue struct {
 	Name  string       `parser:"@Ident ':'"`
 	Value GenericValue `parser:"@@"`
+	Pos   lexer.Position
 }
 
 // GenericValue is a value of some type.
@@ -53,6 +56,7 @@ type GenericValue struct {
 	Float      *float64       `parser:"| @Float"`
 	Map        []NamedValue   `parser:"| '{' ( @@ (',' @@)*)? '}'"`
 	List       []GenericValue `parser:"| '[' ( @@ (',' @@)*)? ']'"`
+	Pos        lexer.Position
 }
 
 // ResultFilter is a filter for the result.
@@ -67,6 +71,7 @@ type ResultField struct {
 	Params     *ParameterList `parser:"('(' @@ ')')?"`
 	Directives []Directive    `parser:"@@*"`
 	SubParts   *ResultFilter  `parser:"('{' @@ '}')?"`
+	Pos        lexer.Position
 }
 
 type FragmentCall struct {
@@ -77,6 +82,7 @@ type FragmentCall struct {
 type Fragment struct {
 	Name       string       `parser:"@Ident"`
 	Definition *FragmentDef `parser:"@@"`
+	Pos        lexer.Position
 }
 
 type FragmentDef struct {
@@ -87,6 +93,7 @@ type FragmentDef struct {
 type Directive struct {
 	Name       string         `parser:"@Directive"`
 	Parameters *ParameterList `parser:"('(' @@ ')')?"`
+	Pos        lexer.Position
 }
 
 var (

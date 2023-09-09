@@ -1,7 +1,9 @@
 package quickgraph
 
 import (
+	"errors"
 	"fmt"
+	"github.com/alecthomas/participle/v2/lexer"
 	"strings"
 )
 
@@ -10,6 +12,7 @@ type GraphError struct {
 	Locations  []ErrorLocation   `json:"locations,omitempty"`
 	Path       []string          `json:"path,omitempty"`
 	Extensions map[string]string `json:"extensions,omitempty"`
+	InnerError error             `json:"-"`
 }
 
 type ErrorLocation struct {
@@ -39,6 +42,44 @@ func (e GraphError) Error() string {
 	}
 
 	return s.String()
+}
+
+func AugmentGraphError(err error, message string, pos lexer.Position, paths ...string) error {
+	var gErr GraphError
+
+	// We should never have a regular error wrapping a GraphError. If that ever happens
+	// the extra error information is lost as we're only using the wrapped GraphError.
+	ok := errors.As(err, &gErr)
+	if !ok {
+		gErr = GraphError{
+			Message:    err.Error(),
+			InnerError: err,
+		}
+	}
+
+	// If the message isn't set, set it.
+	if gErr.Message != "" {
+		gErr.Message = message
+	}
+
+	// Prepend the path to the existing path.
+	if len(paths) > 0 {
+		gErr.Path = append(paths, gErr.Path...)
+	}
+
+	if pos.Offset > 0 && len(gErr.Locations) == 0 {
+		loc := ErrorLocation{
+			Line:   pos.Line,
+			Column: pos.Column,
+		}
+		gErr.Locations = append(gErr.Locations, loc)
+	}
+
+	return gErr
+}
+
+func (e GraphError) Unwrap() error {
+	return e.InnerError
 }
 
 func (e ErrorLocation) String() string {

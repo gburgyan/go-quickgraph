@@ -258,6 +258,7 @@ func (t *FieldLookup) Fetch(ctx context.Context, req *Request, v reflect.Value, 
 		return t.fetchGraphFunction(ctx, req, v, params)
 	}
 	// Return error
+	// TODO: Augment?
 	return nil, fmt.Errorf("unknown field type: %v", t.fieldType)
 }
 
@@ -271,6 +272,7 @@ func (t *FieldLookup) fetchField(v reflect.Value) (any, error) {
 func (t *FieldLookup) fetchGraphFunction(ctx context.Context, req *Request, v reflect.Value, params *ParameterList) (any, error) {
 	obj, err := t.graphFunction.Call(ctx, req, params, v)
 	if err != nil {
+		// TODO: Augment
 		return nil, err
 	}
 	return obj.Interface(), nil

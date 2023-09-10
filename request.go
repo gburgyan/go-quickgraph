@@ -58,6 +58,7 @@ type Request struct {
 func (g *Graphy) NewRequestStub(request string) (*RequestStub, error) {
 	parsedCall, err := ParseRequest(request)
 	if err != nil {
+		// TODO: Augment
 		return nil, err
 	}
 
@@ -70,6 +71,7 @@ func (g *Graphy) NewRequestStub(request string) (*RequestStub, error) {
 	// TODO: Use the fragments in the variable gathering.
 	variableTypeMap, err := g.GatherRequestVariables(parsedCall, fragments)
 	if err != nil {
+		// TODO: Augment
 		return nil, err
 	}
 
@@ -87,6 +89,7 @@ func (g *Graphy) NewRequestStub(request string) (*RequestStub, error) {
 	case "mutation":
 		rs.Mode = RequestMutation
 	default:
+		// TODO: Augment
 		return nil, fmt.Errorf("unknown paramType %s", parsedCall.Mode)
 	}
 
@@ -106,6 +109,7 @@ func (g *Graphy) GatherRequestVariables(parsedCall Wrapper, fragments map[string
 	for _, command := range parsedCall.Commands {
 		graphFunc, ok := g.processors[command.Name]
 		if !ok {
+			// TODO: Augment
 			return nil, fmt.Errorf("unknown command %s", command.Name)
 		}
 
@@ -119,6 +123,7 @@ func (g *Graphy) GatherRequestVariables(parsedCall Wrapper, fragments map[string
 
 					err := g.addTypedInputVariable(varName, variableTypeMap, targetType)
 					if err != nil {
+						// TODO: Augment
 						return nil, err
 					}
 				}
@@ -164,6 +169,7 @@ func (g *Graphy) addTypedInputVariable(varName string, variableTypeMap map[strin
 	varName = varName[1:]
 	if existingVariable, found := variableTypeMap[varName]; found {
 		if existingVariable.Type != targetType {
+			// TODO: Augment
 			return fmt.Errorf("variable %s is used with different types", varName)
 		}
 	} else {
@@ -183,10 +189,13 @@ func (g *Graphy) addAndValidateResultVariables(typ *TypeLookup, filter *ResultFi
 
 	for _, field := range filter.Fields {
 		if typ == nil {
+			// TODO: Is this actually an error?
+			// TODO: Augment
 			return fmt.Errorf("type is nil")
 		}
 		if typ.fields == nil {
 			// TODO: Is this needed?
+			// TODO: Is this actually an error?
 			return fmt.Errorf("type has no fields")
 		}
 		if field.Name == "__typename" {
@@ -216,6 +225,7 @@ func (g *Graphy) addAndValidateResultVariables(typ *TypeLookup, filter *ResultFi
 
 				err := g.validateGraphFunctionParameters(commandField, gf, variableTypeMap)
 				if err != nil {
+					// TODO: Augment
 					return err
 				}
 			}
@@ -224,10 +234,12 @@ func (g *Graphy) addAndValidateResultVariables(typ *TypeLookup, filter *ResultFi
 				// Recurse
 				err := g.addAndValidateResultVariables(childType, field.SubParts, variableTypeMap, nil)
 				if err != nil {
+					// TODO: Augment
 					return err
 				}
 			}
 		} else {
+			// TODO: Augment
 			return fmt.Errorf("unknown field %s", field.Name)
 		}
 	}
@@ -375,6 +387,7 @@ func (rs *RequestStub) NewRequest(variableJson string) (*Request, error) {
 	if variableJson != "" {
 		err := json.Unmarshal([]byte(variableJson), &rawVariables)
 		if err != nil {
+			// TODO: Augment
 			return nil, err
 		}
 	}

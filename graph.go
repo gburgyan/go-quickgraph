@@ -69,6 +69,7 @@ func (g *Graphy) ProcessRequest(ctx context.Context, request string, variableJso
 
 	newRequest, err := rs.NewRequest(variableJson)
 	if err != nil {
+		// TODO: Augment
 		return "", err
 	}
 
@@ -130,6 +131,7 @@ func (g *Graphy) GetRequestStub(request string) (*RequestStub, error) {
 
 	stub, err := g.RequestCache.GetRequestStub(request)
 	if err != nil {
+		// TODO: Augment
 		return nil, err
 	}
 	if stub != nil {
@@ -137,6 +139,7 @@ func (g *Graphy) GetRequestStub(request string) (*RequestStub, error) {
 	}
 	stub, err = g.NewRequestStub(request)
 	if err != nil {
+		// TODO: Augment
 		return nil, err
 	}
 	g.RequestCache.SetRequestStub(request, stub)

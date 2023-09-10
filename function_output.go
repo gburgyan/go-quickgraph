@@ -16,6 +16,7 @@ func (f *GraphFunction) processCallOutput(ctx context.Context, req *Request, fil
 	kind := callResult.Kind()
 	if callResult.CanConvert(errorType) {
 		if !callResult.IsNil() {
+			// TODO: Augment
 			return nil, fmt.Errorf("function returned error: %w", callResult.Convert(errorType).Interface().(error))
 		} else {
 			return nil, nil
@@ -41,6 +42,7 @@ func (f *GraphFunction) processCallOutput(ctx context.Context, req *Request, fil
 				a := callResult.Index(i).Interface()
 				sr, err := f.processOutputStruct(ctx, req, filter, a)
 				if err != nil {
+					// TODO: Augment
 					return nil, err
 				}
 				retVal = append(retVal, sr)
@@ -53,10 +55,12 @@ func (f *GraphFunction) processCallOutput(ctx context.Context, req *Request, fil
 	} else if kind == reflect.Struct {
 		sr, err := f.processOutputStruct(nil, req, filter, callResult.Interface())
 		if err != nil {
+			// TODO: Augment
 			return nil, err
 		}
 		return sr, nil
 	} else {
+		// TODO: Augment
 		return nil, fmt.Errorf("return type of %v not supported", kind)
 	}
 
@@ -84,6 +88,7 @@ func (f *GraphFunction) processOutputStruct(ctx context.Context, req *Request, f
 
 	anyStruct, err := deferenceUnionType(anyStruct)
 	if err != nil {
+		// TODO: Augment
 		return nil, err
 	}
 
@@ -124,12 +129,14 @@ func (f *GraphFunction) processOutputStruct(ctx context.Context, req *Request, f
 
 			fieldAny, err := fieldInfo.Fetch(ctx, req, reflect.ValueOf(anyStruct), field.Params)
 			if err != nil {
+				// TODO: Augment
 				return nil, err
 			}
 			if field.SubParts != nil {
 				fieldVal := reflect.ValueOf(fieldAny)
 				subPart, err := f.processCallOutput(ctx, req, field.SubParts, fieldVal)
 				if err != nil {
+					// TODO: Augment
 					return nil, err
 				}
 				r[field.Name] = subPart
@@ -162,18 +169,21 @@ func deferenceUnionType(anyStruct any) (any, error) {
 				break
 
 			default:
+				// TODO: Augment
 				return nil, fmt.Errorf("fields in union type must be pointers, maps, slices, or interfaces")
 			}
 			if v.Field(i).IsNil() {
 				continue
 			}
 			if found {
+				// TODO: Augment
 				return nil, fmt.Errorf("more than one field in union type is not nil")
 			}
 			anyStruct = v.Field(i).Elem().Interface()
 			found = true
 		}
 		if !found {
+			// TODO: Augment
 			return nil, fmt.Errorf("no fields in union type are not nil")
 		}
 	}

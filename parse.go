@@ -63,6 +63,7 @@ type GenericValue struct {
 type ResultFilter struct {
 	Fields    []ResultField  `parser:"@@*"`
 	Fragments []FragmentCall `parser:"(FragmentStart @@)*"`
+	Pos       lexer.Position
 }
 
 // ResultField is a field in the result to be returned.
@@ -121,6 +122,7 @@ var (
 func ParseRequest(input string) (Wrapper, error) {
 	r, err := parser.ParseString("", input)
 	if err != nil {
+		// TODO: Augment
 		return Wrapper{}, err
 	}
 	return *r, nil

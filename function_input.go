@@ -199,9 +199,10 @@ func (f *GraphFunction) getCallParamsNamedStruct(ctx context.Context, req *Reque
 func parseInputIntoValue(req *Request, inValue GenericValue, targetValue reflect.Value) (err error) {
 	// Catch panics and return them as errors.
 	defer func() {
-		//if r := recover(); r != nil {
-		//	err = fmt.Errorf("panic: %v", r)
-		//}
+		if r := recover(); r != nil {
+			e := fmt.Errorf("panic: %v", r)
+			err = AugmentGraphError(e, "", inValue.Pos)
+		}
 	}()
 
 	if inValue.Variable != nil {

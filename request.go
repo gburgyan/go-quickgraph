@@ -58,7 +58,6 @@ type Request struct {
 func (g *Graphy) NewRequestStub(request string) (*RequestStub, error) {
 	parsedCall, err := ParseRequest(request)
 	if err != nil {
-		// TODO: Augment
 		return nil, err
 	}
 
@@ -71,7 +70,6 @@ func (g *Graphy) NewRequestStub(request string) (*RequestStub, error) {
 	// TODO: Use the fragments in the variable gathering.
 	variableTypeMap, err := g.GatherRequestVariables(parsedCall, fragments)
 	if err != nil {
-		// TODO: Augment
 		return nil, err
 	}
 
@@ -109,8 +107,7 @@ func (g *Graphy) GatherRequestVariables(parsedCall Wrapper, fragments map[string
 	for _, command := range parsedCall.Commands {
 		graphFunc, ok := g.processors[command.Name]
 		if !ok {
-			// TODO: Augment
-			return nil, fmt.Errorf("unknown command %s", command.Name)
+			return nil, NewGraphError(fmt.Sprintf("unknown command %s", command.Name), command.Pos)
 		}
 
 		if command.Parameters != nil {

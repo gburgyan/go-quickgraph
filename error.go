@@ -44,6 +44,20 @@ func (e GraphError) Error() string {
 	return s.String()
 }
 
+func NewGraphError(message string, pos lexer.Position, paths ...string) error {
+	var gErr GraphError
+	if pos.Offset > 0 {
+		loc := ErrorLocation{
+			Line:   pos.Line,
+			Column: pos.Column,
+		}
+		gErr.Locations = append(gErr.Locations, loc)
+	}
+	gErr.Message = message
+	gErr.Path = paths
+	return gErr
+}
+
 func AugmentGraphError(err error, message string, pos lexer.Position, paths ...string) error {
 	var gErr GraphError
 

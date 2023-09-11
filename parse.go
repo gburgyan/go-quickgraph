@@ -1,6 +1,7 @@
 package quickgraph
 
 import (
+	"errors"
 	"github.com/alecthomas/participle/v2"
 	"github.com/alecthomas/participle/v2/lexer"
 )
@@ -122,8 +123,12 @@ var (
 func ParseRequest(input string) (Wrapper, error) {
 	r, err := parser.ParseString("", input)
 	if err != nil {
-		// TODO: Augment
-		return Wrapper{}, err
+		var pErr participle.Error
+		if errors.As(err, &pErr) {
+			return Wrapper{}, AugmentGraphError(err, "error parsing request", pErr.Position())
+		} else {
+			return Wrapper{}, err
+		}
 	}
 	return *r, nil
 }

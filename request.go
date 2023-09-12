@@ -87,8 +87,7 @@ func (g *Graphy) NewRequestStub(request string) (*RequestStub, error) {
 	case "mutation":
 		rs.Mode = RequestMutation
 	default:
-		// TODO: Augment
-		return nil, fmt.Errorf("unknown paramType %s", parsedCall.Mode)
+		return nil, NewGraphError(fmt.Sprintf("unknown paramType %s", parsedCall.Mode), parsedCall.Pos)
 	}
 
 	return &rs, nil
@@ -120,8 +119,7 @@ func (g *Graphy) GatherRequestVariables(parsedCall Wrapper, fragments map[string
 
 					err := g.addTypedInputVariable(varName, variableTypeMap, targetType)
 					if err != nil {
-						// TODO: Augment
-						return nil, err
+						return nil, AugmentGraphError(err, fmt.Sprintf("error adding variable %s", varName), parameter.Pos)
 					}
 				}
 			}
@@ -166,8 +164,7 @@ func (g *Graphy) addTypedInputVariable(varName string, variableTypeMap map[strin
 	varName = varName[1:]
 	if existingVariable, found := variableTypeMap[varName]; found {
 		if existingVariable.Type != targetType {
-			// TODO: Augment
-			return fmt.Errorf("variable %s is used with different types", varName)
+			return fmt.Errorf("variable %s is used with different types: existing type: %v, new type: %v", varName, existingVariable.Type, targetType)
 		}
 	} else {
 		variableTypeMap[varName] = &RequestVariable{
@@ -187,13 +184,12 @@ func (g *Graphy) addAndValidateResultVariables(typ *TypeLookup, filter *ResultFi
 	for _, field := range filter.Fields {
 		if typ == nil {
 			// TODO: Is this actually an error?
-			// TODO: Augment
-			return fmt.Errorf("type is nil")
+			return NewGraphError("type is nil", field.Pos)
 		}
 		if typ.fields == nil {
 			// TODO: Is this needed?
 			// TODO: Is this actually an error?
-			return fmt.Errorf("type has no fields")
+			return NewGraphError("type has no fields", field.Pos)
 		}
 		if field.Name == "__typename" {
 			// This is a virtual field that is always present.
@@ -222,8 +218,7 @@ func (g *Graphy) addAndValidateResultVariables(typ *TypeLookup, filter *ResultFi
 
 				err := g.validateGraphFunctionParameters(commandField, gf, variableTypeMap)
 				if err != nil {
-					// TODO: Augment
-					return err
+					return AugmentGraphError(err, fmt.Sprintf("error validating parameters for %s", gf.name), field.Pos, gf.name)
 				}
 			}
 
@@ -231,13 +226,11 @@ func (g *Graphy) addAndValidateResultVariables(typ *TypeLookup, filter *ResultFi
 				// Recurse
 				err := g.addAndValidateResultVariables(childType, field.SubParts, variableTypeMap, nil)
 				if err != nil {
-					// TODO: Augment
-					return err
+					return AugmentGraphError(err, fmt.Sprintf("error validating field for %s", field.Name), field.SubParts.Pos, field.Name)
 				}
 			}
 		} else {
-			// TODO: Augment
-			return fmt.Errorf("unknown field %s", field.Name)
+			return NewGraphError(fmt.Sprintf("unknown field %s", field.Name), field.Pos)
 		}
 	}
 
@@ -290,7 +283,7 @@ func (g *Graphy) validateAnonymousFunctionParams(commandField *ResultField, gf *
 			}
 		}
 		if !allOptional {
-			return fmt.Errorf("missing parameters")
+			return NewGraphError("missing parameters", commandField.Pos)
 		}
 		return nil
 	}
@@ -344,7 +337,7 @@ func (g *Graphy) validateNamedFunctionParams(commandField *ResultField, gf *Grap
 
 			err := g.validateFunctionVarParam(variableTypeMap, varName, targetType)
 			if err != nil {
-				return err
+				return AugmentGraphError(err, fmt.Sprintf("error validating variable %s", varName), cfp.Pos)
 			}
 		}
 		// Todo: Consider parsing, validating, and caching the value for value types. The
@@ -366,7 +359,7 @@ func (g *Graphy) validateNamedFunctionParams(commandField *ResultField, gf *Grap
 func (g *Graphy) validateFunctionVarParam(variableTypeMap map[string]*RequestVariable, varName string, targetType reflect.Type) error {
 	if existingVariable, found := variableTypeMap[varName]; found {
 		if existingVariable.Type != targetType {
-			return fmt.Errorf("variable %s is used with different types", varName)
+			return fmt.Errorf("variable %s is used with different types: existing type: %v, new type: %v", varName, existingVariable.Type, targetType)
 		}
 	} else {
 		variableTypeMap[varName] = &RequestVariable{
@@ -384,8 +377,7 @@ func (rs *RequestStub) NewRequest(variableJson string) (*Request, error) {
 	if variableJson != "" {
 		err := json.Unmarshal([]byte(variableJson), &rawVariables)
 		if err != nil {
-			// TODO: Augment
-			return nil, err
+			return nil, transformJsonError(variableJson, err)
 		}
 	}
 
@@ -443,7 +435,7 @@ func (r *Request) Execute(ctx context.Context) (string, error) {
 				} else {
 					errColl = errCollAny.([]error)
 				}
-				gErr := AugmentGraphError(err, fmt.Sprintf("error calling %s: %s", command.Name, err.Error()), command.Pos)
+				gErr := AugmentGraphError(err, fmt.Sprintf("error calling %s: %s", command.Name, err.Error()), command.Pos, command.Name)
 				errColl = append(errColl, gErr)
 				// TODO: Once this is run in parallel, there's a slight race condition here with reassigning the error.
 				result["errors"] = errColl

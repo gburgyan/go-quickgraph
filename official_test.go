@@ -552,8 +552,8 @@ mutation CreateReviewForEpisode($ep: Episode!, $review: ReviewInput!) {
 }`
 
 	resultAny, err := g.ProcessRequest(ctx, input, vars)
-	assert.EqualError(t, err, "error calling createReview: fixed error message [3:3]")
-	assert.Equal(t, `{"data":{},"errors":[{"message":"error calling createReview: fixed error message","locations":[{"line":3,"column":3}]}]}`, resultAny)
+	assert.EqualError(t, err, "error calling createReview: fixed error message (path: createReview) [3:3]")
+	assert.Equal(t, `{"data":{},"errors":[{"message":"error calling createReview: fixed error message","locations":[{"line":3,"column":3}],"path":["createReview"]}]}`, resultAny)
 }
 
 func TestMutatorWithComplexInputVarsPanic(t *testing.T) {
@@ -584,6 +584,6 @@ mutation CreateReviewForEpisode($ep: Episode!, $review: ReviewInput!) {
 }`
 
 	resultAny, err := g.ProcessRequest(ctx, input, vars)
-	assert.EqualError(t, err, "error calling createReview: panic: fixed error message [3:3]")
-	assert.Equal(t, `{"data":{},"errors":[{"message":"error calling createReview: panic: fixed error message","locations":[{"line":3,"column":3}]}]}`, resultAny)
+	assert.EqualError(t, err, "error calling createReview: panic: fixed error message (path: createReview) [3:3]")
+	assert.Equal(t, `{"data":{},"errors":[{"message":"error calling createReview: panic: fixed error message","locations":[{"line":3,"column":3}],"path":["createReview"]}]}`, resultAny)
 }

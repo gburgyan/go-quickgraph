@@ -1,6 +1,7 @@
 package quickgraph
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/alecthomas/participle/v2/lexer"
@@ -98,4 +99,56 @@ func (e GraphError) Unwrap() error {
 
 func (e ErrorLocation) String() string {
 	return fmt.Sprintf("%d:%d", e.Line, e.Column)
+}
+
+func getLineAndColumnFromOffset(input string, offset int) (line int, column int) {
+	line = 1
+	column = 1
+	for i := 0; i < offset && i < len(input); i++ {
+		if input[i] == '\n' {
+			line++
+			column = 1
+		} else {
+			column++
+		}
+	}
+	return
+}
+
+func transformJsonError(input string, err error) error {
+	if err == nil {
+		return nil
+	}
+
+	// Deal with errors from the Json unmarshalling:
+	// * json.UnmarshalTypeError
+	// * json.SyntaxError
+	// Each of these has an Offset field that we can use to get the line and column.
+	// We can then use that to create a GraphError.
+
+	var uterr *json.UnmarshalTypeError
+	if errors.As(err, &uterr) {
+		line, column := getLineAndColumnFromOffset(input, int(uterr.Offset))
+		return GraphError{
+			Message:    err.Error(),
+			Locations:  []ErrorLocation{{Line: line, Column: column}},
+			InnerError: err,
+		}
+	}
+
+	var serr *json.SyntaxError
+	if errors.As(err, &serr) {
+		line, column := getLineAndColumnFromOffset(input, int(serr.Offset))
+		return GraphError{
+			Message:    err.Error(),
+			Locations:  []ErrorLocation{{Line: line, Column: column}},
+			InnerError: err,
+		}
+	}
+
+	// Otherwise, return a degenerate GraphError.
+	return GraphError{
+		Message:    err.Error(),
+		InnerError: err,
+	}
 }

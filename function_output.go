@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -43,7 +44,7 @@ func (f *GraphFunction) processCallOutput(ctx context.Context, req *Request, fil
 				a := callResult.Index(i).Interface()
 				sr, err := f.processOutputStruct(ctx, req, filter, a)
 				if err != nil {
-					return nil, AugmentGraphError(err, fmt.Sprintf("error processing slice element %v", i), filter.Pos)
+					return nil, AugmentGraphError(err, fmt.Sprintf("error processing slice element %v", i), filter.Pos, strconv.Itoa(i))
 				}
 				retVal = append(retVal, sr)
 			}
@@ -126,13 +127,13 @@ func (f *GraphFunction) processOutputStruct(ctx context.Context, req *Request, f
 
 			fieldAny, err := fieldInfo.Fetch(ctx, req, reflect.ValueOf(anyStruct), field.Params)
 			if err != nil {
-				return nil, AugmentGraphError(err, fmt.Sprintf("error fetching field %v", field.Name), field.Pos)
+				return nil, AugmentGraphError(err, fmt.Sprintf("error fetching field %v", field.Name), field.Pos, field.Name)
 			}
 			if field.SubParts != nil {
 				fieldVal := reflect.ValueOf(fieldAny)
 				subPart, err := f.processCallOutput(ctx, req, field.SubParts, fieldVal)
 				if err != nil {
-					return nil, AugmentGraphError(err, fmt.Sprintf("error processing subpart %v", field.Name), field.Pos)
+					return nil, AugmentGraphError(err, fmt.Sprintf("error processing subpart %v", field.Name), field.Pos, field.Name)
 				}
 				r[field.Name] = subPart
 			} else {

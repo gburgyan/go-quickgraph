@@ -12,6 +12,7 @@ type Wrapper struct {
 	OperationDef *OperationDef `parser:"@@?"`
 	Commands     []Command     `parser:"( '{' @@+ '}' )+"`
 	Fragments    []Fragment    `parser:"(FragmentToken @@)*"`
+	Pos          lexer.Position
 }
 
 type OperationDef struct {

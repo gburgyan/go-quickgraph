@@ -87,7 +87,7 @@ func (g *Graphy) NewRequestStub(request string) (*RequestStub, error) {
 	case "mutation":
 		rs.Mode = RequestMutation
 	default:
-		return nil, NewGraphError(fmt.Sprintf("unknown paramType %s", parsedCall.Mode), parsedCall.Pos)
+		return nil, NewGraphError(fmt.Sprintf("unknown/unsupported call mode %s", parsedCall.Mode), parsedCall.Pos)
 	}
 
 	return &rs, nil

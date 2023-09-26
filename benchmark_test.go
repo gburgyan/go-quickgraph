@@ -5,8 +5,14 @@ import (
 	"testing"
 )
 
+type simpleCacheEntry struct {
+	request string
+	stub    *RequestStub
+	err     error
+}
+
 type simpleCache struct {
-	values map[string]*RequestStub
+	values map[string]*simpleCacheEntry
 }
 
 func (s simpleCache) GetRequestStub(request string) (*RequestStub, error) {
@@ -14,11 +20,16 @@ func (s simpleCache) GetRequestStub(request string) (*RequestStub, error) {
 	if !found {
 		return nil, nil
 	}
-	return rs, nil
+	return rs.stub, rs.err
 }
 
-func (s simpleCache) SetRequestStub(request string, stub *RequestStub) {
-	s.values[request] = stub
+func (s simpleCache) SetRequestStub(request string, stub *RequestStub, err error) {
+	cacheEntry := &simpleCacheEntry{
+		request: request,
+		stub:    stub,
+		err:     err,
+	}
+	s.values[request] = cacheEntry
 }
 
 func BenchmarkMutatorWithVars_Cached(b *testing.B) {
@@ -30,7 +41,7 @@ func BenchmarkMutatorWithVars_Cached(b *testing.B) {
 	ctx := context.Background()
 	g := Graphy{
 		RequestCache: simpleCache{
-			values: map[string]*RequestStub{},
+			values: map[string]*simpleCacheEntry{},
 		},
 	}
 

@@ -37,11 +37,12 @@ type RequestVariable struct {
 //	return an intermediate interface that can also be used to generate the cache key.
 type GraphRequestCache interface {
 	// GetRequestStub returns the request stub for a request. It should return nil if the request
-	// is not cached.
+	// is not cached. The error can either be the cached error or an error indicating a cache error.
+	// In case the request is not cached, the returned *RequestStub should be nil.
 	GetRequestStub(request string) (*RequestStub, error)
 
 	// SetRequestStub sets the request stub for a request.
-	SetRequestStub(request string, stub *RequestStub)
+	SetRequestStub(request string, stub *RequestStub, err error)
 }
 
 // Request represents a complete GraphQL-like request. It contains the Graphy instance, the request stub,
@@ -59,6 +60,30 @@ func (g *Graphy) NewRequestStub(request string) (*RequestStub, error) {
 	parsedCall, err := ParseRequest(request)
 	if err != nil {
 		return nil, err
+	}
+
+	// Validate that we have processors for all the commands.
+	var missingCommands []Command
+	for _, command := range parsedCall.Commands {
+		if _, ok := g.processors[command.Name]; !ok {
+			missingCommands = append(missingCommands, command)
+		}
+	}
+	if len(missingCommands) > 0 {
+		// Make a string slice of the command names.
+		missingCommandNames := make([]string, len(missingCommands))
+		for i, command := range missingCommands {
+			missingCommandNames[i] = command.Name
+		}
+		return nil, UnknownCommandError{
+			GraphError: GraphError{
+				Message: "unknown command(s) in request",
+				Locations: []ErrorLocation{
+					lexerPositionError(missingCommands[0].Pos),
+				},
+			},
+			Commands: missingCommandNames,
+		}
 	}
 
 	fragments := map[string]Fragment{}

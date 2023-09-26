@@ -21,6 +21,11 @@ type ErrorLocation struct {
 	Column int `json:"column"`
 }
 
+type UnknownCommandError struct {
+	GraphError
+	Commands []string
+}
+
 // Implement the error interface
 func (e GraphError) Error() string {
 	// Return the message as well as the path (if it exists) as well as the error locations (if they exist).
@@ -48,15 +53,19 @@ func (e GraphError) Error() string {
 func NewGraphError(message string, pos lexer.Position, paths ...string) error {
 	var gErr GraphError
 	if pos.Offset > 0 {
-		loc := ErrorLocation{
-			Line:   pos.Line,
-			Column: pos.Column,
-		}
+		loc := lexerPositionError(pos)
 		gErr.Locations = append(gErr.Locations, loc)
 	}
 	gErr.Message = message
 	gErr.Path = paths
 	return gErr
+}
+
+func lexerPositionError(pos lexer.Position) ErrorLocation {
+	return ErrorLocation{
+		Line:   pos.Line,
+		Column: pos.Column,
+	}
 }
 
 func AugmentGraphError(err error, message string, pos lexer.Position, paths ...string) error {

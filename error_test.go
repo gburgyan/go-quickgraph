@@ -1,6 +1,8 @@
 package quickgraph
 
 import (
+	"context"
+	"errors"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -78,4 +80,23 @@ func Test_getLineAndColumnFromOffset(t *testing.T) {
 			assert.Equal(t, tt.column, column)
 		})
 	}
+}
+
+func Test_UnknownCommand(t *testing.T) {
+	input := `
+{
+  hero {
+    name
+  }
+}`
+
+	ctx := context.Background()
+	g := Graphy{}
+
+	resultAny, err := g.ProcessRequest(ctx, input, "")
+
+	assert.Empty(t, resultAny)
+	var uce UnknownCommandError
+	errors.As(err, &uce)
+	assert.Contains(t, uce.Commands, "hero")
 }

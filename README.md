@@ -86,7 +86,7 @@ Once all the functions are added, the `Graphy` object is ready to be used.
 
 ## Processing of a Request
 
-Internally, a request is processed in three phases:
+Internally, a request is processed in four primary phases:
 
 ### Query Processing:
 
@@ -94,7 +94,7 @@ The inbound query is parsed into a `RequestStub` object. Since a request can hav
 
 ### Variable Processing
 
-If there are variables to be processed, they are unmarshalled using JSON. The result objects are then mapped into the variables that have been defined by the preceeding step. Variables can represent both simple scalar types and more complex object graphs.
+If there are variables to be processed, they are unmarshalled using JSON. The result objects are then mapped into the variables that have been defined by the preceding step. Variables can represent both simple scalar types and more complex object graphs.
 
 ### Function Execution
 
@@ -141,6 +141,13 @@ There is a further discussion on [schemata](#schema-generation) later on.
 
 # Functions
 
+Functions are used in two ways in the processing of a `Graphy` request:
+
+* Handling the primary query processing
+* Providing processing while rendering the results from the output from the primary function
+
+Any 
+
 ## Struct Functions 
 
 ## Anonymous Functions
@@ -159,7 +166,70 @@ There is a further discussion on [schemata](#schema-generation) later on.
 
 ## Limitations
 
-# Limitations
+# Caching
+
+Caching is an optional feature of the graph processing. To enable it, simply set the `RequestCache` on the `Graphy` object. The cache is an implementation of the `GraphRequestCache` interface. If this is not set, the graphy functionality will not cache anything.
+
+The cache is used to cache the result of parsing the request. This is a `RequestStub` as well as any errors that were present in parsing the errors. The request stub contains everything that was prepared to run the request except the variables that were passed in. This process involves a lot of reflection, so this is a comparatively expensive operation. By caching this processing, we gain a roughly 10x speedup.
+
+We cache errors as well because a request that can't be fulfilled by the `Graphy` library will continue to be an error even if it submitted again -- there is no reason to reprocess the request to simply get back to the answer of error.
+
+The internals of the `RequestStub` is only in-memory and not externally serializable.
+
+## Example implementation
+
+Using a simple cache library `github.com/patrickmn/go-cache`, here's a simple implementation:
+
+```go
+type SimpleGraphRequestCache struct {
+	cache *cache.Cache
+}
+
+type simpleGraphRequestCacheEntry struct {
+	request string
+	stub    *RequestStub
+	err     error
+}
+
+func (d *SimpleGraphRequestCache) SetRequestStub(ctx context.Context, request string, stub *RequestStub, err error) {
+	setErr := d.cache.Add(request, &simpleGraphRequestCacheEntry{
+		request: request,
+		stub:    stub,
+		err:     err,
+	}, time.Hour)
+	if setErr != nil {
+		// Log this error, but don't return it.
+		// Potentially disable the cache if this recurs continuously.
+	}
+}
+
+func (d *SimpleGraphRequestCache) GetRequestStub(ctx context.Context, request string) (*RequestStub, error) {
+	value, found := d.cache.Get(request)
+	if !found {
+		return nil, nil
+	}
+	entry, ok := value.(*simpleGraphRequestCacheEntry)
+	if !ok {
+		return nil, nil
+	}
+	return entry.stub, entry.err
+}
+```
+
+Since each unique request, independent of the variables, can be cached, it's important to have a working eviction policy to prevent a denial of service attack from exhausting memory.
+
+## Internal caching
+
+Internally `Graphy` will cache much of the results of reflection operations. These relate to the types that are used for input and output. Since these have a one-to-one relationship to the internal types of the running system, they are cached by `Graphy` for the lifetime of the object; it can't grow out of bounds and cannot be subject to a denial of service attack. 
+
+# Dealing with unknown commands
+
+A frequent requirement is to implement a strangler pattern to start taking requests for things that can be processed, but to forward requests that can't be processed to another service. This is enabled by the processing pipeline by returning a `UnknownCommandError`. Since the processing of the request can be cached, this can be a fail-fast scenario so that the request could be forwarded to another service for processing. 
+
+# Benchmarks
+
+
+# General Limitations
 
 ## Validation of Input
 

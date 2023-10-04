@@ -39,10 +39,10 @@ type GraphRequestCache interface {
 	// GetRequestStub returns the request stub for a request. It should return nil if the request
 	// is not cached. The error can either be the cached error or an error indicating a cache error.
 	// In case the request is not cached, the returned *RequestStub should be nil.
-	GetRequestStub(request string) (*RequestStub, error)
+	GetRequestStub(ctx context.Context, request string) (*RequestStub, error)
 
 	// SetRequestStub sets the request stub for a request.
-	SetRequestStub(request string, stub *RequestStub, err error)
+	SetRequestStub(ctx context.Context, request string, stub *RequestStub, err error)
 }
 
 // Request represents a complete GraphQL-like request. It contains the Graphy instance, the request stub,

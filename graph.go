@@ -65,7 +65,7 @@ func (g *Graphy) ensureInitialized() {
 }
 
 func (g *Graphy) ProcessRequest(ctx context.Context, request string, variableJson string) (string, error) {
-	rs, err := g.GetRequestStub(request)
+	rs, err := g.GetRequestStub(ctx, request)
 	if err != nil {
 		return "", err
 	}
@@ -131,12 +131,12 @@ func (g *Graphy) typeLookup(typ reflect.Type) *TypeLookup {
 	return nil
 }
 
-func (g *Graphy) GetRequestStub(request string) (*RequestStub, error) {
+func (g *Graphy) GetRequestStub(ctx context.Context, request string) (*RequestStub, error) {
 	if g.RequestCache == nil {
 		return g.NewRequestStub(request)
 	}
 
-	stub, err := g.RequestCache.GetRequestStub(request)
+	stub, err := g.RequestCache.GetRequestStub(ctx, request)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +144,7 @@ func (g *Graphy) GetRequestStub(request string) (*RequestStub, error) {
 		return stub, nil
 	}
 	stub, err = g.NewRequestStub(request)
-	g.RequestCache.SetRequestStub(request, stub, err)
+	g.RequestCache.SetRequestStub(ctx, request, stub, err)
 	if err != nil {
 		return nil, err
 	}

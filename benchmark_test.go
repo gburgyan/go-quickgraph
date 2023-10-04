@@ -15,7 +15,7 @@ type simpleCache struct {
 	values map[string]*simpleCacheEntry
 }
 
-func (s simpleCache) GetRequestStub(request string) (*RequestStub, error) {
+func (s simpleCache) GetRequestStub(ctx context.Context, request string) (*RequestStub, error) {
 	rs, found := s.values[request]
 	if !found {
 		return nil, nil
@@ -23,7 +23,7 @@ func (s simpleCache) GetRequestStub(request string) (*RequestStub, error) {
 	return rs.stub, rs.err
 }
 
-func (s simpleCache) SetRequestStub(request string, stub *RequestStub, err error) {
+func (s simpleCache) SetRequestStub(ctx context.Context, request string, stub *RequestStub, err error) {
 	cacheEntry := &simpleCacheEntry{
 		request: request,
 		stub:    stub,

@@ -146,11 +146,85 @@ Functions are used in two ways in the processing of a `Graphy` request:
 * Handling the primary query processing
 * Providing processing while rendering the results from the output from the primary function
 
-Any 
+Any time a request is processed, it gets mapped to the function that is registered for that name. This is done with one of the `Register*` functions on the `Graphy` object.
 
-## Struct Functions 
+In an effort to make it simple for developers to create these functions, there are several ways to add functions and `Graphy` that each have some advantages and disadvantages.
+
+In all cases, if there is a `context.Context` parameter, that will be passed into the function.
 
 ## Anonymous Functions
+
+Anonymous functions look like typical Golang functions and simply take a normal parameter list.
+
+Given this simple function:
+
+```go
+func GetCourses(ctx context.Context, categories []*string) []*Course
+```
+
+You can register the processor with:
+
+```go
+g := Graphy{}
+g.RegisterProcessor(ctx, "courses", GetCourses)
+```
+
+The downside of this approach is based on a limitation in reflection in Golang: there is no way to get the _names_ of the parameters. In this case `Graphy` will run assuming the parameters are positional. This is a variance from orthodox GraphQL behavior as it expects named parameters. If a schema is generated from the `Graphy`, these will be rendered as `arg1`, `arg2`, etc. Those are purely placeholders for the schema and the processing of the request will still be treated positionally; the names of the passed parameters are ignored.
+
+If the named parameters are needed, you can do that via:
+
+```go
+g := Graphy{}
+g.RegisterProcessorWithParamNames(ctx, "courses", GetCourses, "categories")
+```
+
+Once you tell `Graphy` the names of the paramters to expect, it can function with named parameters as is typical for GraphQL.
+
+Finally, you can also register the processor with the most flexible function:
+
+```go
+g := Graphy{}
+g.RegisterFunction(ctx, graphy.FunctionDefinition{
+	Name: "courses",
+	Function: GetCourses,
+	ParameterNames: {"categories"},
+	Mode: graphy.ModeQuery,
+})
+```
+
+This is also how you can register a mutation instead of the default query.
+
+A function may also take zero non-`Context` parameters, in which case it simply gets run.
+
+## Struct Functions
+
+The alternate way that a function can be defined is by passing in a struct as the parameter. The structure must be passed as value. In addition to the struct parameter, it may also, optionally, have a `context.Context` parameter.
+
+For example:
+
+```go
+type CourseInput struct {
+	Categories []string
+}
+
+func GetCourses(ctx context.Context, in CourseInput) []*Course
+{
+	// Implementation
+}
+
+g := Graphy{}
+g.RegisterProcessor(ctx, "courses", GetCourses)
+```
+
+Since reflection can be used to get the names of the members of the structure, that information will be used to get the names of the parameters that will be exposed for the function.
+
+The same `RegisterFunction` function can also be used as described above to define additional aspects of the function, such as if it's a mutator.
+
+## Return Values
+
+Regardless of how the function is defined, it is required to return a struct, a pointer to a struct, or a slice of either. It may optionally return an `error` as well. The returned value will be used to populate the response to the GraphQL calls. The shape of the response object will be used to construct the schema of the `Graphy` in case that is used.
+
+There is a special case where a function can return an `any` type. This is valid from a runtime perspective as the type of the object can be determined at runtime, but it precludes schema generation for the result as the type of the result cannot be determined by the signature of the function.
 
 ## Helper Functions
 

@@ -32,7 +32,7 @@ func (e *MyEnum) UnmarshalString(input string) (interface{}, error) {
 	}
 }
 
-func Test_parseIdentifierIntoValue(t *testing.T) {
+func Test_parseIdentifierIntoValue_Enum(t *testing.T) {
 	var x MyEnum
 	v := reflect.ValueOf(&x)
 
@@ -44,4 +44,103 @@ func Test_parseIdentifierIntoValue(t *testing.T) {
 	// Test an unknown identifier.
 	err = parseIdentifierIntoValue("Unknown", v)
 	assert.Error(t, err)
+}
+
+func Test_parseIdentifierIntoValue_Bool(t *testing.T) {
+	var x bool
+	v := reflect.ValueOf(&x).Elem()
+
+	// Test a known identifier.
+	err := parseIdentifierIntoValue("true", v)
+	assert.Equal(t, true, x)
+	assert.NoError(t, err)
+
+	err = parseIdentifierIntoValue("false", v)
+	assert.Equal(t, false, x)
+	assert.NoError(t, err)
+
+	err = parseIdentifierIntoValue("random", v)
+	assert.Error(t, err)
+}
+
+func Test_parseIdentifierIntoValue_BoolPtr(t *testing.T) {
+	var x *bool
+	v := reflect.ValueOf(&x).Elem()
+
+	// Test a known identifier.
+	err := parseIdentifierIntoValue("true", v)
+	assert.Equal(t, true, *x)
+	assert.NoError(t, err)
+
+	err = parseIdentifierIntoValue("false", v)
+	assert.Equal(t, false, *x)
+	assert.NoError(t, err)
+}
+
+func Test_parseFloatIntoValue_Base(t *testing.T) {
+	x := 42.23
+
+	inVal := GenericValue{
+		Float: &x,
+	}
+
+	var outVal float64
+	v := reflect.ValueOf(&outVal).Elem()
+
+	req := &Request{}
+	err := parseInputIntoValue(req, inVal, v)
+
+	assert.NoError(t, err)
+	assert.Equal(t, x, outVal)
+}
+
+func Test_parseFloatIntoValue_Ptr(t *testing.T) {
+	x := 42.23
+
+	inVal := GenericValue{
+		Float: &x,
+	}
+
+	var outVal *float64
+	v := reflect.ValueOf(&outVal).Elem()
+
+	req := &Request{}
+	err := parseInputIntoValue(req, inVal, v)
+
+	assert.NoError(t, err)
+	assert.Equal(t, x, *outVal)
+}
+
+func Test_parseIntIntoValue_Base(t *testing.T) {
+	var x int64 = 42
+
+	inVal := GenericValue{
+		Int: &x,
+	}
+
+	var outVal int64
+	v := reflect.ValueOf(&outVal).Elem()
+
+	req := &Request{}
+	err := parseInputIntoValue(req, inVal, v)
+
+	assert.NoError(t, err)
+	assert.Equal(t, x, outVal)
+}
+
+func Test_parseIntIntoValue_Ptr(t *testing.T) {
+	var x int64 = 42
+
+	inVal := GenericValue{
+		Int: &x,
+	}
+
+	var outVal *int64
+	v := reflect.ValueOf(&outVal).Elem()
+
+	req := &Request{}
+	err := parseInputIntoValue(req, inVal, v)
+
+	assert.NoError(t, err)
+	assert.Equal(t, x, *outVal)
 }

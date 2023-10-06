@@ -2,7 +2,9 @@ package quickgraph
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -55,14 +57,14 @@ func Test_getLineAndColumnFromOffset(t *testing.T) {
 			input:  "Hello,\nWorld!",
 			offset: 7,
 			line:   2,
-			column: 1,
+			column: 0,
 		},
 		{
 			name:   "Multiple Lines With Offset On Second Line",
 			input:  "Hello,\nWorld!",
 			offset: 8,
 			line:   2,
-			column: 2,
+			column: 1,
 		},
 		{
 			name:   "Offset Larger Than Input Length",
@@ -99,4 +101,49 @@ func Test_UnknownCommand(t *testing.T) {
 	var uce UnknownCommandError
 	errors.As(err, &uce)
 	assert.Contains(t, uce.Commands, "hero")
+}
+
+func Test_JsonError_NoError(t *testing.T) {
+	err := transformJsonError("", nil)
+	assert.NoError(t, err)
+}
+
+func Test_JsonError_UnmarshalTypeError(t *testing.T) {
+	type testStruct struct {
+		Val int
+	}
+	var target testStruct
+	input := "{\"Val\"\n:\"42\"}"
+	jsonErr := json.Unmarshal([]byte(input), &target)
+
+	err := transformJsonError(input, jsonErr)
+	var ge GraphError
+	errors.As(err, &ge)
+
+	assert.Equal(t, 2, ge.Locations[0].Line)
+	assert.Equal(t, 5, ge.Locations[0].Column)
+}
+
+func Test_JsonError_SyntaxError(t *testing.T) {
+	type testStruct struct {
+		Val int
+	}
+	var target testStruct
+	input := "{\"Val\"\n\"42\"}"
+	jsonErr := json.Unmarshal([]byte(input), &target)
+
+	err := transformJsonError(input, jsonErr)
+	var ge GraphError
+	errors.As(err, &ge)
+
+	assert.Equal(t, 2, ge.Locations[0].Line)
+	assert.Equal(t, 1, ge.Locations[0].Column)
+}
+
+func Test_JsonError_RandomError(t *testing.T) {
+	rErr := fmt.Errorf("random error")
+	err := transformJsonError("", rErr)
+	var ge GraphError
+	errors.As(err, &ge)
+	assert.Equal(t, rErr, ge.InnerError)
 }

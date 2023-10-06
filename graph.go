@@ -75,6 +75,7 @@ func (g *Graphy) ProcessRequest(ctx context.Context, request string, variableJso
 		return "", err
 	}
 	if newRequest == nil {
+		// This should have no way of occurring.
 		return "", GraphError{
 			Message: "unknown error creating request",
 		}

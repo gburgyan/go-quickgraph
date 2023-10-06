@@ -116,7 +116,7 @@ func getLineAndColumnFromOffset(input string, offset int) (line int, column int)
 	for i := 0; i < offset && i < len(input); i++ {
 		if input[i] == '\n' {
 			line++
-			column = 1
+			column = 0
 		} else {
 			column++
 		}

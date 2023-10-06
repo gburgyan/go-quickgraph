@@ -8,6 +8,9 @@ import (
 	"testing"
 )
 
+// These tests are all taken verbatim from the official GraphQL documentation
+// retrieved from https://graphql.org/learn/queries/.
+
 type Character struct {
 	Id        string       `json:"id"`
 	Name      string       `json:"name"`

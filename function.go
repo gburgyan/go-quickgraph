@@ -206,11 +206,16 @@ func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc ref
 	gf := GraphFunction{
 		g:           g,
 		name:        def.Name,
-		paramType:   AnonymousParamsInline,
 		mode:        def.Mode,
 		function:    graphFunc,
 		method:      method,
 		nameMapping: map[string]FunctionNameMapping{},
+	}
+
+	if len(def.ParameterNames) > 0 {
+		gf.paramType = NamedParamsInline
+	} else {
+		gf.paramType = AnonymousParamsInline
 	}
 
 	mft := graphFunc.Type()

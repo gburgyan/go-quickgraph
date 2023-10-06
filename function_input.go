@@ -311,9 +311,10 @@ func parseIdentifierIntoValue(identifier string, value reflect.Value) error {
 	if kind == reflect.Bool {
 		// If the value is a bool, set it.
 		var b bool
-		if identifier == "true" {
+		lowerIdent := strings.ToLower(identifier)
+		if lowerIdent == "true" {
 			b = true
-		} else if identifier == "false" {
+		} else if lowerIdent == "false" {
 			b = false
 		} else {
 			return fmt.Errorf("cannot unmarshal identifier %s into type: %v", identifier, value.Type())
@@ -444,7 +445,7 @@ func parseMapIntoValue(req *Request, inValue GenericValue, targetValue reflect.V
 			}
 			missingFields.WriteString(fieldName)
 		}
-		panic("missing required fields: " + missingFields.String())
+		return NewGraphError("missing required fields: "+missingFields.String(), inValue.Pos)
 	}
 	return nil
 }

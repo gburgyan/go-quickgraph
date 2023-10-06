@@ -226,7 +226,50 @@ Regardless of how the function is defined, it is required to return a struct, a 
 
 There is a special case where a function can return an `any` type. This is valid from a runtime perspective as the type of the object can be determined at runtime, but it precludes schema generation for the result as the type of the result cannot be determined by the signature of the function.
 
-## Helper Functions
+## Output Functions
+
+When calling a function to service a request, that function returns the value that is processed into the response -- that part is obvious. Another feature is that those objects can have functions on them as well. This plays into the overall Graph functionality that is exposed by `Graphy`. These receiver functions follow the same pattern as above.
+
+Additionally, they get transformed into schemas exactly as expected. If a receiver function takes nothing (or only a `context.Context` object), then it gets exposed as a field. If the field is referenced, then the function is invoked and the output generation continues. If the function takes parameters, then it's exposed as a function with parameters both for the request as well as the schema:
+
+```go
+type Human struct {
+	Character
+	HeightMeters float64 `json:"HeightMeters"`
+}
+
+func (h *Human) Height(units *string) float64 {
+	if units == nil {
+		return h.HeightMeters
+	}
+	if *units == "FOOT" {
+		return roundToPrecision(h.HeightMeters*3.28084, 7)
+	}
+	return h.HeightMeters
+}
+```
+
+Since the `Height` function takes a pointer to a `string` as a parameter, it's treated as optional.
+
+In this case both of the following queries will work:
+
+```graphql
+{
+  Human(id: "1000") {
+    name
+    height
+  }
+}
+```
+
+```graphql
+{
+    Human(id: "1000") {
+        name
+        height(unit: FOOT)
+    }
+}
+```
 
 # Type System
 

@@ -271,6 +271,10 @@ In this case both of the following queries will work:
 }
 ```
 
+## Function Parameters
+
+Regardless of how the function is invoked, the parameters for the function come from either the base query itself or variables that are passed in along with the query. `Graphy` supports both scalar types, as well as more complex types including complex, and even nested, structures, as well as slices of those objects.
+
 # Type System
 
 ## Enums
@@ -345,6 +349,32 @@ A frequent requirement is to implement a strangler pattern to start taking reque
 
 # Benchmarks
 
+Given this relatively complex query:
+
+```graphql
+mutation CreateReviewForEpisode($ep: Episode!, $review: ReviewInput!) {
+  createReview(episode: $ep, review: $review) {
+    stars
+    commentary
+  }
+}
+```
+
+with this variable JSON:
+
+```json
+{
+  "ep": "JEDI",
+  "review": {
+    "stars": 5,
+    "commentary": "This is a great movie!"
+  }
+}
+```
+
+with caching enabled, the framework overhead is less than 4.4µs on an Apple M1 Pro processor. This includes parsing the variable JSON, calling the function for `CreateReviewForEpisode`, and processing the output. The vast majority of the overhead isn't the library itself, but rather the unmarshalling of the variable JSON as well as marshaling the result to be returned.
+
+See the `benchmark_test.go` benchmarks for more tests and to evaluate this on your hardware.
 
 # General Limitations
 

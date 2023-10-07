@@ -555,7 +555,7 @@ mutation CreateReviewForEpisode($ep: Episode!, $review: ReviewInput!) {
 }`
 
 	resultAny, err := g.ProcessRequest(ctx, input, vars)
-	assert.EqualError(t, err, "error calling createReview: fixed error return (path: createReview) [3:3]: fixed error return")
+	assert.EqualError(t, err, "error calling createReview (path: createReview) [3:3]: fixed error return")
 	assert.Equal(t, `{"data":{},"errors":[{"message":"error calling createReview: fixed error return","locations":[{"line":3,"column":3}],"path":["createReview"]}]}`, resultAny)
 }
 
@@ -587,6 +587,6 @@ mutation CreateReviewForEpisode($ep: Episode!, $review: ReviewInput!) {
 }`
 
 	resultAny, err := g.ProcessRequest(ctx, input, vars)
-	assert.EqualError(t, err, "error calling createReview: panic: fixed error message (path: createReview) [3:3]: panic: fixed error message")
+	assert.EqualError(t, err, "error calling createReview (path: createReview) [3:3]: panic: fixed error message")
 	assert.Equal(t, `{"data":{},"errors":[{"message":"error calling createReview: panic: fixed error message","locations":[{"line":3,"column":3}],"path":["createReview"]}]}`, resultAny)
 }

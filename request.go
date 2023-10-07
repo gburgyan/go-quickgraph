@@ -462,7 +462,7 @@ func (r *Request) Execute(ctx context.Context) (string, error) {
 				} else {
 					errColl = errCollAny.([]error)
 				}
-				gErr := AugmentGraphError(err, fmt.Sprintf("error calling %s: %s", command.Name, err.Error()), command.Pos, command.Name)
+				gErr := AugmentGraphError(err, fmt.Sprintf("error calling %s", command.Name), command.Pos, command.Name)
 				errColl = append(errColl, gErr)
 				// TODO: Once this is run in parallel, there's a slight race condition here with reassigning the error.
 				result["errors"] = errColl

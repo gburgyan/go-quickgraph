@@ -152,7 +152,7 @@ func Test_Missing_Named_Param(t *testing.T) {
 	var ge GraphError
 	ok := errors.As(err, &ge)
 	assert.True(t, ok)
-	assert.Equal(t, "error calling courses: missing required parameters: categories", ge.Message)
+	assert.Equal(t, "error calling courses (path: courses) [3:3]: missing required parameters: categories", ge.Error())
 }
 
 func Test_Missing_Struct_Param(t *testing.T) {
@@ -183,7 +183,7 @@ func Test_Missing_Struct_Param(t *testing.T) {
 	var ge GraphError
 	ok := errors.As(err, &ge)
 	assert.True(t, ok)
-	assert.Equal(t, "error calling courses: missing required parameters: categories", ge.Message)
+	assert.Equal(t, "error calling courses (path: courses) [3:3]: missing required parameters: categories", ge.Error())
 }
 
 func Test_Missing_OutputParam(t *testing.T) {

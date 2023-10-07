@@ -166,3 +166,32 @@ func transformJsonError(input string, err error) error {
 		InnerError: err,
 	}
 }
+
+func (e GraphError) MarshalJSON() ([]byte, error) {
+	// There is no really good way to have the inner error get exposed, even
+	// though it has good information. We need a custom marshaller to do this.
+
+	// We need to create a new type that has all of the fields of GraphError
+	// except for InnerError. We can then marshal that type.
+	type graphErrorNoInnerError struct {
+		Message    string            `json:"message"`
+		Locations  []ErrorLocation   `json:"locations,omitempty"`
+		Path       []string          `json:"path,omitempty"`
+		Extensions map[string]string `json:"extensions,omitempty"`
+	}
+
+	// Create a new instance of the new type and copy the fields over.
+	var gErr graphErrorNoInnerError
+	gErr.Message = e.Message
+	gErr.Locations = e.Locations
+	gErr.Path = e.Path
+	gErr.Extensions = e.Extensions
+
+	// If there is an inner error, append that to the message.
+	if e.InnerError != nil {
+		gErr.Message = fmt.Sprintf("%s: %s", gErr.Message, e.InnerError.Error())
+	}
+
+	// Marshal the new type.
+	return json.Marshal(gErr)
+}

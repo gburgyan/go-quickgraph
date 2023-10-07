@@ -138,11 +138,8 @@ func (g *Graphy) GetRequestStub(ctx context.Context, request string) (*RequestSt
 	}
 
 	stub, err := g.RequestCache.GetRequestStub(ctx, request)
-	if err != nil {
-		return nil, err
-	}
-	if stub != nil {
-		return stub, nil
+	if stub != nil || err != nil {
+		return stub, err
 	}
 	stub, err = g.NewRequestStub(request)
 	g.RequestCache.SetRequestStub(ctx, request, stub, err)

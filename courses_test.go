@@ -91,3 +91,33 @@ query GetCourses($categories: [String!]) {
 
 	assert.Equal(t, `{"data":{"alias":[{"__typename":"Course","instructor":"John Doe","title":"Golang"},{"__typename":"Course","instructor":"Judy Doe","title":"C#"}]}}`, resultAny)
 }
+
+func TestCourses_Graph_Cache(t *testing.T) {
+	input := `
+{
+  courses(categories: ["C#"]) {
+    title
+    instructor
+  }
+}`
+
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterProcessor(ctx, "courses", GetCourses)
+
+	g.RequestCache = simpleCache{
+		values: map[string]*simpleCacheEntry{},
+	}
+
+	resultAny, err := g.ProcessRequest(ctx, input, "")
+	assert.NoError(t, err)
+
+	assert.Equal(t, `{"data":{"courses":[{"instructor":"Judy Doe","title":"C#"}]}}`, resultAny)
+
+	cache := g.RequestCache.(simpleCache)
+	assert.Len(t, cache.values, 1)
+
+	resultAny, err = g.ProcessRequest(ctx, input, "")
+	assert.NoError(t, err)
+	assert.Equal(t, `{"data":{"courses":[{"instructor":"Judy Doe","title":"C#"}]}}`, resultAny)
+}

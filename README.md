@@ -372,7 +372,7 @@ with this variable JSON:
 }
 ```
 
-with caching enabled, the framework overhead is less than 4.4µs on an Apple M1 Pro processor. This includes parsing the variable JSON, calling the function for `CreateReviewForEpisode`, and processing the output. The vast majority of the overhead isn't the library itself, but rather the unmarshalling of the variable JSON as well as marshaling the result to be returned.
+with caching enabled, the framework overhead is less than 4.8µs on an Apple M1 Pro processor. This includes parsing the variable JSON, calling the function for `CreateReviewForEpisode`, and processing the output. The vast majority of the overhead isn't the library itself, but rather the unmarshalling of the variable JSON as well as marshaling the result to be returned.
 
 See the `benchmark_test.go` benchmarks for more tests and to evaluate this on your hardware.
 

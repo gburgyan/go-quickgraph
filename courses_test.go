@@ -2,6 +2,8 @@ package quickgraph
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
@@ -11,6 +13,14 @@ type Course struct {
 	Title      string  `json:"title"`
 	Instructor string  `json:"instructor"`
 	Price      float64 `json:"price"`
+}
+
+type PriceConvertInput struct {
+	Currency string `json:"currency"`
+}
+
+func (c *Course) PriceConvert(in PriceConvertInput) string {
+	return fmt.Sprintf("%.2f %s", c.Price, in.Currency)
 }
 
 var courses = []*Course{
@@ -120,4 +130,100 @@ func TestCourses_Graph_Cache(t *testing.T) {
 	resultAny, err = g.ProcessRequest(ctx, input, "")
 	assert.NoError(t, err)
 	assert.Equal(t, `{"data":{"courses":[{"instructor":"Judy Doe","title":"C#"}]}}`, resultAny)
+}
+
+func Test_Missing_Named_Param(t *testing.T) {
+	input := `
+{
+  courses {
+    title
+    instructor
+  }
+}`
+
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterProcessorWithParamNames(ctx, "courses", GetCourses, "categories")
+
+	_, err := g.ProcessRequest(ctx, input, "")
+	assert.Error(t, err)
+
+	// Get that as a GraphError
+	var ge GraphError
+	ok := errors.As(err, &ge)
+	assert.True(t, ok)
+	assert.Equal(t, "error calling courses: missing required parameters: categories", ge.Message)
+}
+
+func Test_Missing_Struct_Param(t *testing.T) {
+	input := `
+{
+  courses {
+    title
+    instructor
+  }
+}`
+
+	type TestInput struct {
+		Categories []*string `json:"categories"`
+	}
+
+	f := func(ctx context.Context, input TestInput) []*Course {
+		return GetCourses(ctx, input.Categories)
+	}
+
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterProcessor(ctx, "courses", f)
+
+	_, err := g.ProcessRequest(ctx, input, "")
+	assert.Error(t, err)
+
+	// Get that as a GraphError
+	var ge GraphError
+	ok := errors.As(err, &ge)
+	assert.True(t, ok)
+	assert.Equal(t, "error calling courses: missing required parameters: categories", ge.Message)
+}
+
+func Test_Missing_OutputParam(t *testing.T) {
+	input := `
+{
+  courses {
+    title
+    instructor
+	priceconvert
+  }
+}`
+
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterProcessorWithParamNames(ctx, "courses", GetCourses, "categories")
+
+	_, err := g.ProcessRequest(ctx, input, "")
+	assert.Error(t, err)
+
+	// Get that as a GraphError
+	assert.Equal(t, "error validating parameters for PriceConvert (path: PriceConvert) [6:2]: missing parameter currency", err.Error())
+}
+
+func Test_MismatchedParams(t *testing.T) {
+	input := `
+query GetCourses($other: String!) {
+  courses {
+    title
+    instructor
+	priceconvert(other: $FOO)
+  }
+}`
+
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterProcessorWithParamNames(ctx, "courses", GetCourses, "categories")
+
+	_, err := g.ProcessRequest(ctx, input, "")
+	assert.Error(t, err)
+
+	// Get that as a GraphError
+	assert.Equal(t, "error validating parameters for PriceConvert (path: PriceConvert) [6:2]: missing parameter currency", err.Error())
 }

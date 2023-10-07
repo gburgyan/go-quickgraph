@@ -352,23 +352,25 @@ func (g *Graphy) validateNamedFunctionParams(commandField *ResultField, gf *Grap
 		neededField[param.name] = true
 	}
 
-	for _, cfp := range commandField.Params.Values {
-		targetType := gf.nameMapping[cfp.Name].paramType
+	if commandField.Params != nil {
+		for _, cfp := range commandField.Params.Values {
+			targetType := gf.nameMapping[cfp.Name].paramType
 
-		if cfp.Value.Variable != nil {
-			varName := *cfp.Value.Variable
-			// Strip the leading $ from the variable name.
-			varName = varName[1:]
+			if cfp.Value.Variable != nil {
+				varName := *cfp.Value.Variable
+				// Strip the leading $ from the variable name.
+				varName = varName[1:]
 
-			err := g.validateFunctionVarParam(variableTypeMap, varName, targetType)
-			if err != nil {
-				return AugmentGraphError(err, fmt.Sprintf("error validating variable %s", varName), cfp.Pos)
+				err := g.validateFunctionVarParam(variableTypeMap, varName, targetType)
+				if err != nil {
+					return AugmentGraphError(err, fmt.Sprintf("error validating variable %s", varName), cfp.Pos)
+				}
 			}
+			// Todo: Consider parsing, validating, and caching the value for value types. The
+			// special consideration that is needed is that pointers to objects are
+			// allowed -- and we have to ensure that objects that are cached are not
+			// changed between calls. Short-term, we can just not cache value types.
 		}
-		// Todo: Consider parsing, validating, and caching the value for value types. The
-		// special consideration that is needed is that pointers to objects are
-		// allowed -- and we have to ensure that objects that are cached are not
-		// changed between calls. Short-term, we can just not cache value types.
 	}
 
 	// Ensure that all parameters are present.

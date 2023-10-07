@@ -47,6 +47,11 @@ func (e GraphError) Error() string {
 		s.WriteString("]")
 	}
 
+	if e.InnerError != nil {
+		s.WriteString(": ")
+		s.WriteString(e.InnerError.Error())
+	}
+
 	return s.String()
 }
 

@@ -476,7 +476,7 @@ func (r *Request) Execute(ctx context.Context) (string, error) {
 			}
 			res, err := processor.GenerateResult(ctx, r, obj, command.ResultFilter)
 			if err != nil {
-				return "", err
+				return "", AugmentGraphError(err, fmt.Sprintf("error generating result for %s", command.Name), command.ResultFilter.Pos, command.Name)
 			}
 			name := command.Name
 			if command.Alias != nil {

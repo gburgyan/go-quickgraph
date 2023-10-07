@@ -20,8 +20,11 @@ type PriceConvertInput struct {
 	Currency string `json:"currency"`
 }
 
-func (c *Course) PriceConvert(in PriceConvertInput) string {
-	return fmt.Sprintf("%.2f %s", c.Price, in.Currency)
+func (c *Course) PriceConvert(in PriceConvertInput) (string, error) {
+	if in.Currency == "ERR" {
+		return "", errors.New("forced error")
+	}
+	return fmt.Sprintf("%.2f %s", c.Price, in.Currency), nil
 }
 
 var courses = []*Course{
@@ -250,4 +253,28 @@ BlahBlah GetCourses {
 
 	// Get that as a GraphError
 	assert.Equal(t, "unknown/unsupported call mode BlahBlah [2:1]", err.Error())
+}
+
+func Test_OutputError(t *testing.T) {
+	input := `
+query GetCourses {
+  courses(categories: ["Golang"]) {
+    title
+    instructor
+	priceconvert(currency: "ERR")
+  }
+}`
+
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterProcessorWithParamNames(ctx, "courses", GetCourses, "categories")
+
+	_, err := g.ProcessRequest(ctx, input, "")
+	assert.Error(t, err)
+
+	// Get that as a GraphError
+	assert.Equal(t, "error fetching field priceconvert (path: courses/0/priceconvert) [6:2]: forced error", err.Error())
+
+	jsonError, _ := json.Marshal(err)
+	assert.Equal(t, `{"message":"error fetching field priceconvert: forced error","locations":[{"line":6,"column":2}],"path":["courses","0","priceconvert"]}`, string(jsonError))
 }

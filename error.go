@@ -81,13 +81,13 @@ func AugmentGraphError(err error, message string, pos lexer.Position, paths ...s
 	ok := errors.As(err, &gErr)
 	if !ok {
 		gErr = GraphError{
-			Message:    err.Error(),
+			Message:    message,
 			InnerError: err,
 		}
 	}
 
 	// If the message isn't set, set it.
-	if gErr.Message != "" {
+	if gErr.Message == "" {
 		gErr.Message = message
 	}
 

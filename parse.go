@@ -128,6 +128,7 @@ func ParseRequest(input string) (Wrapper, error) {
 		if errors.As(err, &pErr) {
 			return Wrapper{}, AugmentGraphError(err, "error parsing request", pErr.Position())
 		} else {
+			// We should never get here.
 			return Wrapper{}, err
 		}
 	}

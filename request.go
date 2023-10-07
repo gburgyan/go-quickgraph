@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 )
 
 // RequestType is an enumeration of the types of requests. It can be a Query or a Mutation.
@@ -105,7 +106,7 @@ func (g *Graphy) NewRequestStub(request string) (*RequestStub, error) {
 		Fragments: fragments,
 	}
 
-	switch parsedCall.Mode {
+	switch strings.ToLower(parsedCall.Mode) {
 	case "":
 	case "query":
 		rs.Mode = RequestQuery
@@ -156,7 +157,7 @@ func (g *Graphy) GatherRequestVariables(parsedCall Wrapper, fragments map[string
 
 		err := g.addAndValidateResultVariables(typeLookup, command.ResultFilter, variableTypeMap, fragments)
 		if err != nil {
-			return nil, err
+			return nil, AugmentGraphError(err, fmt.Sprintf("error validating result filter for %s", command.Name), command.ResultFilter.Pos, command.Name)
 		}
 	}
 
@@ -355,6 +356,9 @@ func (g *Graphy) validateNamedFunctionParams(commandField *ResultField, gf *Grap
 	if commandField.Params != nil {
 		for _, cfp := range commandField.Params.Values {
 			targetType := gf.nameMapping[cfp.Name].paramType
+
+			// We have the parameter, so remove it from the needed list.
+			delete(neededField, cfp.Name)
 
 			if cfp.Value.Variable != nil {
 				varName := *cfp.Value.Variable

@@ -2,6 +2,7 @@ package quickgraph
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/stretchr/testify/assert"
@@ -204,7 +205,9 @@ func Test_Missing_OutputParam(t *testing.T) {
 	assert.Error(t, err)
 
 	// Get that as a GraphError
-	assert.Equal(t, "error validating parameters for PriceConvert (path: PriceConvert) [6:2]: missing parameter currency", err.Error())
+	assert.Equal(t, "error validating parameters for PriceConvert (path: courses/PriceConvert) [6:2]: missing parameter currency", err.Error())
+	jsonError, _ := json.Marshal(err)
+	assert.Equal(t, `{"message":"error validating parameters for PriceConvert: missing parameter currency","locations":[{"line":6,"column":2}],"path":["courses","PriceConvert"]}`, string(jsonError))
 }
 
 func Test_MismatchedParams(t *testing.T) {
@@ -225,5 +228,26 @@ query GetCourses($other: String!) {
 	assert.Error(t, err)
 
 	// Get that as a GraphError
-	assert.Equal(t, "error validating parameters for PriceConvert (path: PriceConvert) [6:2]: missing parameter currency", err.Error())
+	assert.Equal(t, "error validating parameters for PriceConvert (path: courses/PriceConvert) [6:2]: missing parameter currency", err.Error())
+}
+
+func Test_UnsupportedMode(t *testing.T) {
+	input := `
+BlahBlah GetCourses {
+  courses {
+    title
+    instructor
+	priceconvert(currency: "USD")
+  }
+}`
+
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterProcessorWithParamNames(ctx, "courses", GetCourses, "categories")
+
+	_, err := g.ProcessRequest(ctx, input, "")
+	assert.Error(t, err)
+
+	// Get that as a GraphError
+	assert.Equal(t, "unknown/unsupported call mode BlahBlah [2:1]", err.Error())
 }

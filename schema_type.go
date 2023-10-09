@@ -1,6 +1,7 @@
 package quickgraph
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 	"strings"
@@ -18,8 +19,7 @@ func (g *Graphy) schemaForOutputTypes(types ...*TypeLookup) (string, []reflect.T
 	sb := strings.Builder{}
 	for i := 0; i < len(typeQueue); i++ {
 		if typeQueue[i] == nil {
-			// TODO: WTF?
-			continue
+			panic(fmt.Sprintf("typeQueue[%d] is nil", i))
 		}
 		if completed[typeQueue[i].name] {
 			continue
@@ -35,7 +35,7 @@ func (g *Graphy) schemaForOutputTypes(types ...*TypeLookup) (string, []reflect.T
 				enumQueue = append(enumQueue, et)
 			} else {
 				etl := g.typeLookup(et)
-				if !completed[et.Name()] {
+				if !completed[et.Name()] && etl != nil {
 					typeQueue = append(typeQueue, etl)
 				}
 			}

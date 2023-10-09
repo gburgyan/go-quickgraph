@@ -127,6 +127,8 @@ func (g *Graphy) typeLookup(typ reflect.Type) *TypeLookup {
 		g.m.Unlock()
 		return result
 	}
+	// Fundamental types like floats and ints don't need these lookups because it doesn't make
+	// sense in this context.
 	g.typeLookups[typ] = nil
 	g.m.Unlock()
 	return nil

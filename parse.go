@@ -40,6 +40,7 @@ type Command struct {
 // ParameterList is a list of parameters for a call to a function.
 type ParameterList struct {
 	Values []NamedValue `parser:"(@@ (',' @@)*)?"`
+	Pos    lexer.Position
 }
 
 // NamedValue is a named value. This is used for both parameters and object initialization.

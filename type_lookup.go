@@ -230,7 +230,9 @@ func (g *Graphy) addGraphMethodsForType(typ reflect.Type, index []int, tl *TypeL
 			//  an anonymous struct are not properly recognized as being from
 			//  that struct. We need to figure out what's going on so when emitting
 			//  the schema we can properly identify the type and not output the
-			//  function multiple times.
+			//  function multiple times. Basically, if an anonymous struct member
+			//  has a function, that will presently be output as a function of
+			//  both the struct as well as the type that includes it as anonymous.
 			tfl := FieldLookup{
 				name:          m.Name,
 				resultType:    m.Type,

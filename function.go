@@ -403,7 +403,8 @@ func (f *GraphFunction) Call(ctx context.Context, req *Request, params *Paramete
 	gfv := f.function
 	callResults := gfv.Call(paramValues)
 	if len(callResults) == 0 {
-		return reflect.Value{}, nil
+		// We should never get here because all functions must return at least one value and an optional error.
+		return reflect.Value{}, NewGraphError("function returned no values", params.Pos)
 	}
 
 	var resultValue reflect.Value

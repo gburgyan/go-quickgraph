@@ -96,29 +96,43 @@ func (g *Graphy) typeLookup(typ reflect.Type) *TypeLookup {
 		return tl
 	}
 
-	if typ.Kind() == reflect.Slice {
-		typ = typ.Elem()
+	result := &TypeLookup{
+		typ:                 typ,
+		fields:              make(map[string]FieldLookup),
+		fieldsLowercase:     make(map[string]FieldLookup),
+		implements:          make(map[string]*TypeLookup),
+		implementsLowercase: make(map[string]*TypeLookup),
+		union:               make(map[string]*TypeLookup),
+		unionLowercase:      make(map[string]*TypeLookup),
 	}
-	if typ.Kind() == reflect.Ptr {
-		typ = typ.Elem()
+
+	rootTyp := typ
+
+	if rootTyp.Kind() == reflect.Ptr {
+		rootTyp = rootTyp.Elem()
+		result.isPointer = true
 	}
-	if typ.Kind() == reflect.Struct {
+	if rootTyp.Kind() == reflect.Slice {
+		rootTyp = rootTyp.Elem()
+		result.isSlice = true
+		if rootTyp.Kind() == reflect.Ptr {
+			rootTyp = rootTyp.Elem()
+			result.isPointerSlice = true
+		}
+	}
+
+	result.rootType = rootTyp
+
+	result.name = rootTyp.Name()
+	if rootTyp.Kind() == reflect.Struct {
 		g.m.Unlock()
-		tl := g.makeTypeFieldLookup(typ)
+		g.processFieldLookup(rootTyp, nil, result)
 		g.m.Lock()
-		g.typeLookups[typ] = tl
+		g.typeLookups[typ] = result
 		g.m.Unlock()
-		return tl
+		return result
 	}
 	if typ == anyType {
-		result := &TypeLookup{
-			fields:              make(map[string]FieldLookup),
-			fieldsLowercase:     map[string]FieldLookup{},
-			implements:          map[string]*TypeLookup{},
-			implementsLowercase: map[string]*TypeLookup{},
-			union:               map[string]*TypeLookup{},
-			unionLowercase:      map[string]*TypeLookup{},
-		}
 		for _, at := range g.anyTypes {
 			result.union[at.name] = at
 			result.unionLowercase[strings.ToLower(at.name)] = at
@@ -129,11 +143,7 @@ func (g *Graphy) typeLookup(typ reflect.Type) *TypeLookup {
 	}
 	// Fundamental types like floats and ints don't need these lookups because it doesn't make
 	// sense in this context.
-	result := &TypeLookup{
-		typ:         typ,
-		name:        typ.Name(),
-		fundamental: true,
-	}
+	result.fundamental = true
 	g.typeLookups[typ] = result
 	g.m.Unlock()
 	return result

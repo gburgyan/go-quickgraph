@@ -3,7 +3,9 @@ package quickgraph
 import (
 	"context"
 	"fmt"
+	"github.com/alecthomas/participle/v2/lexer"
 	"reflect"
+	"runtime/debug"
 	"strings"
 )
 
@@ -15,7 +17,6 @@ const (
 	AnonymousParamsInline
 )
 
-// TODO: Should this be unified with the function definition?
 type GraphFunctionMode int
 
 const (
@@ -90,8 +91,7 @@ func (g *Graphy) isValidGraphFunction(graphFunc reflect.Value, method bool) bool
 		}
 
 		if i == 0 && method {
-			// The first parameter must be a pointer to a struct.
-			// TODO: Validation
+			continue
 		} else {
 
 			switch funcParam.Kind() {
@@ -390,21 +390,36 @@ func (f *GraphFunction) Call(ctx context.Context, req *Request, params *Paramete
 	// Catch panics and return them as errors.
 	defer func() {
 		if r := recover(); r != nil {
+			stack := string(debug.Stack())
 			val = reflect.Value{}
-			retErr = fmt.Errorf("panic: %v", r)
+			var pos lexer.Position
+			if params != nil {
+				pos = params.Pos
+			} else {
+				pos = lexer.Position{}
+			}
+			gErr := NewGraphError(fmt.Sprintf("function %s panicked: %v", f.name, r), pos)
+			gErr.AddExtension("stack", stack)
+			retErr = gErr
 		}
 	}()
 
 	paramValues, err := f.getCallParameters(ctx, req, params, methodTarget)
 	if err != nil {
-		return reflect.Value{}, err
+		var pos lexer.Position
+		if params != nil {
+			pos = params.Pos
+		} else {
+			pos = lexer.Position{}
+		}
+		return reflect.Value{}, AugmentGraphError(err, fmt.Sprintf("error getting call parameters for function %s", f.name), pos)
 	}
 
 	gfv := f.function
 	callResults := gfv.Call(paramValues)
 	if len(callResults) == 0 {
 		// We should never get here because all functions must return at least one value and an optional error.
-		return reflect.Value{}, NewGraphError("function returned no values", params.Pos)
+		return reflect.Value{}, NewGraphError("function returned no values", params.Pos, f.name)
 	}
 
 	var resultValue reflect.Value
@@ -412,7 +427,8 @@ func (f *GraphFunction) Call(ctx context.Context, req *Request, params *Paramete
 	for _, callResult := range callResults {
 		if callResult.CanConvert(errorType) {
 			if !callResult.IsNil() {
-				return reflect.Value{}, callResult.Convert(errorType).Interface().(error)
+				err := callResult.Convert(errorType).Interface().(error)
+				return reflect.Value{}, AugmentGraphError(err, fmt.Sprintf("function %s returned error", f.name), params.Pos)
 			}
 		} else {
 			resultValue = callResult

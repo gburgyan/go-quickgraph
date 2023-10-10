@@ -156,7 +156,7 @@ func Test_Missing_Named_Param(t *testing.T) {
 	var ge GraphError
 	ok := errors.As(err, &ge)
 	assert.True(t, ok)
-	assert.Equal(t, "error calling courses (path: courses) [3:3]: missing required parameters: categories", ge.Error())
+	assert.Equal(t, "error getting call parameters for function courses (path: courses) [3:3]: missing required parameters: categories", ge.Error())
 }
 
 func Test_Missing_Struct_Param(t *testing.T) {
@@ -187,7 +187,7 @@ func Test_Missing_Struct_Param(t *testing.T) {
 	var ge GraphError
 	ok := errors.As(err, &ge)
 	assert.True(t, ok)
-	assert.Equal(t, "error calling courses (path: courses) [3:3]: missing required parameters: categories", ge.Error())
+	assert.Equal(t, "error getting call parameters for function courses (path: courses) [3:3]: missing required parameters: categories", ge.Error())
 }
 
 func Test_Missing_OutputParam(t *testing.T) {
@@ -273,8 +273,8 @@ query GetCourses {
 	assert.Error(t, err)
 
 	// Get that as a GraphError
-	assert.Equal(t, "error fetching field priceconvert (path: courses/0/priceconvert) [6:2]: forced error", err.Error())
+	assert.Equal(t, "function PriceConvert returned error (path: courses/0/priceconvert) [6:15]: forced error", err.Error())
 
 	jsonError, _ := json.Marshal(err)
-	assert.Equal(t, `{"message":"error fetching field priceconvert: forced error","locations":[{"line":6,"column":2}],"path":["courses","0","priceconvert"]}`, string(jsonError))
+	assert.Equal(t, `{"message":"function PriceConvert returned error: forced error","locations":[{"line":6,"column":15}],"path":["courses","0","priceconvert"]}`, string(jsonError))
 }

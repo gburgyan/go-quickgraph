@@ -261,7 +261,6 @@ func (g *Graphy) addAndValidateResultVariables(typ *TypeLookup, filter *ResultFi
 	}
 
 	// Recurse into the fragments.
-	// Todo: handle fragment types
 	for _, fragment := range filter.Fragments {
 		var fragmentDef *FragmentDef
 		if fragment.Inline != nil {
@@ -274,8 +273,7 @@ func (g *Graphy) addAndValidateResultVariables(typ *TypeLookup, filter *ResultFi
 		if found, subTyp := typ.ImplementsInterface(fragmentDef.TypeName); found {
 			err := g.addAndValidateResultVariables(subTyp, fragmentDef.Filter, variableTypeMap, fragments)
 			if err != nil {
-				// Todo: Wrap the error with the fragment name.
-				return err
+				return AugmentGraphError(err, fmt.Sprintf("error validating fragment %s", fragmentDef.TypeName), fragmentDef.Filter.Pos, fragmentDef.TypeName)
 			}
 		}
 	}
@@ -484,8 +482,8 @@ func (r *Request) Execute(ctx context.Context) (string, error) {
 			}
 			data[name] = res
 		} else {
-			// TODO: Make this better
-			return "", fmt.Errorf("unknown command %s", command.Name)
+			// This shouldn't happen since we validate the commands when we create the request stub.
+			panic(fmt.Sprintf("unknown command %s", command.Name))
 		}
 	}
 

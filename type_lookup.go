@@ -42,16 +42,6 @@ func (tl *TypeLookup) GetField(name string) (FieldLookup, bool) {
 		result, ok = tl.fieldsLowercase[strings.ToLower(name)]
 	}
 	return result, ok
-	//if ok {
-	//	return result, ok
-	//}
-	//for _, tl := range tl.union {
-	//	result, ok = tl.GetField(name)
-	//	if ok {
-	//		return result, ok
-	//	}
-	//}
-	//return FieldLookup{}, false
 }
 
 func (tl *TypeLookup) ImplementsInterface(name string) (bool, *TypeLookup) {
@@ -259,9 +249,8 @@ func (t *FieldLookup) Fetch(ctx context.Context, req *Request, v reflect.Value, 
 	case FieldTypeGraphFunction:
 		return t.fetchGraphFunction(ctx, req, v, params)
 	}
-	// Return error
-	// TODO: Augment?
-	return nil, fmt.Errorf("unknown field type: %v", t.fieldType)
+	// This should never happen, but return an error if we get here.
+	return nil, NewGraphError(fmt.Sprintf("unknown field type: %v", t.fieldType), params.Pos)
 }
 
 func (t *FieldLookup) fetchField(v reflect.Value) (any, error) {
@@ -274,8 +263,7 @@ func (t *FieldLookup) fetchField(v reflect.Value) (any, error) {
 func (t *FieldLookup) fetchGraphFunction(ctx context.Context, req *Request, v reflect.Value, params *ParameterList) (any, error) {
 	obj, err := t.graphFunction.Call(ctx, req, params, v)
 	if err != nil {
-		// TODO: Augment
-		return nil, err
+		return nil, AugmentGraphError(err, "error calling graph function", params.Pos)
 	}
 	return obj.Interface(), nil
 }

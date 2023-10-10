@@ -55,7 +55,7 @@ func (e GraphError) Error() string {
 	return s.String()
 }
 
-func NewGraphError(message string, pos lexer.Position, paths ...string) error {
+func NewGraphError(message string, pos lexer.Position, paths ...string) GraphError {
 	var gErr GraphError
 	if pos.Offset > 0 {
 		loc := lexerPositionError(pos)
@@ -194,4 +194,11 @@ func (e GraphError) MarshalJSON() ([]byte, error) {
 
 	// Marshal the new type.
 	return json.Marshal(gErr)
+}
+
+func (e *GraphError) AddExtension(key string, value string) {
+	if e.Extensions == nil {
+		e.Extensions = map[string]string{}
+	}
+	e.Extensions[key] = value
 }

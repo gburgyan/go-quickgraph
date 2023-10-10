@@ -394,7 +394,7 @@ func parseMapIntoValue(req *Request, inValue GenericValue, targetValue reflect.V
 	// A map is a little more complicated. We need to loop through the fields of the target type
 	// and set the values from the input map. This is how we initialize a struct from a map.
 	targetType := targetValue.Type()
-	// TODO: Cache this so we don't have to reconstruct it ever time.
+	// TODO: Cache this so we don't have to reconstruct it every time.
 	// Loop through the fields of the target type and make a map of the fields by "json" tag.
 	fieldMap := map[string]reflect.StructField{}
 	requiredFields := map[string]bool{}
@@ -433,7 +433,7 @@ func parseMapIntoValue(req *Request, inValue GenericValue, targetValue reflect.V
 			}
 			delete(requiredFields, fieldName)
 		} else {
-			// TODO: Handle this better. Warning? Error?
+			return NewGraphError(fmt.Sprintf("field %s not found in input struct", namedValue.Name), namedValue.Pos, namedValue.Name)
 		}
 	}
 

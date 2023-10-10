@@ -2,6 +2,7 @@ package quickgraph
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"math"
@@ -555,8 +556,8 @@ mutation CreateReviewForEpisode($ep: Episode!, $review: ReviewInput!) {
 }`
 
 	resultAny, err := g.ProcessRequest(ctx, input, vars)
-	assert.EqualError(t, err, "error calling createReview (path: createReview) [3:3]: fixed error return")
-	assert.Equal(t, `{"data":{},"errors":[{"message":"error calling createReview: fixed error return","locations":[{"line":3,"column":3}],"path":["createReview"]}]}`, resultAny)
+	assert.EqualError(t, err, "function createReview returned error (path: createReview) [3:16]: fixed error return")
+	assert.Equal(t, `{"data":{},"errors":[{"message":"function createReview returned error: fixed error return","locations":[{"line":3,"column":16}],"path":["createReview"]}]}`, resultAny)
 }
 
 func TestMutatorWithComplexInputVarsPanic(t *testing.T) {
@@ -587,6 +588,10 @@ mutation CreateReviewForEpisode($ep: Episode!, $review: ReviewInput!) {
 }`
 
 	resultAny, err := g.ProcessRequest(ctx, input, vars)
-	assert.EqualError(t, err, "error calling createReview (path: createReview) [3:3]: panic: fixed error message")
-	assert.Equal(t, `{"data":{},"errors":[{"message":"error calling createReview: panic: fixed error message","locations":[{"line":3,"column":3}],"path":["createReview"]}]}`, resultAny)
+	assert.EqualError(t, err, "function createReview panicked: fixed error message (path: createReview) [3:16]")
+	assert.Contains(t, resultAny, `{"data":{},"errors":[{"message":"function createReview panicked: fixed error message","locations":[{"line":3,"column":16}],"path":["createReview"],"extensions":{"stack"`, resultAny)
+	var gErr GraphError
+	errors.As(err, &gErr)
+	// The stack trace isn't stable so we can't compare it. Just verify we have it.
+	assert.Contains(t, gErr.Extensions, "stack")
 }

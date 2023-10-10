@@ -129,9 +129,14 @@ func (g *Graphy) typeLookup(typ reflect.Type) *TypeLookup {
 	}
 	// Fundamental types like floats and ints don't need these lookups because it doesn't make
 	// sense in this context.
-	g.typeLookups[typ] = nil
+	result := &TypeLookup{
+		typ:         typ,
+		name:        typ.Name(),
+		fundamental: true,
+	}
+	g.typeLookups[typ] = result
 	g.m.Unlock()
-	return nil
+	return result
 }
 
 func (g *Graphy) GetRequestStub(ctx context.Context, request string) (*RequestStub, error) {

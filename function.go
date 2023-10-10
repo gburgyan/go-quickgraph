@@ -106,7 +106,7 @@ func (g *Graphy) isValidGraphFunction(graphFunc reflect.Value, method bool) bool
 
 	// Check the return types of the graphFunc. It must return a serializable
 	// type. It may also return an error.
-	returnType, err := validateFunctionReturnTypes(mft)
+	returnType, err := g.validateFunctionReturnTypes(mft)
 	if err != nil {
 		return false
 	}
@@ -219,17 +219,17 @@ func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc ref
 	}
 
 	mft := graphFunc.Type()
-	returnType, err := validateFunctionReturnTypes(mft)
+	returnType, err := g.validateFunctionReturnTypes(mft)
 	if err != nil {
 		panic(err)
 	}
-	if returnType == anyType && len(def.ReturnAnyOverride) > 0 {
+	if returnType.typ == anyType && len(def.ReturnAnyOverride) > 0 {
 		gf.baseReturnType = g.convertAnySlice(def.ReturnAnyOverride)
 		// We need special handling for the `any` type later.
-		gf.rawReturnType = returnType
+		gf.rawReturnType = returnType.typ
 	} else {
-		gf.baseReturnType = g.typeLookup(returnType)
-		gf.rawReturnType = returnType
+		gf.baseReturnType = returnType
+		gf.rawReturnType = returnType.typ
 	}
 
 	hasNames := false
@@ -279,16 +279,16 @@ func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflec
 	}
 
 	mft := graphFunc.Type()
-	returnType, err := validateFunctionReturnTypes(mft)
+	returnType, err := g.validateFunctionReturnTypes(mft)
 	if err != nil {
 		panic(err)
 	}
-	if returnType == anyType && len(def.ReturnAnyOverride) > 0 {
+	if returnType.typ == anyType && len(def.ReturnAnyOverride) > 0 {
 		gf.baseReturnType = g.convertAnySlice(def.ReturnAnyOverride)
-		gf.rawReturnType = returnType
+		gf.rawReturnType = returnType.typ
 	} else {
-		gf.baseReturnType = g.typeLookup(returnType)
-		gf.rawReturnType = returnType
+		gf.baseReturnType = returnType
+		gf.rawReturnType = returnType.typ
 	}
 
 	// The parameter type must be a pointer to a struct. We will panic if it is
@@ -354,7 +354,7 @@ func (g *Graphy) convertAnySlice(types []any) *TypeLookup {
 // validateFunctionReturnTypes validates the return types of the function passed. It requires the function
 // to have at least one non-error return value and at most one error return value. The function should have
 // between one and two return values.
-func validateFunctionReturnTypes(mft reflect.Type) (reflect.Type, error) {
+func (g *Graphy) validateFunctionReturnTypes(mft reflect.Type) (*TypeLookup, error) {
 	// Validate that the mutatorFunc has a single non-error return value and an optional error.
 	if mft.NumOut() == 0 {
 		panic("mutatorFunc must have at least one return value")
@@ -380,7 +380,7 @@ func validateFunctionReturnTypes(mft reflect.Type) (reflect.Type, error) {
 	if nonErrorCount == 0 {
 		return nil, fmt.Errorf("mutatorFunc must have at least one non-error return value")
 	}
-	return returnType, nil
+	return g.typeLookup(returnType), nil
 }
 
 // Call executes the graph function with a given context, request and command. It first prepares the

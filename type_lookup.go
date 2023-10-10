@@ -28,6 +28,7 @@ type FieldLookup struct {
 type TypeLookup struct {
 	typ                 reflect.Type
 	name                string
+	fundamental         bool
 	fields              map[string]FieldLookup
 	fieldsLowercase     map[string]FieldLookup
 	implements          map[string]*TypeLookup

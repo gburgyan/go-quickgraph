@@ -147,7 +147,9 @@ func (g *Graphy) newGraphFunction(def FunctionDefinition, method bool) GraphFunc
 	var funcTyp reflect.Type
 	var funcVal reflect.Value
 
-	// Todo: This feels awkward. Is there a better way to do this?
+	// Todo: This feels awkward. Is there a better way to do this? This is called from
+	//  both registering functions directly, as well we from registering methods on the
+	//  output types.
 	if rVal, ok := def.Function.(reflect.Value); ok {
 		funcVal = rVal
 		funcTyp = funcVal.Type()

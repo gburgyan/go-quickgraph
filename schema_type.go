@@ -224,6 +224,7 @@ func (g *Graphy) schemaRefForType(t *TypeLookup) (string, *TypeLookup) {
 			baseType = "Boolean"
 
 		case reflect.Struct:
+			extraType = t
 			tl := t
 			if tl != nil {
 				// TODO: Handle same type name in different packages.

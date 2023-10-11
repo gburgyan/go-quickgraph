@@ -26,6 +26,9 @@ func (g *Graphy) schemaForOutputTypes(types ...*TypeLookup) (string, []reflect.T
 		}
 		completed[typeQueue[i].name] = true
 		t := typeQueue[i]
+		if t.fundamental {
+			continue
+		}
 		schema, extra, err := g.schemaForOutputType(t)
 		if err != nil {
 			return "", nil, err

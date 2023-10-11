@@ -27,7 +27,12 @@ type FieldLookup struct {
 
 type TypeLookup struct {
 	typ                 reflect.Type
+	rootType            reflect.Type
+	isSlice             bool
+	isPointer           bool
+	isPointerSlice      bool
 	name                string
+	fundamental         bool
 	fields              map[string]FieldLookup
 	fieldsLowercase     map[string]FieldLookup
 	implements          map[string]*TypeLookup
@@ -56,27 +61,6 @@ func (tl *TypeLookup) ImplementsInterface(name string) (bool, *TypeLookup) {
 		}
 	}
 	return false, nil
-}
-
-// makeTypeFieldLookup creates a lookup of fields for a given type. It performs
-// a depth-first search of the type, including anonymous fields. It creates the lookup
-// using either the json tag name or the field name.
-func (g *Graphy) makeTypeFieldLookup(typ reflect.Type) *TypeLookup {
-	// Do a depth-first search of the type to find all the fields.
-	// Include the anonymous fields in this search and treat them as if
-	// they were part of the current type in a flattened manner.
-	result := &TypeLookup{
-		typ:                 typ,
-		name:                typ.Name(),
-		fields:              make(map[string]FieldLookup),
-		fieldsLowercase:     map[string]FieldLookup{},
-		implements:          map[string]*TypeLookup{},
-		implementsLowercase: map[string]*TypeLookup{},
-		union:               map[string]*TypeLookup{},
-		unionLowercase:      map[string]*TypeLookup{},
-	}
-	g.processFieldLookup(typ, nil, result)
-	return result
 }
 
 // processFieldLookup is a helper function for makeTypeFieldLookup. It recursively processes

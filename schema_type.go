@@ -200,34 +200,39 @@ func (g *Graphy) schemaRefForType(t *TypeLookup) (string, *TypeLookup) {
 	optionalInner := t.isPointerSlice
 
 	var baseType string
-	switch t.rootType.Kind() {
-	case reflect.String:
-		if t.rootType.AssignableTo(stringEnumValuesType) {
-			extraType = t
-			baseType = t.name
-		} else {
-			baseType = "String"
+	if t.rootType == nil {
+		baseType = t.name
+		extraType = t
+	} else {
+		switch t.rootType.Kind() {
+		case reflect.String:
+			if t.rootType.AssignableTo(stringEnumValuesType) {
+				extraType = t
+				baseType = t.name
+			} else {
+				baseType = "String"
+			}
+
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			baseType = "Int"
+
+		case reflect.Float32, reflect.Float64:
+			baseType = "Float"
+
+		case reflect.Bool:
+			baseType = "Boolean"
+
+		case reflect.Struct:
+			tl := t
+			if tl != nil {
+				// TODO: Handle same type name in different packages.
+				baseType = tl.name
+			}
+
+		default:
+			panic("unsupported type")
 		}
-
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		baseType = "Int"
-
-	case reflect.Float32, reflect.Float64:
-		baseType = "Float"
-
-	case reflect.Bool:
-		baseType = "Boolean"
-
-	case reflect.Struct:
-		tl := extraType
-		if tl != nil {
-			// TODO: Handle same type name in different packages.
-			baseType = tl.name
-		}
-
-	default:
-		panic("unsupported type")
 	}
 
 	work := baseType

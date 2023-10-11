@@ -271,7 +271,7 @@ func TestGraphFunction_ImplicitReturnUnion(t *testing.T) {
 	g := Graphy{}
 	g.RegisterProcessor(ctx, "f", f)
 
-	fmt.Println(g.SchemaDefinition(ctx))
+	//fmt.Println(g.SchemaDefinition(ctx))
 
 	gql := `
 query f($arg: String!) {

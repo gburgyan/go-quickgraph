@@ -2,7 +2,6 @@ package quickgraph
 
 import (
 	"context"
-	"reflect"
 	"sort"
 	"strings"
 )
@@ -22,7 +21,7 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) (string, error) {
 	}
 
 	outputTypes := []*TypeLookup{}
-	enumTypes := []reflect.Type{}
+	enumTypes := []*TypeLookup{}
 
 	for mode, functions := range procByMode {
 
@@ -46,18 +45,19 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			for _, outType := range fOuput {
-				if outType.AssignableTo(stringEnumValuesType) {
-					enumTypes = append(enumTypes, outType)
+			for _, outTypeLookup := range fOuput {
+				if outTypeLookup.rootType != nil {
+					if outTypeLookup.rootType.AssignableTo(stringEnumValuesType) {
+						enumTypes = append(enumTypes, outTypeLookup)
+					}
 				} else {
-					outTypeLookup := g.typeLookup(outType)
 					outputTypes = append(outputTypes, outTypeLookup)
 				}
 			}
 			sb.WriteString(funcParams)
 
 			sb.WriteString("): ")
-			schemaRef, _ := g.schemaRefForType(function.rawReturnType)
+			schemaRef, _ := g.schemaRefForType(function.baseReturnType)
 			outputTypes = append(outputTypes, function.baseReturnType)
 			sb.WriteString(schemaRef)
 			sb.WriteString("\n")
@@ -82,7 +82,7 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) (string, error) {
 	return sb.String(), nil
 }
 
-func (g *Graphy) schemaForFunctionParameters(f *GraphFunction) (string, []reflect.Type, error) {
+func (g *Graphy) schemaForFunctionParameters(f *GraphFunction) (string, []*TypeLookup, error) {
 	sb := strings.Builder{}
 
 	mappings := []FunctionNameMapping{}
@@ -100,12 +100,12 @@ func (g *Graphy) schemaForFunctionParameters(f *GraphFunction) (string, []reflec
 		}
 		sb.WriteString(param.name)
 		sb.WriteString(": ")
-		schemaRef, _ := g.schemaRefForType(param.paramType)
+		schemaRef, _ := g.schemaRefForType(g.typeLookup(param.paramType))
 		sb.WriteString(schemaRef)
 	}
 
-	ret := []reflect.Type{
-		f.rawReturnType,
+	ret := []*TypeLookup{
+		f.baseReturnType,
 	}
 
 	return sb.String(), ret, nil

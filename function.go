@@ -50,15 +50,20 @@ type FunctionDefinition struct {
 }
 
 type GraphFunction struct {
-	g              *Graphy
-	name           string
-	paramType      GraphFunctionParamType
-	mode           GraphFunctionMode
-	function       reflect.Value
-	nameMapping    map[string]FunctionNameMapping
+	// General information about the function.
+	g        *Graphy
+	name     string
+	function reflect.Value
+	method   bool
+
+	// Input handling
+	paramType   GraphFunctionParamType
+	mode        GraphFunctionMode
+	nameMapping map[string]FunctionNameMapping
+
+	// Output handling
 	baseReturnType *TypeLookup
 	rawReturnType  reflect.Type
-	method         bool
 }
 
 type FunctionNameMapping struct {

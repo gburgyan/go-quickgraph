@@ -50,6 +50,9 @@ func (tl *TypeLookup) GetField(name string) (FieldLookup, bool) {
 }
 
 func (tl *TypeLookup) ImplementsInterface(name string) (bool, *TypeLookup) {
+	if strings.ToLower(name) == strings.ToLower(tl.name) {
+		return true, tl
+	}
 	_, found := tl.implementsLowercase[strings.ToLower(name)]
 	if found {
 		return true, tl

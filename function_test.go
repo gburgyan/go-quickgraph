@@ -2,6 +2,7 @@ package quickgraph
 
 import (
 	"context"
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -238,4 +239,70 @@ query {
 	response, err := g.ProcessRequest(ctx, gql, vars)
 	assert.NoError(t, err)
 	assert.Equal(t, `{"data":{"f":{"FuncParam":"Hello InputString"}}}`, response)
+}
+
+func TestGraphFunction_ImplicitReturnUnion(t *testing.T) {
+	type in struct {
+		InString string
+	}
+	type resultA struct {
+		OutStringA string
+	}
+	type resultB struct {
+		OutStringB string
+	}
+	f := func(ctx context.Context, selector string) (*resultA, *resultB, error) {
+		if selector == "A" {
+			return &resultA{OutStringA: "A-Result"}, nil, nil
+		}
+		if selector == "B" {
+			return nil, &resultB{OutStringB: "B-Result"}, nil
+		}
+		if selector == "AB" {
+			return &resultA{OutStringA: "A-Result"}, &resultB{OutStringB: "B-Result"}, nil
+		}
+		if selector == "error" {
+			return nil, nil, fmt.Errorf("error selector")
+		}
+		return nil, nil, nil
+	}
+
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterProcessor(ctx, "f", f)
+
+	fmt.Println(g.SchemaDefinition(ctx))
+
+	gql := `
+query f($arg: String!) {
+  f(Arg: $arg) {
+    __typename
+	... on resultA {
+		OutStringA
+	}
+	... on resultB {
+		OutStringB
+	}
+  }
+}`
+
+	response, err := g.ProcessRequest(ctx, gql, `{"arg":"A"}`)
+	assert.NoError(t, err)
+	assert.Equal(t, `{"data":{"f":{"OutStringA":"A-Result","__typename":"resultA"}}}`, response)
+
+	response, err = g.ProcessRequest(ctx, gql, `{"arg":"B"}`)
+	assert.NoError(t, err)
+	assert.Equal(t, `{"data":{"f":{"OutStringB":"B-Result","__typename":"resultB"}}}`, response)
+
+	response, err = g.ProcessRequest(ctx, gql, `{"arg":"AB"}`)
+	assert.Error(t, err)
+	assert.Equal(t, `{"data":{},"errors":[{"message":"function f returned multiple non-nil values","locations":[{"line":3,"column":5}],"path":["f"]}]}`, response)
+
+	response, err = g.ProcessRequest(ctx, gql, `{"arg":"error"}`)
+	assert.Error(t, err)
+	assert.Equal(t, `{"data":{},"errors":[{"message":"function f returned error: error selector","locations":[{"line":3,"column":5}],"path":["f"]}]}`, response)
+
+	response, err = g.ProcessRequest(ctx, gql, `{"arg":""}`)
+	assert.Error(t, err)
+	assert.Equal(t, `{"data":{},"errors":[{"message":"function f returned no non-nil values","locations":[{"line":3,"column":5}],"path":["f"]}]}`, response)
 }

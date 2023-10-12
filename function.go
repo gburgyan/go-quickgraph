@@ -57,9 +57,10 @@ type GraphFunction struct {
 	method   bool
 
 	// Input handling
-	paramType   GraphFunctionParamType
-	mode        GraphFunctionMode
-	nameMapping map[string]FunctionNameMapping
+	paramType    GraphFunctionParamType
+	mode         GraphFunctionMode
+	nameMapping  map[string]FunctionNameMapping
+	indexMapping []FunctionNameMapping
 
 	// Output handling
 	baseReturnType *TypeLookup
@@ -74,7 +75,7 @@ type FunctionNameMapping struct {
 	anonymousArgument bool
 }
 
-func (g *Graphy) isValidGraphFunction(graphFunc reflect.Value, method bool) bool {
+func (g *Graphy) isValidGraphFunction(graphFunc reflect.Value, name string, method bool) bool {
 	// A valid graph function must be a func type. It's inputs must be zero or more
 	// serializable types. If it's a method, the first parameter must be a pointer to
 	// a struct for the receiver. It may, optionally, take a context.Context
@@ -111,7 +112,7 @@ func (g *Graphy) isValidGraphFunction(graphFunc reflect.Value, method bool) bool
 
 	// Check the return types of the graphFunc. It must return a serializable
 	// type. It may also return an error.
-	returnType, err := g.validateFunctionReturnTypes(mft)
+	returnType, err := g.validateFunctionReturnTypes(mft, name)
 	if err != nil {
 		return false
 	}
@@ -158,7 +159,7 @@ func (g *Graphy) newGraphFunction(def FunctionDefinition, method bool) GraphFunc
 		funcTyp = funcVal.Type()
 	}
 
-	if !g.isValidGraphFunction(funcVal, method) {
+	if !g.isValidGraphFunction(funcVal, def.Name, method) {
 		panic("not valid graph function")
 	}
 
@@ -226,7 +227,7 @@ func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc ref
 	}
 
 	mft := graphFunc.Type()
-	returnType, err := g.validateFunctionReturnTypes(mft)
+	returnType, err := g.validateFunctionReturnTypes(mft, def.Name)
 	if err != nil {
 		panic(err)
 	}
@@ -245,6 +246,8 @@ func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc ref
 			panic("parameter names count must match parameter count")
 		}
 		hasNames = true
+	} else {
+		gf.indexMapping = make([]FunctionNameMapping, len(inputs))
 	}
 
 	// Iterate over the parameters and create the anonymous arguments.
@@ -266,6 +269,7 @@ func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc ref
 			mapping.name = fmt.Sprintf("arg%d", mapping.paramIndex)
 			mapping.anonymousArgument = true
 			gf.nameMapping[mapping.name] = mapping
+			gf.indexMapping[i] = mapping
 		}
 	}
 
@@ -286,7 +290,7 @@ func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflec
 	}
 
 	mft := graphFunc.Type()
-	returnType, err := g.validateFunctionReturnTypes(mft)
+	returnType, err := g.validateFunctionReturnTypes(mft, def.Name)
 	if err != nil {
 		panic(err)
 	}
@@ -361,33 +365,56 @@ func (g *Graphy) convertAnySlice(types []any) *TypeLookup {
 // validateFunctionReturnTypes validates the return types of the function passed. It requires the function
 // to have at least one non-error return value and at most one error return value. The function should have
 // between one and two return values.
-func (g *Graphy) validateFunctionReturnTypes(mft reflect.Type) (*TypeLookup, error) {
-	// Validate that the mutatorFunc has a single non-error return value and an optional error.
-	if mft.NumOut() == 0 {
-		panic("mutatorFunc must have at least one return value")
-	}
-	if mft.NumOut() > 2 {
-		panic("mutatorFunc must have at most two return values")
-	}
-
+func (g *Graphy) validateFunctionReturnTypes(mft reflect.Type, name string) (*TypeLookup, error) {
 	errorCount := 0
-	nonErrorCount := 0
-	var returnType reflect.Type
+
+	nonPointerCount := 0
+	var returnTypes []reflect.Type
+
 	for i := 0; i < mft.NumOut(); i++ {
-		if mft.Out(i).ConvertibleTo(errorType) {
+		out := mft.Out(i)
+		if out.ConvertibleTo(errorType) {
 			errorCount++
 		} else {
-			nonErrorCount++
-			returnType = mft.Out(i)
+			returnTypes = append(returnTypes, out)
+			if out.Kind() != reflect.Ptr {
+				nonPointerCount++
+			}
 		}
 	}
+
 	if errorCount > 1 {
-		return nil, fmt.Errorf("mutatorFunc may have at most one error return value")
+		return nil, fmt.Errorf("function may have at most one error return value")
 	}
-	if nonErrorCount == 0 {
-		return nil, fmt.Errorf("mutatorFunc must have at least one non-error return value")
+	if len(returnTypes) == 0 {
+		return nil, fmt.Errorf("function must have at least one non-error return value")
 	}
-	return g.typeLookup(returnType), nil
+	if len(returnTypes) == 1 {
+		// This is the simple case where we have a single return type.
+		return g.typeLookup(returnTypes[0]), nil
+	}
+	if nonPointerCount > 1 {
+		return nil, fmt.Errorf("function may have at most one non-pointer return value")
+	}
+
+	// If we have multiple return types, we're in the implicit union case.
+	// We need to create a union type for the return types.
+	unionName := name + "ResultUnion"
+	result := &TypeLookup{
+		name:                unionName,
+		fields:              make(map[string]FieldLookup),
+		fieldsLowercase:     make(map[string]FieldLookup),
+		implements:          make(map[string]*TypeLookup),
+		implementsLowercase: make(map[string]*TypeLookup),
+		union:               make(map[string]*TypeLookup),
+		unionLowercase:      make(map[string]*TypeLookup),
+	}
+	for _, returnType := range returnTypes {
+		tl := g.typeLookup(returnType)
+		result.union[tl.name] = tl
+		result.unionLowercase[strings.ToLower(tl.name)] = tl
+	}
+	return result, nil
 }
 
 // Call executes the graph function with a given context, request and command. It first prepares the
@@ -429,7 +456,7 @@ func (f *GraphFunction) Call(ctx context.Context, req *Request, params *Paramete
 		return reflect.Value{}, NewGraphError("function returned no values", params.Pos, f.name)
 	}
 
-	var resultValue reflect.Value
+	var resultValues []reflect.Value
 	// TODO: Tighten this up to deal with the return types better.
 	for _, callResult := range callResults {
 		if callResult.CanConvert(errorType) {
@@ -438,11 +465,30 @@ func (f *GraphFunction) Call(ctx context.Context, req *Request, params *Paramete
 				return reflect.Value{}, AugmentGraphError(err, fmt.Sprintf("function %s returned error", f.name), params.Pos)
 			}
 		} else {
-			resultValue = callResult
+			resultValues = append(resultValues, callResult)
 		}
 	}
 
-	return resultValue, nil
+	if len(resultValues) == 1 {
+		return resultValues[0], nil
+	}
+
+	// At this point, we are in the implicit union case. We need to return the single non-nil result
+	// value from the results. If we have zero or more than one non-nil result value, that is an error.
+	// Otherwise, return the single non-nil result value.
+	var nonNilResult reflect.Value
+	for _, resultValue := range resultValues {
+		if !resultValue.IsNil() {
+			if nonNilResult.IsValid() {
+				return reflect.Value{}, NewGraphError(fmt.Sprintf("function %s returned multiple non-nil values", f.name), params.Pos)
+			}
+			nonNilResult = resultValue
+		}
+	}
+	if !nonNilResult.IsValid() {
+		return reflect.Value{}, NewGraphError(fmt.Sprintf("function %s returned no non-nil values", f.name), params.Pos)
+	}
+	return nonNilResult, nil
 }
 
 func (f *GraphFunction) GenerateResult(ctx context.Context, req *Request, obj reflect.Value, filter *ResultFilter) (any, error) {

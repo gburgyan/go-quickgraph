@@ -134,14 +134,26 @@ func (g *Graphy) GatherRequestVariables(parsedCall Wrapper, fragments map[string
 		if !ok {
 			return nil, NewGraphError(fmt.Sprintf("unknown command %s", command.Name), command.Pos)
 		}
-
+		anonArgs := false
+		argIndex := 0
+		if graphFunc.paramType == AnonymousParamsInline {
+			anonArgs = true
+		}
 		if command.Parameters != nil {
 			for _, parameter := range command.Parameters.Values {
 				if parameter.Value.Variable != nil {
 					varName := *parameter.Value.Variable
-					// TODO: Deal with anonymous functions -- this will fail on those presently.
-					paramTarget := graphFunc.nameMapping[parameter.Name]
+					var paramTarget FunctionNameMapping
+					if anonArgs {
+						paramTarget = graphFunc.indexMapping[argIndex]
+						argIndex++
+					} else {
+						paramTarget = graphFunc.nameMapping[parameter.Name]
+					}
 					targetType := paramTarget.paramType
+					if targetType == nil {
+						panic(fmt.Sprintf("unknown parameter %s", parameter.Name))
+					}
 
 					err := g.addTypedInputVariable(varName, variableTypeMap, targetType)
 					if err != nil {

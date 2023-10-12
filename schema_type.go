@@ -7,12 +7,12 @@ import (
 	"strings"
 )
 
-func (g *Graphy) schemaForOutputTypes(types ...*TypeLookup) (string, []reflect.Type, error) {
+func (g *Graphy) schemaForOutputTypes(types ...*TypeLookup) (string, []*TypeLookup, error) {
 
 	completed := make(map[string]bool)
 
 	typeQueue := make([]*TypeLookup, len(types))
-	var enumQueue []reflect.Type
+	var enumQueue []*TypeLookup
 
 	copy(typeQueue, types)
 
@@ -34,11 +34,11 @@ func (g *Graphy) schemaForOutputTypes(types ...*TypeLookup) (string, []reflect.T
 			return "", nil, err
 		}
 		for _, et := range extra {
-			if et.AssignableTo(stringEnumValuesType) {
+			if et.rootType.Kind() != reflect.Invalid && et.rootType.AssignableTo(stringEnumValuesType) {
 				enumQueue = append(enumQueue, et)
 			} else {
-				etl := g.typeLookup(et)
-				if !completed[et.Name()] && etl != nil {
+				etl := et
+				if !completed[et.name] && etl != nil {
 					typeQueue = append(typeQueue, etl)
 				}
 			}
@@ -50,13 +50,13 @@ func (g *Graphy) schemaForOutputTypes(types ...*TypeLookup) (string, []reflect.T
 	return sb.String(), enumQueue, nil
 }
 
-func (g *Graphy) schemaForEnumTypes(types ...reflect.Type) (string, error) {
+func (g *Graphy) schemaForEnumTypes(types ...*TypeLookup) (string, error) {
 	sb := strings.Builder{}
 
 	completed := make(map[string]bool)
 
 	for _, et := range types {
-		enumName := et.String()
+		enumName := et.name
 		if completed[enumName] {
 			continue
 		}
@@ -69,16 +69,16 @@ func (g *Graphy) schemaForEnumTypes(types ...reflect.Type) (string, error) {
 	return sb.String(), nil
 }
 
-func (g *Graphy) schemaForEnum(et reflect.Type) string {
+func (g *Graphy) schemaForEnum(et *TypeLookup) string {
 
 	sb := strings.Builder{}
 
-	enumValue := reflect.New(et)
+	enumValue := reflect.New(et.rootType)
 	sev := enumValue.Convert(stringEnumValuesType)
 	se := sev.Interface().(StringEnumValues)
 
 	sb.WriteString("enum ")
-	sb.WriteString(et.Name())
+	sb.WriteString(et.name)
 	sb.WriteString(" {\n")
 
 	for _, s := range se.EnumValues() {
@@ -90,8 +90,8 @@ func (g *Graphy) schemaForEnum(et reflect.Type) string {
 	return sb.String()
 }
 
-func (g *Graphy) schemaForOutputType(t *TypeLookup) (string, []reflect.Type, error) {
-	var extraTypes []reflect.Type
+func (g *Graphy) schemaForOutputType(t *TypeLookup) (string, []*TypeLookup, error) {
+	var extraTypes []*TypeLookup
 
 	// TODO: this can use some refactoring -- the function seems too complex as it is.
 	if len(t.union) > 0 {
@@ -114,7 +114,7 @@ func (g *Graphy) schemaForOutputType(t *TypeLookup) (string, []reflect.Type, err
 			}
 			unionCount++
 			sb.WriteString(unionType.name)
-			extraTypes = append(extraTypes, unionType.typ)
+			extraTypes = append(extraTypes, unionType)
 		}
 		sb.WriteString("\n")
 		return sb.String(), extraTypes, nil
@@ -134,7 +134,7 @@ func (g *Graphy) schemaForOutputType(t *TypeLookup) (string, []reflect.Type, err
 			}
 			interfaceCount++
 			sb.WriteString(implementedType.name)
-			extraTypes = append(extraTypes, implementedType.typ)
+			extraTypes = append(extraTypes, implementedType)
 		}
 	}
 
@@ -155,7 +155,7 @@ func (g *Graphy) schemaForOutputType(t *TypeLookup) (string, []reflect.Type, err
 				// to be handled differently.
 				continue
 			}
-			typeString, extraType := g.schemaRefForType(field.resultType)
+			typeString, extraType := g.schemaRefForType(g.typeLookup(field.resultType))
 			if extraType != nil {
 				extraTypes = append(extraTypes, extraType)
 			}
@@ -180,7 +180,7 @@ func (g *Graphy) schemaForOutputType(t *TypeLookup) (string, []reflect.Type, err
 			extraTypes = append(extraTypes, fEnums...)
 			sb.WriteString(funcParams)
 			sb.WriteString("): ")
-			schemaRef, _ := g.schemaRefForType(field.graphFunction.rawReturnType)
+			schemaRef, _ := g.schemaRefForType(field.graphFunction.baseReturnType)
 			sb.WriteString(schemaRef)
 			sb.WriteString("\n")
 		} else {
@@ -192,55 +192,47 @@ func (g *Graphy) schemaForOutputType(t *TypeLookup) (string, []reflect.Type, err
 	return sb.String(), extraTypes, nil
 }
 
-func (g *Graphy) schemaRefForType(t reflect.Type) (string, reflect.Type) {
-	var extraType reflect.Type
+func (g *Graphy) schemaRefForType(t *TypeLookup) (string, *TypeLookup) {
+	var extraType *TypeLookup
 
-	optional := false
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
-		optional = true
-	}
-	array := false
-	optionalInner := false
-	if t.Kind() == reflect.Slice {
-		t = t.Elem()
-		array = true
-		if t.Kind() == reflect.Ptr {
-			t = t.Elem()
-			optionalInner = true
-		}
-	}
+	optional := t.isPointer
+	array := t.isSlice
+	optionalInner := t.isPointerSlice
 
 	var baseType string
-	switch t.Kind() {
-	case reflect.String:
-		if t.AssignableTo(stringEnumValuesType) {
-			extraType = t
-			baseType = t.Name()
-		} else {
-			baseType = "String"
-		}
-
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		baseType = "Int"
-
-	case reflect.Float32, reflect.Float64:
-		baseType = "Float"
-
-	case reflect.Bool:
-		baseType = "Boolean"
-
-	case reflect.Struct:
+	if t.rootType == nil {
+		baseType = t.name
 		extraType = t
-		tl := g.typeLookup(t)
-		if tl != nil {
-			// TODO: Handle same type name in different packages.
-			baseType = tl.name
-		}
+	} else {
+		switch t.rootType.Kind() {
+		case reflect.String:
+			if t.rootType.AssignableTo(stringEnumValuesType) {
+				extraType = t
+				baseType = t.name
+			} else {
+				baseType = "String"
+			}
 
-	default:
-		panic("unsupported type")
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			baseType = "Int"
+
+		case reflect.Float32, reflect.Float64:
+			baseType = "Float"
+
+		case reflect.Bool:
+			baseType = "Boolean"
+
+		case reflect.Struct:
+			extraType = t
+			if t != nil {
+				// TODO: Handle same type name in different packages.
+				baseType = t.name
+			}
+
+		default:
+			panic("unsupported type")
+		}
 	}
 
 	work := baseType

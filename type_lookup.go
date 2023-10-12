@@ -50,6 +50,9 @@ func (tl *TypeLookup) GetField(name string) (FieldLookup, bool) {
 }
 
 func (tl *TypeLookup) ImplementsInterface(name string) (bool, *TypeLookup) {
+	if strings.ToLower(name) == strings.ToLower(tl.name) {
+		return true, tl
+	}
 	_, found := tl.implementsLowercase[strings.ToLower(name)]
 	if found {
 		return true, tl
@@ -194,7 +197,7 @@ func (g *Graphy) addGraphMethodsForType(typ reflect.Type, index []int, tl *TypeL
 			outTypes = append(outTypes, m.Type.Out(j))
 		}
 
-		if g.isValidGraphFunction(m.Func, true) {
+		if g.isValidGraphFunction(m.Func, m.Name, true) {
 			// Todo: Make this take a reflect.Type instead of an any.
 			gf := g.newGraphFunction(FunctionDefinition{
 				Name:     m.Name,

@@ -3,6 +3,7 @@ package quickgraph
 import (
 	"context"
 	"fmt"
+	"github.com/alecthomas/participle/v2/lexer"
 	"reflect"
 	"strconv"
 	"strings"
@@ -14,15 +15,15 @@ import (
 // Currently, it only supports slices, maps, and structs,
 // and returns an error if the function returns a different kind of value.
 func (f *GraphFunction) processCallOutput(ctx context.Context, req *Request, filter *ResultFilter, callResult reflect.Value) (any, error) {
+	var pos lexer.Position
+	if filter != nil {
+		pos = filter.Pos
+	}
+
 	kind := callResult.Kind()
 	if callResult.CanConvert(errorType) {
-		if !callResult.IsNil() {
-			err := callResult.Convert(errorType).Interface().(error)
-			err = AugmentGraphError(err, fmt.Sprintf("function returned error: %v", err), filter.Pos)
-			return nil, err
-		} else {
-			return nil, nil
-		}
+		// This should have been handled earlier. But just in case...
+		panic("error should have been handled earlier")
 	}
 
 	if kind == reflect.Interface {
@@ -44,7 +45,7 @@ func (f *GraphFunction) processCallOutput(ctx context.Context, req *Request, fil
 				a := callResult.Index(i).Interface()
 				sr, err := f.processOutputStruct(ctx, req, filter, a)
 				if err != nil {
-					return nil, AugmentGraphError(err, fmt.Sprintf("error processing slice element %v", i), filter.Pos, strconv.Itoa(i))
+					return nil, AugmentGraphError(err, fmt.Sprintf("error processing slice element %v", i), pos, strconv.Itoa(i))
 				}
 				retVal = append(retVal, sr)
 			}
@@ -52,18 +53,17 @@ func (f *GraphFunction) processCallOutput(ctx context.Context, req *Request, fil
 		}
 	} else if kind == reflect.Map {
 		// TODO: Handle maps?
-		return nil, NewGraphError(fmt.Sprintf("maps not supported"), filter.Pos)
+		return nil, NewGraphError(fmt.Sprintf("maps not supported"), pos)
 	} else if kind == reflect.Struct {
 		sr, err := f.processOutputStruct(nil, req, filter, callResult.Interface())
 		if err != nil {
-			return nil, AugmentGraphError(err, fmt.Sprintf("error processing struct"), filter.Pos)
+			return nil, AugmentGraphError(err, fmt.Sprintf("error processing struct"), pos)
 		}
 		return sr, nil
 	} else {
-		return nil, NewGraphError(fmt.Sprintf("return type of %v not supported", kind), filter.Pos)
+		return nil, NewGraphError(fmt.Sprintf("return type of %v not supported", kind), pos)
 	}
 
-	// TODO: Better error handling.
 	return nil, nil
 }
 

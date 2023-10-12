@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/alecthomas/participle/v2/lexer"
 	"reflect"
 	"strings"
 )
@@ -89,7 +90,6 @@ func (g *Graphy) NewRequestStub(request string) (*RequestStub, error) {
 
 	fragments := map[string]Fragment{}
 	for _, fragment := range parsedCall.Fragments {
-		// TODO: Validate the fragments.
 		fragments[fragment.Name] = fragment
 	}
 
@@ -165,7 +165,6 @@ func (g *Graphy) GatherRequestVariables(parsedCall Wrapper, fragments map[string
 
 		// Depth-first search into the result filter.
 		typeLookup := graphFunc.baseReturnType
-		// TODO: Dive into the result filter and find variables there.
 
 		err := g.addAndValidateResultVariables(typeLookup, command.ResultFilter, variableTypeMap, fragments)
 		if err != nil {
@@ -452,57 +451,117 @@ func (rs *RequestStub) NewRequest(variableJson string) (*Request, error) {
 	}, nil
 }
 
+type commandResult struct {
+	name string
+	obj  any
+	err  error
+}
+
 // Execute executes a GraphQL request. It looks up the appropriate processor for each command and invokes it.
 // It returns the result of the request as a JSON string.
 func (r *Request) Execute(ctx context.Context) (string, error) {
 	result := map[string]any{}
 	data := map[string]any{}
+	var errColl []error
 	result["data"] = data
-
 	var retErr error
 
-	for _, command := range r.Stub.Commands {
-		// TODO: In query mode, we can run all these in parallel.
-		// Find the processor
-		if processor, ok := r.Graphy.processors[command.Name]; ok {
-			obj, err := processor.Call(ctx, r, command.Parameters, reflect.Value{})
+	var cmdResults []commandResult
+	var parallel bool
+	if r.Stub.Mode == RequestMutation {
+		parallel = false
+	} else {
+		parallel = true
+	}
 
-			if err != nil {
-				errCollAny, found := result["errors"]
-				var errColl []error
-				if !found {
-					errColl = []error{}
-					result["errors"] = errColl
-				} else {
-					errColl = errCollAny.([]error)
-				}
-				gErr := AugmentGraphError(err, fmt.Sprintf("error calling %s", command.Name), command.Pos, command.Name)
-				errColl = append(errColl, gErr)
-				// TODO: Once this is run in parallel, there's a slight race condition here with reassigning the error.
-				result["errors"] = errColl
-
-				retErr = gErr
-				continue
-			}
-			res, err := processor.GenerateResult(ctx, r, obj, command.ResultFilter)
-			if err != nil {
-				return "", AugmentGraphError(err, fmt.Sprintf("error generating result for %s", command.Name), command.ResultFilter.Pos, command.Name)
-			}
-			name := command.Name
-			if command.Alias != nil {
-				name = *command.Alias
-			}
-			data[name] = res
-		} else {
-			// This shouldn't happen since we validate the commands when we create the request stub.
-			panic(fmt.Sprintf("unknown command %s", command.Name))
+	if parallel {
+		resultChan := make(chan commandResult)
+		// Execute the commands in parallel.
+		for _, command := range r.Stub.Commands {
+			go func(command Command) {
+				resultChan <- r.executeCommand(ctx, command)
+			}(command)
 		}
+		// Gather the results from the channel and put them in the cmdResults
+		// slice.
+		for len(cmdResults) < len(r.Stub.Commands) {
+			select {
+			case <-ctx.Done():
+				cmdResults = append(cmdResults, commandResult{
+					err: AugmentGraphError(ctx.Err(), "context timed out", lexer.Position{}),
+				})
+				break
+			case cmdResult := <-resultChan:
+				cmdResults = append(cmdResults, cmdResult)
+			}
+		}
+	} else {
+		for _, command := range r.Stub.Commands {
+			ctxErr := ctx.Err()
+			if ctxErr != nil {
+				cmdResults = append(cmdResults, commandResult{
+					err: AugmentGraphError(ctx.Err(), "context timed out", lexer.Position{}),
+				})
+				break
+			}
+			cmdResults = append(cmdResults, r.executeCommand(ctx, command))
+		}
+	}
+
+	for _, cmdResult := range cmdResults {
+		if cmdResult.err != nil {
+			errColl = append(errColl, cmdResult.err)
+			retErr = cmdResult.err
+		}
+
+		if cmdResult.name != "" {
+			data[cmdResult.name] = cmdResult.obj
+		}
+	}
+
+	if len(errColl) > 0 {
+		result["errors"] = errColl
 	}
 
 	// Serialize the result to JSON.
 	marshal, err := json.Marshal(result)
 	if err != nil {
+		// There should be no way for this to happen since we're using basic objects.
 		return "", err
 	}
 	return string(marshal), retErr
+}
+
+func (r *Request) executeCommand(ctx context.Context, command Command) commandResult {
+	processor, ok := r.Graphy.processors[command.Name]
+	if !ok {
+		// This shouldn't happen since we validate the commands when we create the request stub.
+		return commandResult{
+			err: NewGraphError(fmt.Sprintf("unknown command %s", command.Name), command.Pos),
+		}
+	}
+
+	obj, err := processor.Call(ctx, r, command.Parameters, reflect.Value{})
+	if err != nil {
+		return commandResult{
+			err: AugmentGraphError(err, fmt.Sprintf("error calling %s", command.Name), command.Pos, command.Name),
+		}
+	}
+
+	res, err := processor.GenerateResult(ctx, r, obj, command.ResultFilter)
+	if err != nil {
+		return commandResult{
+			err: AugmentGraphError(err, fmt.Sprintf("error generating result for %s", command.Name), command.ResultFilter.Pos, command.Name),
+		}
+	}
+
+	name := command.Name
+	if command.Alias != nil {
+		name = *command.Alias
+	}
+
+	return commandResult{
+		name: name,
+		obj:  res,
+	}
 }

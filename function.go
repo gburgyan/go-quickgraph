@@ -457,7 +457,6 @@ func (f *GraphFunction) Call(ctx context.Context, req *Request, params *Paramete
 	}
 
 	var resultValues []reflect.Value
-	// TODO: Tighten this up to deal with the return types better.
 	for _, callResult := range callResults {
 		if callResult.CanConvert(errorType) {
 			if !callResult.IsNil() {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"testing"
+	"time"
 )
 
 type TestUnion struct {
@@ -15,6 +16,15 @@ type TestUnion struct {
 type NonUnion struct {
 	A string
 	B int
+}
+
+type StringResult struct {
+	Out string
+}
+
+func DelayedFunc(ctx context.Context, sleepTime int64) StringResult {
+	time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+	return StringResult{Out: fmt.Sprintf("DelayedFunc: %v", sleepTime)}
 }
 
 func TestDeferenceUnionType(t *testing.T) {
@@ -323,4 +333,89 @@ type resultB {
 	schema, err := g.SchemaDefinition(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, expected, schema)
+}
+
+func TestGraphFunction_ParallelQuery(t *testing.T) {
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterProcessor(ctx, "delay", DelayedFunc)
+
+	startTime := time.Now()
+	gql := `
+query {
+  a: delay(sleepTime: 75) {
+    Out
+  }
+  b: delay(sleepTime: 125) {
+    Out
+  }
+}
+`
+	response, err := g.ProcessRequest(ctx, gql, "")
+	endTime := time.Now()
+
+	assert.NoError(t, err)
+	assert.Equal(t, `{"data":{"a":{"Out":"DelayedFunc: 75"},"b":{"Out":"DelayedFunc: 125"}}}`, response)
+
+	// The total time should be less than 200ms, since the queries are run in parallel.
+	duration := endTime.Sub(startTime)
+	assert.True(t, duration < 200*time.Millisecond)
+}
+
+func TestGraphFunction_ParallelQuery_Timeout(t *testing.T) {
+	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+	defer cancel()
+	g := Graphy{}
+	g.RegisterProcessor(ctx, "delay", DelayedFunc)
+
+	startTime := time.Now()
+	gql := `
+query {
+  a: delay(sleepTime: 50) {
+    Out
+  }
+  b: delay(sleepTime: 125) {
+    Out
+  }
+}
+`
+	response, err := g.ProcessRequest(ctx, gql, "")
+	endTime := time.Now()
+
+	assert.Error(t, err)
+	assert.Equal(t, `{"data":{"a":{"Out":"DelayedFunc: 50"}},"errors":[{"message":"context timed out: context deadline exceeded"}]}`, response)
+
+	// The total time should be less than 200ms, since the queries are run in parallel.
+	duration := endTime.Sub(startTime)
+	assert.True(t, duration < 150*time.Millisecond)
+}
+
+func TestGraphFunction_SerialQuery_Timeout(t *testing.T) {
+	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(ctx, 40*time.Millisecond)
+	defer cancel()
+	g := Graphy{}
+	g.RegisterProcessor(ctx, "delay", DelayedFunc)
+
+	startTime := time.Now()
+	gql := `
+mutation {
+  a: delay(sleepTime: 50) {
+    Out
+  }
+  b: delay(sleepTime: 125) {
+    Out
+  }
+}
+`
+	response, err := g.ProcessRequest(ctx, gql, "")
+	endTime := time.Now()
+
+	assert.Error(t, err)
+	assert.Equal(t, `{"data":{"a":{"Out":"DelayedFunc: 50"}},"errors":[{"message":"context timed out: context deadline exceeded"}]}`, response)
+
+	// The total time should be less than 200ms, since the queries are run in parallel.
+	duration := endTime.Sub(startTime)
+	assert.True(t, duration < 100*time.Millisecond)
 }

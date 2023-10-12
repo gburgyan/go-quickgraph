@@ -17,7 +17,6 @@ const (
 )
 
 type FieldLookup struct {
-	// TODO: Add support for enums.
 	fieldType     FieldType
 	name          string
 	resultType    reflect.Type

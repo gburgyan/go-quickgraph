@@ -271,8 +271,6 @@ func TestGraphFunction_ImplicitReturnUnion(t *testing.T) {
 	g := Graphy{}
 	g.RegisterProcessor(ctx, "f", f)
 
-	fmt.Println(g.SchemaDefinition(ctx))
-
 	gql := `
 query f($arg: String!) {
   f(Arg: $arg) {
@@ -305,4 +303,24 @@ query f($arg: String!) {
 	response, err = g.ProcessRequest(ctx, gql, `{"arg":""}`)
 	assert.Error(t, err)
 	assert.Equal(t, `{"data":{},"errors":[{"message":"function f returned no non-nil values","locations":[{"line":3,"column":5}],"path":["f"]}]}`, response)
+
+	expected := `type Query {
+	f(arg1: String!): fResultUnion!
+}
+
+union fResultUnion = resultA | resultB
+
+type resultA {
+	OutStringA: String!
+}
+
+type resultB {
+	OutStringB: String!
+}
+
+`
+
+	schema, err := g.SchemaDefinition(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, schema)
 }

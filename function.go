@@ -75,7 +75,7 @@ type FunctionNameMapping struct {
 	anonymousArgument bool
 }
 
-func (g *Graphy) isValidGraphFunction(graphFunc reflect.Value, method bool) bool {
+func (g *Graphy) isValidGraphFunction(graphFunc reflect.Value, name string, method bool) bool {
 	// A valid graph function must be a func type. It's inputs must be zero or more
 	// serializable types. If it's a method, the first parameter must be a pointer to
 	// a struct for the receiver. It may, optionally, take a context.Context
@@ -112,7 +112,7 @@ func (g *Graphy) isValidGraphFunction(graphFunc reflect.Value, method bool) bool
 
 	// Check the return types of the graphFunc. It must return a serializable
 	// type. It may also return an error.
-	returnType, err := g.validateFunctionReturnTypes(mft)
+	returnType, err := g.validateFunctionReturnTypes(mft, name)
 	if err != nil {
 		return false
 	}
@@ -159,7 +159,7 @@ func (g *Graphy) newGraphFunction(def FunctionDefinition, method bool) GraphFunc
 		funcTyp = funcVal.Type()
 	}
 
-	if !g.isValidGraphFunction(funcVal, method) {
+	if !g.isValidGraphFunction(funcVal, def.Name, method) {
 		panic("not valid graph function")
 	}
 
@@ -227,7 +227,7 @@ func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc ref
 	}
 
 	mft := graphFunc.Type()
-	returnType, err := g.validateFunctionReturnTypes(mft)
+	returnType, err := g.validateFunctionReturnTypes(mft, def.Name)
 	if err != nil {
 		panic(err)
 	}
@@ -290,7 +290,7 @@ func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflec
 	}
 
 	mft := graphFunc.Type()
-	returnType, err := g.validateFunctionReturnTypes(mft)
+	returnType, err := g.validateFunctionReturnTypes(mft, def.Name)
 	if err != nil {
 		panic(err)
 	}
@@ -365,7 +365,7 @@ func (g *Graphy) convertAnySlice(types []any) *TypeLookup {
 // validateFunctionReturnTypes validates the return types of the function passed. It requires the function
 // to have at least one non-error return value and at most one error return value. The function should have
 // between one and two return values.
-func (g *Graphy) validateFunctionReturnTypes(mft reflect.Type) (*TypeLookup, error) {
+func (g *Graphy) validateFunctionReturnTypes(mft reflect.Type, name string) (*TypeLookup, error) {
 	errorCount := 0
 
 	nonPointerCount := 0
@@ -399,7 +399,7 @@ func (g *Graphy) validateFunctionReturnTypes(mft reflect.Type) (*TypeLookup, err
 
 	// If we have multiple return types, we're in the implicit union case.
 	// We need to create a union type for the return types.
-	unionName := mft.Name() + "ResultUnion"
+	unionName := name + "ResultUnion"
 	result := &TypeLookup{
 		name:                unionName,
 		fields:              make(map[string]FieldLookup),

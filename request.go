@@ -219,14 +219,9 @@ func (g *Graphy) addAndValidateResultVariables(typ *TypeLookup, filter *ResultFi
 	}
 
 	for _, field := range filter.Fields {
-		if typ == nil {
-			// TODO: Is this actually an error?
-			return NewGraphError("type is nil", field.Pos)
-		}
-		if typ.fields == nil {
-			// TODO: Is this needed?
-			// TODO: Is this actually an error?
-			return NewGraphError("type has no fields", field.Pos)
+		if len(typ.fields) == 0 {
+			// This is a bit silly, but not an error.
+			return nil
 		}
 		if field.Name == "__typename" {
 			// This is a virtual field that is always present.
@@ -380,9 +375,9 @@ func (g *Graphy) validateNamedFunctionParams(commandField *ResultField, gf *Grap
 				}
 			}
 			// Todo: Consider parsing, validating, and caching the value for value types. The
-			// special consideration that is needed is that pointers to objects are
-			// allowed -- and we have to ensure that objects that are cached are not
-			// changed between calls. Short-term, we can just not cache value types.
+			//  special consideration that is needed is that pointers to objects are
+			//  allowed -- and we have to ensure that objects that are cached are not
+			//  changed between calls. Short-term, we can just not cache value types.
 		}
 	}
 

@@ -75,6 +75,51 @@ enum episode {
 	assert.Equal(t, expected, schema)
 }
 
+func TestGraphy_MultiParamFunction(t *testing.T) {
+	g := Graphy{}
+	ctx := context.Background()
+
+	g.RegisterFunction(ctx, FunctionDefinition{
+		Name:           "Update",
+		Function:       func(ep episode, count int) []Character { return nil },
+		Mode:           ModeMutation,
+		ParameterNames: []string{"Episode", "Count"},
+	})
+
+	schema, err := g.SchemaDefinition(ctx)
+	assert.NoError(t, err)
+
+	expected := `type Mutation {
+	Update(Episode: episode!, Count: Int!): [Character!]!
+}
+
+type Character {
+	appearsIn: [episode!]!
+	friends: [Character]!
+	FriendsConnection(arg1: Int!): FriendsConnection
+	id: String!
+	name: String!
+}
+
+type FriendsConnection {
+	edges: [ConnectionEdge]!
+	totalCount: Int!
+}
+
+type ConnectionEdge {
+	node: Character
+}
+
+enum episode {
+	NEWHOPE
+	EMPIRE
+	JEDI
+}
+
+`
+	assert.Equal(t, expected, schema)
+}
+
 func TestGraphy_implementsSchema(t *testing.T) {
 	g := Graphy{}
 	ctx := context.Background()

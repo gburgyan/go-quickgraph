@@ -595,3 +595,42 @@ mutation CreateReviewForEpisode($ep: Episode!, $review: ReviewInput!) {
 	// The stack trace isn't stable so we can't compare it. Just verify we have it.
 	assert.Contains(t, gErr.Extensions, "stack")
 }
+
+func TestEnumInvalid(t *testing.T) {
+	var h = Character{
+		Name: "R2-D2",
+		Friends: []*Character{
+			{
+				Name: "Luke Skywalker",
+			},
+			{
+				Name: "Han Solo",
+			},
+			{
+				Name: "Leia Organa",
+			},
+		},
+	}
+
+	heroProvider := func(ctx context.Context, ep episode) *Character {
+		return &h
+	}
+
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterProcessorWithParamNames(ctx, "hero", heroProvider, "episode")
+
+	input := `
+query  {
+  hero(episode: INVALID) {
+    name
+    friends {
+      name
+    }
+  }
+}`
+
+	resultAny, err := g.ProcessRequest(ctx, input, "")
+	assert.Error(t, err)
+	assert.Equal(t, `{"data":{},"errors":[{"message":"error getting call parameters for function hero: invalid enum value INVALID","locations":[{"line":3,"column":8}],"path":["hero"]}]}`, resultAny)
+}

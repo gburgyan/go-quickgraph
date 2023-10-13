@@ -75,7 +75,7 @@ type FunctionNameMapping struct {
 	anonymousArgument bool
 }
 
-func (g *Graphy) isValidGraphFunction(graphFunc reflect.Value, name string, method bool) bool {
+func (g *Graphy) validateGraphFunction(graphFunc reflect.Value, name string, method bool) error {
 	// A valid graph function must be a func type. It's inputs must be zero or more
 	// serializable types. If it's a method, the first parameter must be a pointer to
 	// a struct for the receiver. It may, optionally, take a context.Context
@@ -84,7 +84,7 @@ func (g *Graphy) isValidGraphFunction(graphFunc reflect.Value, name string, meth
 	// Check the function type.
 	mft := graphFunc.Type()
 	if mft.Kind() != reflect.Func {
-		return false
+		return fmt.Errorf("function %s is not a func: %v", name, mft)
 	}
 
 	// Check the parameters of the graphFunc. The first parameter may be a
@@ -99,13 +99,12 @@ func (g *Graphy) isValidGraphFunction(graphFunc reflect.Value, name string, meth
 		if i == 0 && method {
 			continue
 		} else {
-
 			switch funcParam.Kind() {
 			case reflect.Ptr:
-				return true
+				return nil
 
 			case reflect.Map:
-				return false
+				return fmt.Errorf("function %s has a parameter of type map, which is not supported", name)
 			}
 		}
 	}
@@ -114,13 +113,13 @@ func (g *Graphy) isValidGraphFunction(graphFunc reflect.Value, name string, meth
 	// type. It may also return an error.
 	returnType, err := g.validateFunctionReturnTypes(mft, name)
 	if err != nil {
-		return false
+		return err
 	}
 	if returnType == nil {
-		return false
+		return fmt.Errorf("function %s has no return type", name)
 	}
 
-	return true
+	return nil
 }
 
 func (g *Graphy) newGraphFunction(def FunctionDefinition, method bool) GraphFunction {
@@ -159,8 +158,9 @@ func (g *Graphy) newGraphFunction(def FunctionDefinition, method bool) GraphFunc
 		funcTyp = funcVal.Type()
 	}
 
-	if !g.isValidGraphFunction(funcVal, def.Name, method) {
-		panic("not valid graph function")
+	err := g.validateGraphFunction(funcVal, def.Name, method)
+	if err != nil {
+		panic("not valid graph function: " + err.Error())
 	}
 
 	startParam := 0

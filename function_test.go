@@ -419,3 +419,30 @@ mutation {
 	duration := endTime.Sub(startTime)
 	assert.True(t, duration < 100*time.Millisecond)
 }
+
+func TestGraphFunction_Invalid(t *testing.T) {
+	type in struct {
+		InString string
+	}
+	type res struct {
+		OutString string
+	}
+
+	ctx := context.Background()
+	g := Graphy{}
+	assert.PanicsWithValue(t, "not valid graph function: function may have at most one non-pointer return value", func() {
+		g.RegisterProcessor(ctx, "f", func() (episode, episode) { return "foo", "bar" })
+	})
+
+	assert.PanicsWithValue(t, "not valid graph function: function must have at least one non-error return value", func() {
+		g.RegisterProcessor(ctx, "f", func() error { return nil })
+	})
+
+	assert.PanicsWithValue(t, "not valid graph function: function may have at most one error return value", func() {
+		g.RegisterProcessor(ctx, "f", func() (episode, error, error) { return "foo", nil, nil })
+	})
+
+	assert.PanicsWithValue(t, "not valid graph function: function f is not a func: string", func() {
+		g.RegisterProcessor(ctx, "f", "Not a function")
+	})
+}

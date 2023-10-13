@@ -196,7 +196,8 @@ func (g *Graphy) addGraphMethodsForType(typ reflect.Type, index []int, tl *TypeL
 			outTypes = append(outTypes, m.Type.Out(j))
 		}
 
-		if g.isValidGraphFunction(m.Func, m.Name, true) {
+		err := g.validateGraphFunction(m.Func, m.Name, true)
+		if err == nil {
 			// Todo: Make this take a reflect.Type instead of an any.
 			gf := g.newGraphFunction(FunctionDefinition{
 				Name:     m.Name,

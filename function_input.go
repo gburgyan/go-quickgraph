@@ -369,6 +369,17 @@ func unmarshalWithEnumUnmarshaler(identifier string, value reflect.Value) (bool,
 		}
 		interfaceVal.Set(reflect.ValueOf(val))
 		return true, nil
+	} else if ok := value.CanConvert(stringEnumValuesType); ok {
+		// If it supports the StringEnumValues interface, use that.
+		stringEnumValues := destinationVal.Convert(stringEnumValuesType).Interface().(StringEnumValues)
+		enumValues := stringEnumValues.EnumValues()
+		for _, enumValue := range enumValues {
+			if enumValue == identifier {
+				interfaceVal.SetString(identifier)
+				return true, nil
+			}
+		}
+		return true, fmt.Errorf("invalid enum value %s", identifier)
 	}
 	return false, nil
 }

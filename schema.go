@@ -12,6 +12,7 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) (string, error) {
 	procByMode := map[GraphFunctionMode][]*GraphFunction{}
 
 	for _, function := range g.processors {
+		function := function
 		byMode, ok := procByMode[function.mode]
 		if !ok {
 			byMode = []*GraphFunction{}

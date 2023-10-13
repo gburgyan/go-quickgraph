@@ -280,6 +280,11 @@ func TestGraphFunction_ImplicitReturnUnion(t *testing.T) {
 	ctx := context.Background()
 	g := Graphy{}
 	g.RegisterProcessor(ctx, "f", f)
+	g.RegisterFunction(ctx, FunctionDefinition{
+		Name:            "CustomResultFunc",
+		Function:        f,
+		ReturnUnionName: "MyUnion",
+	})
 
 	gql := `
 query f($arg: String!) {
@@ -316,9 +321,12 @@ query f($arg: String!) {
 
 	expected := `type Query {
 	f(arg1: String!): fResultUnion!
+	CustomResultFunc(arg1: String!): MyUnion!
 }
 
 union fResultUnion = resultA | resultB
+
+union MyUnion = resultA | resultB
 
 type resultA {
 	OutStringA: String!

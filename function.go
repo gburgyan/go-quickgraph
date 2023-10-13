@@ -47,6 +47,10 @@ type FunctionDefinition struct {
 	// to in the query. Regular queries are functions that do not change the state of the
 	// system. They will be called in parallel.
 	Mode GraphFunctionMode
+
+	// ReturnEnumName is used to provide a custom name for implicit return unions. If this is
+	// not set the default name is the name of the function followed by "ResultUnion".
+	ReturnUnionName string
 }
 
 type GraphFunction struct {
@@ -111,12 +115,9 @@ func (g *Graphy) validateGraphFunction(graphFunc reflect.Value, name string, met
 
 	// Check the return types of the graphFunc. It must return a serializable
 	// type. It may also return an error.
-	returnType, err := g.validateFunctionReturnTypes(mft, name)
+	_, err := g.validateFunctionReturnTypes(mft, FunctionDefinition{Name: name})
 	if err != nil {
 		return err
-	}
-	if returnType == nil {
-		return fmt.Errorf("function %s has no return type", name)
 	}
 
 	return nil
@@ -227,7 +228,7 @@ func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc ref
 	}
 
 	mft := graphFunc.Type()
-	returnType, err := g.validateFunctionReturnTypes(mft, def.Name)
+	returnType, err := g.validateFunctionReturnTypes(mft, def)
 	if err != nil {
 		panic(err)
 	}
@@ -290,7 +291,7 @@ func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflec
 	}
 
 	mft := graphFunc.Type()
-	returnType, err := g.validateFunctionReturnTypes(mft, def.Name)
+	returnType, err := g.validateFunctionReturnTypes(mft, def)
 	if err != nil {
 		panic(err)
 	}
@@ -365,7 +366,7 @@ func (g *Graphy) convertAnySlice(types []any) *TypeLookup {
 // validateFunctionReturnTypes validates the return types of the function passed. It requires the function
 // to have at least one non-error return value and at most one error return value. The function should have
 // between one and two return values.
-func (g *Graphy) validateFunctionReturnTypes(mft reflect.Type, name string) (*TypeLookup, error) {
+func (g *Graphy) validateFunctionReturnTypes(mft reflect.Type, definition FunctionDefinition) (*TypeLookup, error) {
 	errorCount := 0
 
 	nonPointerCount := 0
@@ -399,7 +400,12 @@ func (g *Graphy) validateFunctionReturnTypes(mft reflect.Type, name string) (*Ty
 
 	// If we have multiple return types, we're in the implicit union case.
 	// We need to create a union type for the return types.
-	unionName := name + "ResultUnion"
+	var unionName string
+	if definition.ReturnUnionName != "" {
+		unionName = definition.ReturnUnionName
+	} else {
+		unionName = definition.Name + "ResultUnion"
+	}
 	result := &TypeLookup{
 		name:                unionName,
 		fields:              make(map[string]FieldLookup),

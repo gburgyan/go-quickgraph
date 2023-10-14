@@ -1,4 +1,4 @@
-module GoGraphy
+module github.com/gburgyan/go-quickgraph
 
 go 1.20
 

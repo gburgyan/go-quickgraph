@@ -94,7 +94,7 @@ func (g *Graphy) NewRequestStub(request string) (*RequestStub, error) {
 		}
 		return nil, UnknownCommandError{
 			GraphError: GraphError{
-				Message: "unknown command(s) in request",
+				Message: "unknown command(s) in request: " + strings.Join(missingCommandNames, ", "),
 				Locations: []ErrorLocation{
 					lexerPositionError(missingCommands[0].Pos),
 				},
@@ -431,13 +431,13 @@ func (rs *RequestStub) NewRequest(variableJson string) (*Request, error) {
 		if variableJson, found := rawVariables[varName]; found {
 			err := json.Unmarshal(variableJson, variableValue.Interface())
 			if err != nil {
-				return nil, NewGraphError(fmt.Sprintf("error parsing variable %s into type %s: %s", varName, variable.Type.Name(), err), lexer.Position{})
+				return nil, AugmentGraphError(err, fmt.Sprintf("error parsing variable %s into type %s", varName, variable.Type.Name()), lexer.Position{})
 			}
 			variables[varName] = variableValue.Elem()
 		} else if variable.Default != nil {
 			err := parseInputIntoValue(nil, *variable.Default, variableValue.Elem())
 			if err != nil {
-				return nil, NewGraphError(fmt.Sprintf("error parsing default variable %s into type %s: %s", varName, variable.Type.Name(), err), lexer.Position{})
+				return nil, AugmentGraphError(err, fmt.Sprintf("error parsing default variable %s into type %s", varName, variable.Type.Name()), lexer.Position{})
 			}
 			variables[varName] = variableValue.Elem()
 		} else {

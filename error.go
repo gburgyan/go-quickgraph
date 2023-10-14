@@ -205,7 +205,8 @@ func (e *GraphError) AddExtension(key string, value string) {
 
 func formatError(err error) string {
 	// If the error is a GraphError, make this into a graph-style error JSON. Otherwise, return "".
-	if ge, ok := err.(GraphError); ok {
+	var ge GraphError
+	if errors.As(err, &ge) {
 		resultMap := map[string]any{
 			"errors": []any{
 				ge,
@@ -215,4 +216,8 @@ func formatError(err error) string {
 		return string(resultJson)
 	}
 	return ""
+}
+
+func (e UnknownCommandError) Unwrap() error {
+	return e.GraphError
 }

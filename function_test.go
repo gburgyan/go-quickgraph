@@ -519,7 +519,7 @@ query f($time: int! = "foo") {
 	response, err := g.ProcessRequest(ctx, gql, ``)
 
 	assert.Error(t, err)
-	assert.Equal(t, `{"errors":[{"message":"error parsing default variable time into type int64:  [2:23]: panic: reflect: call of reflect.Value.SetString on int64 Value"}]}`, response)
+	assert.Equal(t, `{"errors":[{"message":"error parsing default variable time into type int64: panic: reflect: call of reflect.Value.SetString on int64 Value","locations":[{"line":2,"column":23}]}]}`, response)
 }
 
 func TestGraphFunction_MissingVariable(t *testing.T) {

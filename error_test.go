@@ -97,7 +97,7 @@ func Test_UnknownCommand(t *testing.T) {
 
 	resultAny, err := g.ProcessRequest(ctx, input, "")
 
-	assert.Empty(t, resultAny)
+	assert.Equal(t, `{"errors":[{"message":"unknown command(s) in request: hero","locations":[{"line":3,"column":3}]}]}`, resultAny)
 	var uce UnknownCommandError
 	errors.As(err, &uce)
 	assert.Contains(t, uce.Commands, "hero")

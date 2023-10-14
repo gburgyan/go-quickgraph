@@ -252,9 +252,6 @@ query {
 }
 
 func TestGraphFunction_ImplicitReturnUnion(t *testing.T) {
-	type in struct {
-		InString string
-	}
 	type resultA struct {
 		OutStringA string
 	}

@@ -11,11 +11,16 @@
 * Generation of a GraphQL schema from the set-up GraphQL environment.
 * Be as idiomatic as possible. This means using Go's native types and idioms as much as possible. If you are familiar with Go, you should be able to use this library without having to learn a lot of new concepts.
 * If we need to relax something in the processing of a GraphQL query, err on the side of preserving Go idioms, even if it means that we are not 100% compliant with the GraphQL specification.
+* Attempt to allow anything legal in GraphQL to be expressed in Go. Make the common things as easy as possible.
 * Be as fast as practical. Cache aggressively.
 
 The last point is critical in thinking about how the library is built. It relies heavily on Go reflection to figure out what the interfaces are of the functions and structs. Certain things, like function parameter names, are not available at runtime, so we have to make some compromises. If, for instance, we have a function that takes two non-context arguments, we can process requests assuming that the order of the parameters in the request matches the order from the function. This is not 100% compliant with the GraphQL specification, but it is a reasonable compromise to make in order to preserve Go idioms and minimize boilerplate code.
 
 # Installation
+
+```bash
+go get github.com/gburgyan/go-quickgraph
+```
 
 # Usage and Examples
 
@@ -277,16 +282,206 @@ Regardless of how the function is invoked, the parameters for the function come 
 
 # Type System
 
+The way `Graphy` works with types is intended to be as transparent to the user as possible. The normal types, scalars, structs, and slices all work as expected. This applies to both input in the form of parameters being sent in to functions and the results of those functions.
+
+Maps, presently, are not supported.
+
 ## Enums
+
+Go doesn't have a native way of representing enumerations in a way that is open to be used for reflection. To get around this, `Graphy` provides a few different ways of exposing enumerations.
+
+### Simple strings
+
+### `EnumUnmarshaler` interface
+
+If you need to have function inputs that map to specific non-string inputs, you can implement the `EnumUnmarshaler` interface:
+
+```go
+// EnumUnmarshaler provides an interface for types that can unmarshal
+// a string representation into their enumerated type. This is useful
+// for types that need to convert a string, typically from external sources
+// like JSON or XML, into a specific enumerated type in Go.
+//
+// UnmarshalString should return the appropriate enumerated value for the
+// given input string, or an error if the input is not valid for the enumeration.
+type EnumUnmarshaler interface {
+	UnmarshalString(input string) (interface{}, error)
+}
+```
+
+`UnmarshalString` is called with the supplied identifier, and is responsible for converting that into whatever type is needed. If the identifier cannot be converted, simply return an error.
+
+The downside of this is that there is no way to communicate to the schema what are the _valid_ values for the enumeration.
+
+Example:
+
+```go
+type MyEnum string
+
+const (
+	EnumVal1 MyEnum = "EnumVal1"
+	EnumVal2 MyEnum = "EnumVal2"
+	EnumVal3 MyEnum = "EnumVal3"
+)
+
+func (e *MyEnum) UnmarshalString(input string) (interface{}, error) {
+	switch input {
+	case "EnumVal1":
+		return EnumVal1, nil
+	case "EnumVal2":
+		return EnumVal2, nil
+	case "EnumVal3":
+		return EnumVal3, nil
+	default:
+		return nil, fmt.Errorf("invalid enum value %s", input)
+	}
+}
+```
+
+In this case, the enum type is a string, but that's not a requirement.
+
+### `StringEnumValues`
+
+Another way of dealing with enumerations is to treat them as strings, but with a layer of validation applied. You can implement the `StringEnumValues` interface to say what are the valid values for a given type.
+
+```go
+// StringEnumValues provides an interface for types that can return
+// a list of valid string representations for their enumeration.
+// This can be useful in scenarios like validation or auto-generation
+// of documentation where a list of valid enum values is required.
+//
+// EnumValues should return a slice of strings representing the valid values
+// for the enumeration.
+type StringEnumValues interface {
+	EnumValues() []string
+}
+```
+
+These strings are used both for input validation and schema generation. The limitation is that the inputs and outputs that use this type need to be of a string type.
+
+An example from the tests:
+
+```go
+type episode string
+
+func (e episode) EnumValues() []string {
+	return []string{
+		"NEWHOPE",
+		"EMPIRE",
+		"JEDI",
+	}
+}
+```
 
 ## Interfaces
 
+Interfaces, in this case, are referring to how GraphQL uses the term "interface." The way that a type can implement an interface, as well as select the output filtering based on the type of object that is being returned.
+
+The way this is modeled in this library is by using anonymous fields on a struct type to show an "is-a" relationship.
+
+So, for instance:
+
+```go
+type Character struct {
+	Id        string       `json:"id"`
+	Name      string       `json:"name"`
+	Friends   []*Character `json:"friends"`
+	AppearsIn []episode    `json:"appearsIn"`
+}
+
+type Human struct {
+	Character
+	HeightMeters float64 `json:"HeightMeters"`
+}
+```
+
+In this case, a `Human` is a subtype of `Character`. The schema generated from this is:
+
+```graphql
+type Human implements Character {
+	FriendsConnection(arg1: Int!): FriendsConnection
+	HeightMeters: Float!
+}
+
+type Character {
+	appearsIn: [episode!]!
+	friends: [Character]!
+	id: String!
+	name: String!
+}
+```
+
 ## Unions
+
+Another aspect of GraphQL that doesn't cleanly map to Go is the concept of unions -- where a value can be one of several distinct types.
+
+This is handled by one of two ways: implicit and explicit unions.
+
+### Implicit Unions
+
+Implicit unions are created by functions that return multiple pointers to results. Of course only one of those result pointers can be non-nil. For example:
+
+```go
+type resultA struct {
+	OutStringA string
+}
+type resultB struct {
+	OutStringB string
+}
+func Implicit(ctx context.Context, selector string) (*resultA, *resultB, error) {
+	// implementation
+}
+```
+
+This will generate a schema that looks like:
+
+```graphql
+type Query {
+	Implicit(arg1: String!): ImplicitResultUnion!
+}
+
+union ImplicitResultUnion = resultA | resultB
+
+type resultA {
+	OutStringA: String!
+}
+
+type resultB {
+	OutStringB: String!
+}
+```
+
+If you need a custom-named enum, you can register the function like:
+
+```go
+g.RegisterFunction(ctx, FunctionDefinition{
+	Name:            "CustomResultFunc",
+	Function:        function,
+	ReturnUnionName: "MyUnion",
+})
+```
+
+In which case the name of the union is `MyUnion`.
+
+### Explicit Unions
+
+You can also name a type ending with the string `Union` and that type will be treated as a union. The members of that type must all be pointers. The result of the evaluation of the union must have a single non-nil value, and that is the implied type of the result.
 
 # Schema Generation
 
+Once a `graphy` is set up with all the query and mutation handlers, you can call:
+
+```go
+schema, err := g.SchemaDefinition(ctx)
+```
+
+This will create a GraphQL schema that represents the state of the `graphy` object. Explore the `schema_type_test.go` test file for more examples of generated schemata.
+
 ## Limitations
 
+* Presently the input and output objects are treated equivalently
+* If there are multiple types with the same name, but from different packages, the results will not be valid.
+ 
 # Caching
 
 Caching is an optional feature of the graph processing. To enable it, simply set the `RequestCache` on the `Graphy` object. The cache is an implementation of the `GraphRequestCache` interface. If this is not set, the graphy functionality will not cache anything.
@@ -372,9 +567,11 @@ with this variable JSON:
 }
 ```
 
-with caching enabled, the framework overhead is less than 4.8µs on an Apple M1 Pro processor. This includes parsing the variable JSON, calling the function for `CreateReviewForEpisode`, and processing the output. The vast majority of the overhead isn't the library itself, but rather the unmarshalling of the variable JSON as well as marshaling the result to be returned.
+with caching enabled, the framework overhead is less than 4.8µs on an Apple M1 Pro processor. This includes parsing the variable JSON, calling the function for `CreateReviewForEpisode`, and processing the output. The vast majority of the overhead, roughly 75% of the time, isn't the library itself, but rather the unmarshalling of the variable JSON as well as marshaling the result to be returned.
 
 See the `benchmark_test.go` benchmarks for more tests and to evaluate this on your hardware.
+
+While potentially caching the variable JSON would be possible, the decision was made that it's likely not worthwhile as the variables are what are most likely to change between requests negating any benefits of caching.
 
 # General Limitations
 

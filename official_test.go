@@ -56,12 +56,12 @@ func (c *Character) FriendsConnection(first int) *FriendsConnection {
 	return result
 }
 
-type episode string
-
 type Review struct {
 	Stars      int     `json:"stars"`
 	Commentary *string `json:"commentary"`
 }
+
+type episode string
 
 func (e episode) EnumValues() []string {
 	return []string{

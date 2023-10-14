@@ -144,6 +144,34 @@ There are several important things here:
 
 There is a further discussion on [schemata](#schema-generation) later on.
 
+## Error handling
+
+There are two general places where errors can occur: setup and runtime. During setup, the library will generally `panic` as this is something that should fail fast and indicates a structural problem with the program itself. At runtime, there should be no way that the system can `panic`.
+
+When calling `result, err := g.ProcessRequest(ctx, input, "{variables...})` the result should contain something that can be returned to a GraphQL client in all cases. The errors, if any, are formatted the way that a GraphQL client would expect. So, for instance:
+
+```json
+{
+  "data": {},
+  "errors": [
+    {
+      "message": "error getting call parameters for function hero: invalid enum value INVALID",
+      "locations": [
+        {
+          "line": 3,
+          "column": 8
+        }
+      ],
+      "path": [
+        "hero"
+      ]
+    }
+  ]
+}
+```
+
+The error is also returned by the function itself and should be able to be handled normally.
+
 # Functions
 
 Functions are used in two ways in the processing of a `Graphy` request:

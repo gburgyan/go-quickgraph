@@ -454,3 +454,90 @@ func TestGraphFunction_Invalid(t *testing.T) {
 		g.RegisterProcessor(ctx, "f", "Not a function")
 	})
 }
+
+func TestGraphFunction_IncorrectQueryMode(t *testing.T) {
+	type in struct {
+		InString string
+	}
+	f := func(ctx context.Context, i in) Character {
+		return Character{}
+	}
+
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterFunction(ctx, FunctionDefinition{
+		Name:     "f",
+		Function: f,
+		Mode:     ModeMutation,
+	})
+
+	gql := `
+query {
+  f(InString: "InputString") {
+    Name
+  }
+}`
+	response, err := g.ProcessRequest(ctx, gql, "")
+	assert.Error(t, err)
+	assert.Equal(t, `{"errors":[{"message":"mutation f used in query","locations":[{"line":3,"column":3}]}]}`, response)
+}
+
+func TestGraphFunction_BadVariableType(t *testing.T) {
+	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(ctx, 40*time.Millisecond)
+	defer cancel()
+	g := Graphy{}
+	g.RegisterProcessor(ctx, "delay", DelayedFunc)
+
+	gql := `
+query f($time: int!) {
+  delay(sleepTime: $time) {
+    Out
+  }
+}
+`
+	response, err := g.ProcessRequest(ctx, gql, `{"time": "foo"}`)
+
+	assert.Error(t, err)
+	assert.Equal(t, `{"errors":[{"message":"error parsing variable time into type int64: json: cannot unmarshal string into Go value of type int64"}]}`, response)
+}
+
+func TestGraphFunction_BadDefaultVariableType(t *testing.T) {
+	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(ctx, 40*time.Millisecond)
+	defer cancel()
+	g := Graphy{}
+	g.RegisterProcessor(ctx, "delay", DelayedFunc)
+
+	gql := `
+query f($time: int! = "foo") {
+  delay(sleepTime: $time) {
+    Out
+  }
+}
+`
+	response, err := g.ProcessRequest(ctx, gql, ``)
+
+	assert.Error(t, err)
+	assert.Equal(t, `{"errors":[{"message":"error parsing default variable time into type int64:  [2:23]: panic: reflect: call of reflect.Value.SetString on int64 Value"}]}`, response)
+}
+
+func TestGraphFunction_MissingVariable(t *testing.T) {
+	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(ctx, 40*time.Millisecond)
+	defer cancel()
+	g := Graphy{}
+	g.RegisterProcessor(ctx, "delay", DelayedFunc)
+
+	gql := `
+query f($time: int!) {
+  delay(sleepTime: $time) {
+    Out
+  }
+}
+`
+	response, err := g.ProcessRequest(ctx, gql, ``)
+
+	assert.Error(t, err)
+	assert.Equal(t, `{"errors":[{"message":"variable time not provided"}]}`, response)
+}

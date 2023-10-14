@@ -202,3 +202,17 @@ func (e *GraphError) AddExtension(key string, value string) {
 	}
 	e.Extensions[key] = value
 }
+
+func formatError(err error) string {
+	// If the error is a GraphError, make this into a graph-style error JSON. Otherwise, return "".
+	if ge, ok := err.(GraphError); ok {
+		resultMap := map[string]any{
+			"errors": []any{
+				ge,
+			},
+		}
+		resultJson, _ := json.Marshal(resultMap)
+		return string(resultJson)
+	}
+	return ""
+}

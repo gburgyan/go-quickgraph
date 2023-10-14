@@ -67,18 +67,12 @@ func (g *Graphy) ensureInitialized() {
 func (g *Graphy) ProcessRequest(ctx context.Context, request string, variableJson string) (string, error) {
 	rs, err := g.GetRequestStub(ctx, request)
 	if err != nil {
-		return "", err
+		return formatError(err), err
 	}
 
 	newRequest, err := rs.NewRequest(variableJson)
 	if err != nil {
-		return "", err
-	}
-	if newRequest == nil {
-		// This should have no way of occurring.
-		return "", GraphError{
-			Message: "unknown error creating request",
-		}
+		return formatError(err), err
 	}
 
 	return newRequest.Execute(ctx)

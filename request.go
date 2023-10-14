@@ -64,10 +64,25 @@ func (g *Graphy) NewRequestStub(request string) (*RequestStub, error) {
 		return nil, err
 	}
 
+	var mode RequestType
+	switch strings.ToLower(parsedCall.Mode) {
+	case "":
+	case "query":
+		mode = RequestQuery
+	case "mutation":
+		mode = RequestMutation
+	default:
+		return nil, NewGraphError(fmt.Sprintf("unknown/unsupported call mode %s", parsedCall.Mode), parsedCall.Pos)
+	}
+
 	// Validate that we have processors for all the commands.
 	var missingCommands []Command
 	for _, command := range parsedCall.Commands {
-		if _, ok := g.processors[command.Name]; !ok {
+		if processor, ok := g.processors[command.Name]; ok {
+			if mode == RequestQuery && processor.mode == ModeMutation {
+				return nil, NewGraphError(fmt.Sprintf("mutation %s used in query", command.Name), command.Pos)
+			}
+		} else {
 			missingCommands = append(missingCommands, command)
 		}
 	}
@@ -104,16 +119,7 @@ func (g *Graphy) NewRequestStub(request string) (*RequestStub, error) {
 		Commands:  parsedCall.Commands,
 		Variables: variableTypeMap,
 		Fragments: fragments,
-	}
-
-	switch strings.ToLower(parsedCall.Mode) {
-	case "":
-	case "query":
-		rs.Mode = RequestQuery
-	case "mutation":
-		rs.Mode = RequestMutation
-	default:
-		return nil, NewGraphError(fmt.Sprintf("unknown/unsupported call mode %s", parsedCall.Mode), parsedCall.Pos)
+		Mode:      mode,
 	}
 
 	return &rs, nil
@@ -425,17 +431,17 @@ func (rs *RequestStub) NewRequest(variableJson string) (*Request, error) {
 		if variableJson, found := rawVariables[varName]; found {
 			err := json.Unmarshal(variableJson, variableValue.Interface())
 			if err != nil {
-				return nil, fmt.Errorf("variable %s into type %s: %s", varName, variable.Type.Name(), err)
+				return nil, NewGraphError(fmt.Sprintf("error parsing variable %s into type %s: %s", varName, variable.Type.Name(), err), lexer.Position{})
 			}
 			variables[varName] = variableValue.Elem()
 		} else if variable.Default != nil {
 			err := parseInputIntoValue(nil, *variable.Default, variableValue.Elem())
 			if err != nil {
-				return nil, fmt.Errorf("variable %s into type %s: %s", varName, variable.Type.Name(), err)
+				return nil, NewGraphError(fmt.Sprintf("error parsing default variable %s into type %s: %s", varName, variable.Type.Name(), err), lexer.Position{})
 			}
 			variables[varName] = variableValue.Elem()
 		} else {
-			return nil, fmt.Errorf("variable %s not provided", varName)
+			return nil, NewGraphError(fmt.Sprintf("variable %s not provided", varName), lexer.Position{})
 		}
 	}
 

@@ -37,6 +37,11 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) (string, error) {
 		}
 		sb.WriteString(" {\n")
 
+		// Sort the functions by name
+		sort.Slice(functions, func(i, j int) bool {
+			return functions[i].name < functions[j].name
+		})
+
 		for _, function := range functions {
 			sb.WriteString("\t")
 			sb.WriteString(function.name)

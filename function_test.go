@@ -320,13 +320,13 @@ query f($arg: String!) {
 	assert.Equal(t, `{"data":{},"errors":[{"message":"function f returned no non-nil values","locations":[{"line":3,"column":5}],"path":["f"]}]}`, response)
 
 	expected := `type Query {
-	f(arg1: String!): fResultUnion!
 	CustomResultFunc(arg1: String!): MyUnion!
+	f(arg1: String!): fResultUnion!
 }
 
-union fResultUnion = resultA | resultB
-
 union MyUnion = resultA | resultB
+
+union fResultUnion = resultA | resultB
 
 type resultA {
 	OutStringA: String!

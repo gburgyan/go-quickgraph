@@ -12,5 +12,5 @@ type DirectiveInput struct {
 
 type DirectiveHandler interface {
 	InputTypes() []DirectiveInput
-	HandlePreFetch(ctx context.Context, request *Request, directive *Directive) (bool, error)
+	HandlePreFetch(ctx context.Context, request *Request, directive *directive) (bool, error)
 }

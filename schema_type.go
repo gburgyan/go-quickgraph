@@ -7,12 +7,12 @@ import (
 	"strings"
 )
 
-func (g *Graphy) schemaForOutputTypes(types ...*TypeLookup) (string, []*TypeLookup, error) {
+func (g *Graphy) schemaForOutputTypes(types ...*typeLookup) (string, []*typeLookup, error) {
 
 	completed := make(map[string]bool)
 
-	typeQueue := make([]*TypeLookup, len(types))
-	var enumQueue []*TypeLookup
+	typeQueue := make([]*typeLookup, len(types))
+	var enumQueue []*typeLookup
 
 	copy(typeQueue, types)
 
@@ -50,7 +50,7 @@ func (g *Graphy) schemaForOutputTypes(types ...*TypeLookup) (string, []*TypeLook
 	return sb.String(), enumQueue, nil
 }
 
-func (g *Graphy) schemaForEnumTypes(types ...*TypeLookup) (string, error) {
+func (g *Graphy) schemaForEnumTypes(types ...*typeLookup) (string, error) {
 	sb := strings.Builder{}
 
 	completed := make(map[string]bool)
@@ -69,7 +69,7 @@ func (g *Graphy) schemaForEnumTypes(types ...*TypeLookup) (string, error) {
 	return sb.String(), nil
 }
 
-func (g *Graphy) schemaForEnum(et *TypeLookup) string {
+func (g *Graphy) schemaForEnum(et *typeLookup) string {
 
 	sb := strings.Builder{}
 
@@ -90,8 +90,8 @@ func (g *Graphy) schemaForEnum(et *TypeLookup) string {
 	return sb.String()
 }
 
-func (g *Graphy) schemaForOutputType(t *TypeLookup) (string, []*TypeLookup, error) {
-	var extraTypes []*TypeLookup
+func (g *Graphy) schemaForOutputType(t *typeLookup) (string, []*typeLookup, error) {
+	var extraTypes []*typeLookup
 
 	// TODO: this can use some refactoring -- the function seems too complex as it is.
 	if len(t.union) > 0 {
@@ -192,8 +192,8 @@ func (g *Graphy) schemaForOutputType(t *TypeLookup) (string, []*TypeLookup, erro
 	return sb.String(), extraTypes, nil
 }
 
-func (g *Graphy) schemaRefForType(t *TypeLookup) (string, *TypeLookup) {
-	var extraType *TypeLookup
+func (g *Graphy) schemaRefForType(t *typeLookup) (string, *typeLookup) {
+	var extraType *typeLookup
 
 	optional := t.isPointer
 	array := t.isSlice

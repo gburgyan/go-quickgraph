@@ -8,6 +8,16 @@ import (
 	"strings"
 )
 
+// GraphError represents an error that occurs within a graph structure.
+// It provides a structured way to express errors with added context,
+// such as their location in the source and any associated path.
+//
+// Fields:
+// - Message: The main error message.
+// - Locations: A slice of ErrorLocation structs that detail where in the source the error occurred.
+// - Path: Represents the path in the graph where the error occurred.
+// - Extensions: A map containing additional error information not part of the standard fields.
+// - InnerError: An underlying error that might have caused this GraphError. It is not serialized to JSON.
 type GraphError struct {
 	Message    string            `json:"message"`
 	Locations  []ErrorLocation   `json:"locations,omitempty"`
@@ -16,11 +26,20 @@ type GraphError struct {
 	InnerError error             `json:"-"`
 }
 
+// ErrorLocation provides details about where in the source a particular error occurred.
+//
+// Fields:
+// - Line: The line number of the error.
+// - Column: The column number of the error.
 type ErrorLocation struct {
 	Line   int `json:"line"`
 	Column int `json:"column"`
 }
 
+// UnknownCommandError is a specific type of GraphError that
+// occurs when an unknown command is encountered.
+// It embeds the GraphError and adds a Commands field which contains
+// a list of commands that were unrecognized.
 type UnknownCommandError struct {
 	GraphError
 	Commands []string
@@ -55,6 +74,8 @@ func (e GraphError) Error() string {
 	return s.String()
 }
 
+// NewGraphError creates a new GraphError with the provided message, position, and path. It
+// uses the position to create an ErrorLocation structure and adds it to the Locations field.
 func NewGraphError(message string, pos lexer.Position, paths ...string) GraphError {
 	var gErr GraphError
 	if pos.Offset > 0 {
@@ -66,6 +87,7 @@ func NewGraphError(message string, pos lexer.Position, paths ...string) GraphErr
 	return gErr
 }
 
+// lexerPositionError takes a lexer.Position and returns an ErrorLocation that is the equivalent.
 func lexerPositionError(pos lexer.Position) ErrorLocation {
 	return ErrorLocation{
 		Line:   pos.Line,
@@ -73,6 +95,27 @@ func lexerPositionError(pos lexer.Position) ErrorLocation {
 	}
 }
 
+// AugmentGraphError wraps the provided error with additional context, creating or augmenting
+// a GraphError structure. This function serves to enrich errors with Graph-specific details
+// such as file position, path, and a custom message.
+//
+// The function primarily handles two cases:
+//  1. If the passed error is already a GraphError, it augments the existing GraphError with the
+//     provided context without losing any existing data.
+//  2. If the passed error is not a GraphError, it wraps it within a new GraphError, setting
+//     the provided context.
+//
+// Parameters:
+//   - err: The error to be wrapped or augmented. It can be a regular error or a GraphError.
+//   - message: A custom message to be set on the GraphError. If a GraphError is passed and it
+//     already contains a message, this parameter is ignored.
+//   - pos: A lexer.Position structure indicating where in the source the error occurred. If a
+//     GraphError is passed and it already contains location data, this parameter is ignored.
+//   - paths: A variadic slice of strings indicating the path in the graph where the error occurred.
+//     These are prepended to any existing paths in a GraphError.
+//
+// Returns:
+// - A GraphError containing the augmented or wrapped error details.
 func AugmentGraphError(err error, message string, pos lexer.Position, paths ...string) error {
 	var gErr GraphError
 
@@ -115,6 +158,8 @@ func (e ErrorLocation) String() string {
 	return fmt.Sprintf("%d:%d", e.Line, e.Column)
 }
 
+// getLineAndColumnFromOffset takes a string and an offset and returns the line and column
+// corresponding to that offset.
 func getLineAndColumnFromOffset(input string, offset int) (line int, column int) {
 	line = 1
 	column = 1
@@ -129,6 +174,7 @@ func getLineAndColumnFromOffset(input string, offset int) (line int, column int)
 	return
 }
 
+// transformJsonError takes an error from the json package and transforms it into a GraphError.
 func transformJsonError(input string, err error) error {
 	if err == nil {
 		return nil
@@ -167,6 +213,8 @@ func transformJsonError(input string, err error) error {
 	}
 }
 
+// MarshalJSON implements the json.Marshaler interface for GraphError.
+// This allows us to format the error in the way that GraphQL expects.
 func (e GraphError) MarshalJSON() ([]byte, error) {
 	// There is no really good way to have the inner error get exposed, even
 	// though it has good information. We need a custom marshaller to do this.
@@ -196,6 +244,15 @@ func (e GraphError) MarshalJSON() ([]byte, error) {
 	return json.Marshal(gErr)
 }
 
+// AddExtension adds a key-value pair to the Extensions field of a GraphError.
+// Extensions in a GraphError provide a way to include additional error
+// information that is not part of the standard error fields.
+//
+// If the Extensions map is nil, it will be initialized before adding the key-value pair.
+//
+// Parameters:
+// - key: The key for the extension. It represents the name or identifier for the additional data.
+// - value: The value associated with the key. It provides extra context or data for the error.
 func (e *GraphError) AddExtension(key string, value string) {
 	if e.Extensions == nil {
 		e.Extensions = map[string]string{}

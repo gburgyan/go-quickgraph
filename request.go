@@ -20,23 +20,27 @@ const (
 // RequestStub represents a stub of a GraphQL-like request. It contains the Graphy instance,
 // the mode of the request (Query or Mutation), the commands to execute, and the variables used in the request.
 type RequestStub struct {
-	Graphy    *Graphy
-	Mode      RequestType
-	Commands  []Command
-	Variables map[string]*RequestVariable
-	Fragments map[string]Fragment
+	graphy    *Graphy
+	mode      RequestType
+	commands  []command
+	variables map[string]*requestVariable
+	fragments map[string]fragment
 }
 
-// RequestVariable represents a variable in a GraphQL-like request. It contains the variable name and its type.
-type RequestVariable struct {
+// requestVariable represents a variable in a GraphQL-like request. It contains the variable name and its type.
+type requestVariable struct {
 	Name    string
 	Type    reflect.Type
-	Default *GenericValue
+	Default *genericValue
 }
 
-// TODO: Generating the cache key for a request can be time consuming; this should
-//
-//	return an intermediate interface that can also be used to generate the cache key.
+// GraphRequestCache represents an interface for caching request stubs
+// associated with graph requests. Implementations of this interface
+// provide mechanisms to store and retrieve `RequestStub`s, allowing
+// for optimizations and reduced processing times in graph operations.
+// Note that the `RequestStub` is an internal representation of a
+// graph request, and is not intended to be used directly by consumers.
+// It is not serializable to JSON and needs to be kept in memory.
 type GraphRequestCache interface {
 	// GetRequestStub returns the request stub for a request. It should return nil if the request
 	// is not cached. The error can either be the cached error or an error indicating a cache error.
@@ -50,16 +54,16 @@ type GraphRequestCache interface {
 // Request represents a complete GraphQL-like request. It contains the Graphy instance, the request stub,
 // and the actual variables used in the request.
 type Request struct {
-	Graphy    *Graphy
-	Stub      RequestStub
-	Variables map[string]reflect.Value
+	graphy    *Graphy
+	stub      RequestStub
+	variables map[string]reflect.Value
 }
 
-// NewRequestStub creates a new request stub from a string representation of a GraphQL request.
+// newRequestStub creates a new request stub from a string representation of a GraphQL request.
 // It parses the request, gathers and validates the variables used in the request, and determines
 // the request type (Query or Mutation).
-func (g *Graphy) NewRequestStub(request string) (*RequestStub, error) {
-	parsedCall, err := ParseRequest(request)
+func (g *Graphy) newRequestStub(request string) (*RequestStub, error) {
+	parsedCall, err := parseRequest(request)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +80,7 @@ func (g *Graphy) NewRequestStub(request string) (*RequestStub, error) {
 	}
 
 	// Validate that we have processors for all the commands.
-	var missingCommands []Command
+	var missingCommands []command
 	for _, command := range parsedCall.Commands {
 		if processor, ok := g.processors[command.Name]; ok {
 			if mode == RequestQuery && processor.mode == ModeMutation {
@@ -103,38 +107,38 @@ func (g *Graphy) NewRequestStub(request string) (*RequestStub, error) {
 		}
 	}
 
-	fragments := map[string]Fragment{}
+	fragments := map[string]fragment{}
 	for _, fragment := range parsedCall.Fragments {
 		fragments[fragment.Name] = fragment
 	}
 
 	// TODO: Use the fragments in the variable gathering.
-	variableTypeMap, err := g.GatherRequestVariables(parsedCall, fragments)
+	variableTypeMap, err := g.gatherRequestVariables(parsedCall, fragments)
 	if err != nil {
 		return nil, err
 	}
 
 	rs := RequestStub{
-		Graphy:    g,
-		Commands:  parsedCall.Commands,
-		Variables: variableTypeMap,
-		Fragments: fragments,
-		Mode:      mode,
+		graphy:    g,
+		commands:  parsedCall.Commands,
+		variables: variableTypeMap,
+		fragments: fragments,
+		mode:      mode,
 	}
 
 	return &rs, nil
 }
 
-// GatherRequestVariables gathers and validates the variables used in a GraphQL request.
+// gatherRequestVariables gathers and validates the variables used in a GraphQL request.
 // It ensures that the variables used across different commands are of the same type.
-func (g *Graphy) GatherRequestVariables(parsedCall Wrapper, fragments map[string]Fragment) (map[string]*RequestVariable, error) {
+func (g *Graphy) gatherRequestVariables(parsedCall wrapper, fragments map[string]fragment) (map[string]*requestVariable, error) {
 	// TODO: Look at the parsed arguments, find their types, then later verify that
 	//  they are correct.
 
 	// Find the commands in the request that use variables, extract the types
 	// of the variables, and convert the variables to the correct type. Ensure that
 	// there is consistency with the types in case two commands use the same variable.
-	variableTypeMap := map[string]*RequestVariable{}
+	variableTypeMap := map[string]*requestVariable{}
 	for _, command := range parsedCall.Commands {
 		graphFunc, ok := g.processors[command.Name]
 		if !ok {
@@ -149,7 +153,7 @@ func (g *Graphy) GatherRequestVariables(parsedCall Wrapper, fragments map[string
 			for _, parameter := range command.Parameters.Values {
 				if parameter.Value.Variable != nil {
 					varName := *parameter.Value.Variable
-					var paramTarget FunctionNameMapping
+					var paramTarget functionNameMapping
 					if anonArgs {
 						paramTarget = graphFunc.indexMapping[argIndex]
 						argIndex++
@@ -180,7 +184,7 @@ func (g *Graphy) GatherRequestVariables(parsedCall Wrapper, fragments map[string
 
 	if parsedCall.OperationDef != nil {
 		// Ensure that all the variables used in the operation definition are present.
-		opVars := map[string]VariableDef{}
+		opVars := map[string]variableDef{}
 		for _, variable := range parsedCall.OperationDef.Variables {
 			// Trim off the leading $.
 			name := variable.Name[1:]
@@ -202,7 +206,7 @@ func (g *Graphy) GatherRequestVariables(parsedCall Wrapper, fragments map[string
 	return variableTypeMap, nil
 }
 
-func (g *Graphy) addTypedInputVariable(varName string, variableTypeMap map[string]*RequestVariable, targetType reflect.Type) error {
+func (g *Graphy) addTypedInputVariable(varName string, variableTypeMap map[string]*requestVariable, targetType reflect.Type) error {
 	// Strip the leading $ from the variable name.
 	varName = varName[1:]
 	if existingVariable, found := variableTypeMap[varName]; found {
@@ -210,7 +214,7 @@ func (g *Graphy) addTypedInputVariable(varName string, variableTypeMap map[strin
 			return fmt.Errorf("variable %s is used with different types: existing type: %v, new type: %v", varName, existingVariable.Type, targetType)
 		}
 	} else {
-		variableTypeMap[varName] = &RequestVariable{
+		variableTypeMap[varName] = &requestVariable{
 			Name: varName,
 			Type: targetType,
 		}
@@ -218,7 +222,7 @@ func (g *Graphy) addTypedInputVariable(varName string, variableTypeMap map[strin
 	return nil
 }
 
-func (g *Graphy) addAndValidateResultVariables(typ *TypeLookup, filter *ResultFilter, variableTypeMap map[string]*RequestVariable, fragments map[string]Fragment) error {
+func (g *Graphy) addAndValidateResultVariables(typ *typeLookup, filter *ResultFilter, variableTypeMap map[string]*requestVariable, fragments map[string]fragment) error {
 
 	if filter == nil {
 		return nil
@@ -234,7 +238,7 @@ func (g *Graphy) addAndValidateResultVariables(typ *TypeLookup, filter *ResultFi
 			continue
 		}
 		if pf, ok := typ.GetField(field.Name); ok {
-			var commandField *ResultField
+			var commandField *resultField
 			for _, resultField := range filter.Fields {
 				if resultField.Name == field.Name {
 					commandField = &resultField
@@ -246,7 +250,7 @@ func (g *Graphy) addAndValidateResultVariables(typ *TypeLookup, filter *ResultFi
 				continue
 			}
 
-			var childType *TypeLookup
+			var childType *typeLookup
 			if pf.fieldType == FieldTypeField {
 				childType = g.typeLookup(pf.resultType)
 				// Recurse
@@ -274,7 +278,7 @@ func (g *Graphy) addAndValidateResultVariables(typ *TypeLookup, filter *ResultFi
 
 	// Recurse into the fragments.
 	for _, fragment := range filter.Fragments {
-		var fragmentDef *FragmentDef
+		var fragmentDef *fragmentDef
 		if fragment.Inline != nil {
 			fragmentDef = fragment.Inline
 		} else if fragment.FragmentRef != nil {
@@ -293,7 +297,7 @@ func (g *Graphy) addAndValidateResultVariables(typ *TypeLookup, filter *ResultFi
 	return nil
 }
 
-func (g *Graphy) validateGraphFunctionParameters(commandField *ResultField, gf *GraphFunction, variableTypeMap map[string]*RequestVariable) error {
+func (g *Graphy) validateGraphFunctionParameters(commandField *resultField, gf *graphFunction, variableTypeMap map[string]*requestVariable) error {
 	// Validate the parameters.
 	switch gf.paramType {
 	case AnonymousParamsInline:
@@ -305,7 +309,7 @@ func (g *Graphy) validateGraphFunctionParameters(commandField *ResultField, gf *
 	}
 }
 
-func (g *Graphy) validateAnonymousFunctionParams(commandField *ResultField, gf *GraphFunction, variableTypeMap map[string]*RequestVariable) error {
+func (g *Graphy) validateAnonymousFunctionParams(commandField *resultField, gf *graphFunction, variableTypeMap map[string]*requestVariable) error {
 	// Ensure that the number of parameters is correct.
 	// TODO: If the parameters are all pointers, then they are optional.
 
@@ -357,7 +361,7 @@ func (g *Graphy) validateAnonymousFunctionParams(commandField *ResultField, gf *
 	return nil
 }
 
-func (g *Graphy) validateNamedFunctionParams(commandField *ResultField, gf *GraphFunction, variableTypeMap map[string]*RequestVariable) error {
+func (g *Graphy) validateNamedFunctionParams(commandField *resultField, gf *graphFunction, variableTypeMap map[string]*requestVariable) error {
 	neededField := map[string]bool{}
 	for _, param := range gf.nameMapping {
 		neededField[param.name] = true
@@ -397,13 +401,13 @@ func (g *Graphy) validateNamedFunctionParams(commandField *ResultField, gf *Grap
 	return nil
 }
 
-func (g *Graphy) validateFunctionVarParam(variableTypeMap map[string]*RequestVariable, varName string, targetType reflect.Type) error {
+func (g *Graphy) validateFunctionVarParam(variableTypeMap map[string]*requestVariable, varName string, targetType reflect.Type) error {
 	if existingVariable, found := variableTypeMap[varName]; found {
 		if existingVariable.Type != targetType {
 			return fmt.Errorf("variable %s is used with different types: existing type: %v, new type: %v", varName, existingVariable.Type, targetType)
 		}
 	} else {
-		variableTypeMap[varName] = &RequestVariable{
+		variableTypeMap[varName] = &requestVariable{
 			Name: varName,
 			Type: targetType,
 		}
@@ -424,7 +428,7 @@ func (rs *RequestStub) NewRequest(variableJson string) (*Request, error) {
 
 	// Now use the variable type map to convert the variables to the correct type.
 	variables := map[string]reflect.Value{}
-	for varName, variable := range rs.Variables {
+	for varName, variable := range rs.variables {
 		// Get the RawMessage for the variable. Create a new instance of the variable type using reflection.
 		// Then unmarshal the variable from JSON.
 		variableValue := reflect.New(variable.Type)
@@ -446,9 +450,9 @@ func (rs *RequestStub) NewRequest(variableJson string) (*Request, error) {
 	}
 
 	return &Request{
-		Graphy:    rs.Graphy,
-		Stub:      *rs,
-		Variables: variables,
+		graphy:    rs.graphy,
+		stub:      *rs,
+		variables: variables,
 	}, nil
 }
 
@@ -458,9 +462,9 @@ type commandResult struct {
 	err  error
 }
 
-// Execute executes a GraphQL request. It looks up the appropriate processor for each command and invokes it.
+// execute executes a GraphQL request. It looks up the appropriate processor for each command and invokes it.
 // It returns the result of the request as a JSON string.
-func (r *Request) Execute(ctx context.Context) (string, error) {
+func (r *Request) execute(ctx context.Context) (string, error) {
 	result := map[string]any{}
 	data := map[string]any{}
 	var errColl []error
@@ -469,7 +473,7 @@ func (r *Request) Execute(ctx context.Context) (string, error) {
 
 	var cmdResults []commandResult
 	var parallel bool
-	if r.Stub.Mode == RequestMutation {
+	if r.stub.mode == RequestMutation {
 		parallel = false
 	} else {
 		parallel = true
@@ -477,15 +481,15 @@ func (r *Request) Execute(ctx context.Context) (string, error) {
 
 	if parallel {
 		resultChan := make(chan commandResult)
-		// Execute the commands in parallel.
-		for _, command := range r.Stub.Commands {
-			go func(command Command) {
-				resultChan <- r.executeCommand(ctx, command)
-			}(command)
+		// execute the commands in parallel.
+		for _, cmd := range r.stub.commands {
+			go func(cmd command) {
+				resultChan <- r.executeCommand(ctx, cmd)
+			}(cmd)
 		}
 		// Gather the results from the channel and put them in the cmdResults
 		// slice.
-		for len(cmdResults) < len(r.Stub.Commands) {
+		for len(cmdResults) < len(r.stub.commands) {
 			select {
 			case <-ctx.Done():
 				cmdResults = append(cmdResults, commandResult{
@@ -497,7 +501,7 @@ func (r *Request) Execute(ctx context.Context) (string, error) {
 			}
 		}
 	} else {
-		for _, command := range r.Stub.Commands {
+		for _, command := range r.stub.commands {
 			ctxErr := ctx.Err()
 			if ctxErr != nil {
 				cmdResults = append(cmdResults, commandResult{
@@ -533,8 +537,8 @@ func (r *Request) Execute(ctx context.Context) (string, error) {
 	return string(marshal), retErr
 }
 
-func (r *Request) executeCommand(ctx context.Context, command Command) commandResult {
-	processor, ok := r.Graphy.processors[command.Name]
+func (r *Request) executeCommand(ctx context.Context, command command) commandResult {
+	processor, ok := r.graphy.processors[command.Name]
 	if !ok {
 		// This shouldn't happen since we validate the commands when we create the request stub.
 		return commandResult{

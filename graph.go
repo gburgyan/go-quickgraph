@@ -7,12 +7,24 @@ import (
 	"sync"
 )
 
+// Graphy is the main entry point for the go-quickgraph library. This holds all the
+// registered functions and types and provides methods for executing requests.
+// It is safe to use concurrently once it has been initialized -- there is no guarantee
+// that the initialization is thread-safe.
+//
+// The zero value for Graphy is safe to use.
+//
+// The RequestCache is optional, but it can be used to cache the results of parsing
+// requests. This can be useful if you are using the library in a server environment
+// and want to cache the results of parsing requests to speed things up. Refer to
+// GraphRequestCache for more information.
 type Graphy struct {
-	processors   map[string]GraphFunction
-	typeLookups  map[reflect.Type]*TypeLookup
-	anyTypes     []*TypeLookup
-	m            sync.Mutex
 	RequestCache GraphRequestCache
+
+	processors  map[string]graphFunction
+	typeLookups map[reflect.Type]*typeLookup
+	anyTypes    []*typeLookup
+	m           sync.Mutex
 }
 
 var contextType = reflect.TypeOf((*context.Context)(nil)).Elem()
@@ -60,7 +72,7 @@ func (g *Graphy) RegisterAnyType(ctx context.Context, types ...any) {
 
 func (g *Graphy) ensureInitialized() {
 	if g.processors == nil {
-		g.processors = map[string]GraphFunction{}
+		g.processors = map[string]graphFunction{}
 	}
 }
 
@@ -75,14 +87,14 @@ func (g *Graphy) ProcessRequest(ctx context.Context, request string, variableJso
 		return formatError(err), err
 	}
 
-	return newRequest.Execute(ctx)
+	return newRequest.execute(ctx)
 }
 
-func (g *Graphy) typeLookup(typ reflect.Type) *TypeLookup {
+func (g *Graphy) typeLookup(typ reflect.Type) *typeLookup {
 	g.m.Lock()
 
 	if g.typeLookups == nil {
-		g.typeLookups = map[reflect.Type]*TypeLookup{}
+		g.typeLookups = map[reflect.Type]*typeLookup{}
 	}
 
 	if tl, ok := g.typeLookups[typ]; ok {
@@ -90,14 +102,14 @@ func (g *Graphy) typeLookup(typ reflect.Type) *TypeLookup {
 		return tl
 	}
 
-	result := &TypeLookup{
+	result := &typeLookup{
 		typ:                 typ,
-		fields:              make(map[string]FieldLookup),
-		fieldsLowercase:     make(map[string]FieldLookup),
-		implements:          make(map[string]*TypeLookup),
-		implementsLowercase: make(map[string]*TypeLookup),
-		union:               make(map[string]*TypeLookup),
-		unionLowercase:      make(map[string]*TypeLookup),
+		fields:              make(map[string]fieldLookup),
+		fieldsLowercase:     make(map[string]fieldLookup),
+		implements:          make(map[string]*typeLookup),
+		implementsLowercase: make(map[string]*typeLookup),
+		union:               make(map[string]*typeLookup),
+		unionLowercase:      make(map[string]*typeLookup),
 	}
 
 	rootTyp := typ
@@ -145,14 +157,14 @@ func (g *Graphy) typeLookup(typ reflect.Type) *TypeLookup {
 
 func (g *Graphy) GetRequestStub(ctx context.Context, request string) (*RequestStub, error) {
 	if g.RequestCache == nil {
-		return g.NewRequestStub(request)
+		return g.newRequestStub(request)
 	}
 
 	stub, err := g.RequestCache.GetRequestStub(ctx, request)
 	if stub != nil || err != nil {
 		return stub, err
 	}
-	stub, err = g.NewRequestStub(request)
+	stub, err = g.newRequestStub(request)
 	g.RequestCache.SetRequestStub(ctx, request, stub, err)
 	if err != nil {
 		return nil, err

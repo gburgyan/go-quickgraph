@@ -7,10 +7,10 @@ import (
 	"strings"
 )
 
-// getCallParameters returns the parameters to use when calling the function represented by this GraphFunction.
+// getCallParameters returns the parameters to use when calling the function represented by this graphFunction.
 // The parameters are returned as a slice of reflect.Value that can be used to call the function.
 // The request and command are used to populate the parameters to the function.
-func (f *GraphFunction) getCallParameters(ctx context.Context, req *Request, paramList *ParameterList, target reflect.Value) ([]reflect.Value, error) {
+func (f *graphFunction) getCallParameters(ctx context.Context, req *Request, paramList *parameterList, target reflect.Value) ([]reflect.Value, error) {
 	switch f.paramType {
 	case NamedParamsInline:
 		return f.getCallParamsNamedInline(ctx, req, paramList, target)
@@ -24,7 +24,7 @@ func (f *GraphFunction) getCallParameters(ctx context.Context, req *Request, par
 	return nil, fmt.Errorf("unknown function paramType: %v", f.paramType)
 }
 
-func (f *GraphFunction) getCallParamsNamedInline(ctx context.Context, req *Request, params *ParameterList, target reflect.Value) ([]reflect.Value, error) {
+func (f *graphFunction) getCallParamsNamedInline(ctx context.Context, req *Request, params *parameterList, target reflect.Value) ([]reflect.Value, error) {
 	gft := f.function.Type()
 
 	// Make something to hold the parameters
@@ -79,7 +79,7 @@ func (f *GraphFunction) getCallParamsNamedInline(ctx context.Context, req *Reque
 	return paramValues, nil
 }
 
-func (f *GraphFunction) getCallParamsAnonymousInline(ctx context.Context, req *Request, params *ParameterList, target reflect.Value) ([]reflect.Value, error) {
+func (f *graphFunction) getCallParamsAnonymousInline(ctx context.Context, req *Request, params *parameterList, target reflect.Value) ([]reflect.Value, error) {
 	gft := f.function.Type()
 
 	// Make something to hold the parameters
@@ -133,7 +133,7 @@ func (f *GraphFunction) getCallParamsAnonymousInline(ctx context.Context, req *R
 	return paramValues, nil
 }
 
-func (f *GraphFunction) getCallParamsNamedStruct(ctx context.Context, req *Request, params *ParameterList, target reflect.Value) ([]reflect.Value, error) {
+func (f *graphFunction) getCallParamsNamedStruct(ctx context.Context, req *Request, params *parameterList, target reflect.Value) ([]reflect.Value, error) {
 	gft := f.function.Type()
 
 	// Make something to hold the parameters
@@ -193,10 +193,10 @@ func (f *GraphFunction) getCallParamsNamedStruct(ctx context.Context, req *Reque
 	return paramValues, nil
 }
 
-// parseInputIntoValue interprets a GenericValue according to the type of the targetValue and assigns the result to targetValue.
+// parseInputIntoValue interprets a genericValue according to the type of the targetValue and assigns the result to targetValue.
 // This method takes into account various types of input such as string, int, float, list, map, identifier, and GraphQL variable.
 // It returns an error if the input cannot be parsed into the target type.
-func parseInputIntoValue(req *Request, inValue GenericValue, targetValue reflect.Value) (err error) {
+func parseInputIntoValue(req *Request, inValue genericValue, targetValue reflect.Value) (err error) {
 	// Catch panics and return them as errors.
 	defer func() {
 		if r := recover(); r != nil {
@@ -242,7 +242,7 @@ func parseInputIntoValue(req *Request, inValue GenericValue, targetValue reflect
 
 // parseVariableIntoValue extracts the value of a variable from the provided request and assigns it to targetValue.
 func parseVariableIntoValue(req *Request, variableName string, targetValue reflect.Value) error {
-	value, ok := req.Variables[variableName]
+	value, ok := req.variables[variableName]
 	if !ok {
 		return fmt.Errorf("variable %v not found", variableName)
 	}
@@ -386,7 +386,7 @@ func unmarshalWithEnumUnmarshaler(identifier string, value reflect.Value) (bool,
 
 // parseListIntoValue assigns a list of GenericValues to targetValue. Each item in the list is parsed into a value and assigned
 // to the corresponding index in the slice represented by targetValue. If an item cannot be parsed, it returns an error.
-func parseListIntoValue(req *Request, inVal GenericValue, targetValue reflect.Value) error {
+func parseListIntoValue(req *Request, inVal genericValue, targetValue reflect.Value) error {
 	targetType := targetValue.Type()
 	targetValue.Set(reflect.MakeSlice(targetType, len(inVal.List), len(inVal.List)))
 	for i, listItem := range inVal.List {
@@ -401,7 +401,7 @@ func parseListIntoValue(req *Request, inVal GenericValue, targetValue reflect.Va
 // parseMapIntoValue assigns a map of GenericValues to the struct represented by targetValue. Each field in the input map is parsed
 // into a value and set on the struct field that has a matching "json" tag or field name. If a required field is missing from the
 // input map, it returns an error.
-func parseMapIntoValue(req *Request, inValue GenericValue, targetValue reflect.Value) error {
+func parseMapIntoValue(req *Request, inValue genericValue, targetValue reflect.Value) error {
 	// A map is a little more complicated. We need to loop through the fields of the target type
 	// and set the values from the input map. This is how we initialize a struct from a map.
 	targetType := targetValue.Type()

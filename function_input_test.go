@@ -80,7 +80,7 @@ func Test_parseIdentifierIntoValue_BoolPtr(t *testing.T) {
 func Test_parseFloatIntoValue_Base(t *testing.T) {
 	x := 42.23
 
-	inVal := GenericValue{
+	inVal := genericValue{
 		Float: &x,
 	}
 
@@ -97,7 +97,7 @@ func Test_parseFloatIntoValue_Base(t *testing.T) {
 func Test_parseFloatIntoValue_Ptr(t *testing.T) {
 	x := 42.23
 
-	inVal := GenericValue{
+	inVal := genericValue{
 		Float: &x,
 	}
 
@@ -114,7 +114,7 @@ func Test_parseFloatIntoValue_Ptr(t *testing.T) {
 func Test_parseIntIntoValue_Base(t *testing.T) {
 	var x int64 = 42
 
-	inVal := GenericValue{
+	inVal := genericValue{
 		Int: &x,
 	}
 
@@ -131,7 +131,7 @@ func Test_parseIntIntoValue_Base(t *testing.T) {
 func Test_parseIntIntoValue_Ptr(t *testing.T) {
 	var x int64 = 42
 
-	inVal := GenericValue{
+	inVal := genericValue{
 		Int: &x,
 	}
 

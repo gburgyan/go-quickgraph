@@ -53,7 +53,7 @@ type FunctionDefinition struct {
 	ReturnUnionName string
 }
 
-type GraphFunction struct {
+type graphFunction struct {
 	// General information about the function.
 	g        *Graphy
 	name     string
@@ -63,15 +63,15 @@ type GraphFunction struct {
 	// Input handling
 	paramType    GraphFunctionParamType
 	mode         GraphFunctionMode
-	nameMapping  map[string]FunctionNameMapping
-	indexMapping []FunctionNameMapping
+	nameMapping  map[string]functionNameMapping
+	indexMapping []functionNameMapping
 
 	// Output handling
-	baseReturnType *TypeLookup
+	baseReturnType *typeLookup
 	rawReturnType  reflect.Type
 }
 
-type FunctionNameMapping struct {
+type functionNameMapping struct {
 	name              string
 	paramIndex        int // Todo: make this into a slice of param indexes for anonymous params
 	paramType         reflect.Type
@@ -123,7 +123,7 @@ func (g *Graphy) validateGraphFunction(graphFunc reflect.Value, name string, met
 	return nil
 }
 
-func (g *Graphy) newGraphFunction(def FunctionDefinition, method bool) GraphFunction {
+func (g *Graphy) newGraphFunction(def FunctionDefinition, method bool) graphFunction {
 	// This form of the graph function needs to be able to figure out the params
 	// only from the function signature. This is tricky because Go doesn't have
 	// named parameters. To get around this, we can operate in two modes:
@@ -170,7 +170,7 @@ func (g *Graphy) newGraphFunction(def FunctionDefinition, method bool) GraphFunc
 	}
 	// Gather the parameter types, ignoring the context.Context if it is
 	// present.
-	var inputTypes []FunctionNameMapping
+	var inputTypes []functionNameMapping
 
 	for i := startParam; i < funcTyp.NumIn(); i++ {
 		in := funcTyp.In(i)
@@ -178,7 +178,7 @@ func (g *Graphy) newGraphFunction(def FunctionDefinition, method bool) GraphFunc
 			// Skip this parameter if it is a context.Context.
 			continue
 		}
-		fnm := FunctionNameMapping{
+		fnm := functionNameMapping{
 			paramIndex: i,
 			paramType:  in,
 		}
@@ -207,18 +207,18 @@ func (g *Graphy) newGraphFunction(def FunctionDefinition, method bool) GraphFunc
 	}
 }
 
-func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc reflect.Value, inputs []FunctionNameMapping, method bool) GraphFunction {
+func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc reflect.Value, inputs []functionNameMapping, method bool) graphFunction {
 	// We are in the case where there are multiple parameters. We will use the
 	// types of the parameters to create anonymous arguments. We won't have any named
 	// parameters as we don't have any names to use.
 
-	gf := GraphFunction{
+	gf := graphFunction{
 		g:           g,
 		name:        def.Name,
 		mode:        def.Mode,
 		function:    graphFunc,
 		method:      method,
-		nameMapping: map[string]FunctionNameMapping{},
+		nameMapping: map[string]functionNameMapping{},
 	}
 
 	if len(def.ParameterNames) > 0 {
@@ -248,7 +248,7 @@ func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc ref
 		}
 		hasNames = true
 	} else {
-		gf.indexMapping = make([]FunctionNameMapping, len(inputs))
+		gf.indexMapping = make([]functionNameMapping, len(inputs))
 	}
 
 	// Iterate over the parameters and create the anonymous arguments.
@@ -277,11 +277,11 @@ func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc ref
 	return gf
 }
 
-func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflect.Value, paramType reflect.Type, method bool) GraphFunction {
+func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflect.Value, paramType reflect.Type, method bool) graphFunction {
 	// We are in the case where there is a single struct parameter. We will use
 	// the names of the struct fields as the parameter names.
 
-	gf := GraphFunction{
+	gf := graphFunction{
 		g:         g,
 		name:      def.Name,
 		paramType: NamedParamsStruct,
@@ -310,7 +310,7 @@ func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflec
 	}
 
 	// Iterate over the fields of the struct and create the name mapping.
-	nameMapping := map[string]FunctionNameMapping{}
+	nameMapping := map[string]functionNameMapping{}
 
 	for i := 0; i < paramType.NumField(); i++ {
 		field := paramType.Field(i)
@@ -324,7 +324,7 @@ func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflec
 			name = jsonTag
 		}
 
-		mapping := FunctionNameMapping{
+		mapping := functionNameMapping{
 			name:              name,
 			paramIndex:        i,
 			paramType:         field.Type,
@@ -346,14 +346,14 @@ func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflec
 	return gf
 }
 
-func (g *Graphy) convertAnySlice(types []any) *TypeLookup {
-	result := &TypeLookup{
-		fields:              make(map[string]FieldLookup),
-		fieldsLowercase:     map[string]FieldLookup{},
-		implements:          map[string]*TypeLookup{},
-		implementsLowercase: map[string]*TypeLookup{},
-		union:               map[string]*TypeLookup{},
-		unionLowercase:      map[string]*TypeLookup{},
+func (g *Graphy) convertAnySlice(types []any) *typeLookup {
+	result := &typeLookup{
+		fields:              make(map[string]fieldLookup),
+		fieldsLowercase:     map[string]fieldLookup{},
+		implements:          map[string]*typeLookup{},
+		implementsLowercase: map[string]*typeLookup{},
+		union:               map[string]*typeLookup{},
+		unionLowercase:      map[string]*typeLookup{},
 	}
 	for _, typ := range types {
 		at := g.typeLookup(reflect.TypeOf(typ))
@@ -366,7 +366,7 @@ func (g *Graphy) convertAnySlice(types []any) *TypeLookup {
 // validateFunctionReturnTypes validates the return types of the function passed. It requires the function
 // to have at least one non-error return value and at most one error return value. The function should have
 // between one and two return values.
-func (g *Graphy) validateFunctionReturnTypes(mft reflect.Type, definition FunctionDefinition) (*TypeLookup, error) {
+func (g *Graphy) validateFunctionReturnTypes(mft reflect.Type, definition FunctionDefinition) (*typeLookup, error) {
 	errorCount := 0
 
 	nonPointerCount := 0
@@ -406,14 +406,14 @@ func (g *Graphy) validateFunctionReturnTypes(mft reflect.Type, definition Functi
 	} else {
 		unionName = definition.Name + "ResultUnion"
 	}
-	result := &TypeLookup{
+	result := &typeLookup{
 		name:                unionName,
-		fields:              make(map[string]FieldLookup),
-		fieldsLowercase:     make(map[string]FieldLookup),
-		implements:          make(map[string]*TypeLookup),
-		implementsLowercase: make(map[string]*TypeLookup),
-		union:               make(map[string]*TypeLookup),
-		unionLowercase:      make(map[string]*TypeLookup),
+		fields:              make(map[string]fieldLookup),
+		fieldsLowercase:     make(map[string]fieldLookup),
+		implements:          make(map[string]*typeLookup),
+		implementsLowercase: make(map[string]*typeLookup),
+		union:               make(map[string]*typeLookup),
+		unionLowercase:      make(map[string]*typeLookup),
 	}
 	for _, returnType := range returnTypes {
 		tl := g.typeLookup(returnType)
@@ -426,7 +426,7 @@ func (g *Graphy) validateFunctionReturnTypes(mft reflect.Type, definition Functi
 // Call executes the graph function with a given context, request and command. It first prepares the
 // parameters for the function call, then invokes the function and processes the results. If the function
 // returns an error, it returns a formatted error. If the function returns no results, it returns nil.
-func (f *GraphFunction) Call(ctx context.Context, req *Request, params *ParameterList, methodTarget reflect.Value) (val reflect.Value, retErr error) {
+func (f *graphFunction) Call(ctx context.Context, req *Request, params *parameterList, methodTarget reflect.Value) (val reflect.Value, retErr error) {
 	// Catch panics and return them as errors.
 	defer func() {
 		if r := recover(); r != nil {
@@ -496,12 +496,12 @@ func (f *GraphFunction) Call(ctx context.Context, req *Request, params *Paramete
 	return nonNilResult, nil
 }
 
-func (f *GraphFunction) GenerateResult(ctx context.Context, req *Request, obj reflect.Value, filter *ResultFilter) (any, error) {
+func (f *graphFunction) GenerateResult(ctx context.Context, req *Request, obj reflect.Value, filter *ResultFilter) (any, error) {
 	// Process the results
 	return f.processCallOutput(ctx, req, filter, obj)
 }
 
-func (f *GraphFunction) receiverValueForFunction(target reflect.Value) reflect.Value {
+func (f *graphFunction) receiverValueForFunction(target reflect.Value) reflect.Value {
 	if !f.method {
 		panic("receiverValueForFunction called on non-method")
 	}

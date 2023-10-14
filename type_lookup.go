@@ -16,15 +16,15 @@ const (
 	FieldTypeEnum
 )
 
-type FieldLookup struct {
+type fieldLookup struct {
 	fieldType     FieldType
 	name          string
 	resultType    reflect.Type
 	fieldIndexes  []int
-	graphFunction *GraphFunction
+	graphFunction *graphFunction
 }
 
-type TypeLookup struct {
+type typeLookup struct {
 	typ                 reflect.Type
 	rootType            reflect.Type
 	isSlice             bool
@@ -32,15 +32,15 @@ type TypeLookup struct {
 	isPointerSlice      bool
 	name                string
 	fundamental         bool
-	fields              map[string]FieldLookup
-	fieldsLowercase     map[string]FieldLookup
-	implements          map[string]*TypeLookup
-	implementsLowercase map[string]*TypeLookup
-	union               map[string]*TypeLookup
-	unionLowercase      map[string]*TypeLookup
+	fields              map[string]fieldLookup
+	fieldsLowercase     map[string]fieldLookup
+	implements          map[string]*typeLookup
+	implementsLowercase map[string]*typeLookup
+	union               map[string]*typeLookup
+	unionLowercase      map[string]*typeLookup
 }
 
-func (tl *TypeLookup) GetField(name string) (FieldLookup, bool) {
+func (tl *typeLookup) GetField(name string) (fieldLookup, bool) {
 	result, ok := tl.fields[name]
 	if !ok {
 		result, ok = tl.fieldsLowercase[strings.ToLower(name)]
@@ -48,7 +48,7 @@ func (tl *TypeLookup) GetField(name string) (FieldLookup, bool) {
 	return result, ok
 }
 
-func (tl *TypeLookup) ImplementsInterface(name string) (bool, *TypeLookup) {
+func (tl *typeLookup) ImplementsInterface(name string) (bool, *typeLookup) {
 	if strings.ToLower(name) == strings.ToLower(tl.name) {
 		return true, tl
 	}
@@ -68,7 +68,7 @@ func (tl *TypeLookup) ImplementsInterface(name string) (bool, *TypeLookup) {
 // processFieldLookup is a helper function for makeTypeFieldLookup. It recursively processes
 // a given type, populating the result map with field lookups. It takes into account JSON
 // tags for naming and field exclusion.
-func (g *Graphy) processFieldLookup(typ reflect.Type, prevIndex []int, tl *TypeLookup) {
+func (g *Graphy) processFieldLookup(typ reflect.Type, prevIndex []int, tl *typeLookup) {
 	name := typ.Name()
 	if strings.HasSuffix(name, "Union") {
 		g.processUnionFieldLookup(typ, prevIndex, tl, name)
@@ -77,7 +77,7 @@ func (g *Graphy) processFieldLookup(typ reflect.Type, prevIndex []int, tl *TypeL
 	}
 }
 
-func (g *Graphy) processUnionFieldLookup(typ reflect.Type, prevIndex []int, tl *TypeLookup, name string) {
+func (g *Graphy) processUnionFieldLookup(typ reflect.Type, prevIndex []int, tl *typeLookup, name string) {
 	name = name[:len(name)-5]
 	tl.name = name
 
@@ -98,7 +98,7 @@ func (g *Graphy) processUnionFieldLookup(typ reflect.Type, prevIndex []int, tl *
 	}
 }
 
-func (g *Graphy) processBaseTypeFieldLookup(typ reflect.Type, prevIndex []int, tl *TypeLookup) {
+func (g *Graphy) processBaseTypeFieldLookup(typ reflect.Type, prevIndex []int, tl *typeLookup) {
 	// List of functions to process for the anonymous fields.
 	var deferredAnonymous []func()
 
@@ -141,7 +141,7 @@ func (g *Graphy) processBaseTypeFieldLookup(typ reflect.Type, prevIndex []int, t
 			// TODO: Add enum support here. Special processing for strings that implement
 			//  the StringEnumValues interface.
 
-			tfl := FieldLookup{
+			tfl := fieldLookup{
 				name:         fieldName,
 				resultType:   field.Type,
 				fieldIndexes: index,
@@ -182,7 +182,7 @@ func (g *Graphy) processBaseTypeFieldLookup(typ reflect.Type, prevIndex []int, t
 	}
 }
 
-func (g *Graphy) addGraphMethodsForType(typ reflect.Type, index []int, tl *TypeLookup) {
+func (g *Graphy) addGraphMethodsForType(typ reflect.Type, index []int, tl *typeLookup) {
 	for i := 0; i < typ.NumMethod(); i++ {
 		m := typ.Method(i)
 
@@ -210,7 +210,7 @@ func (g *Graphy) addGraphMethodsForType(typ reflect.Type, index []int, tl *TypeL
 			//  function multiple times. Basically, if an anonymous struct member
 			//  has a function, that will presently be output as a function of
 			//  both the struct as well as the type that includes it as anonymous.
-			tfl := FieldLookup{
+			tfl := fieldLookup{
 				name:          m.Name,
 				resultType:    m.Type,
 				fieldIndexes:  index,
@@ -227,9 +227,9 @@ func (g *Graphy) addGraphMethodsForType(typ reflect.Type, index []int, tl *TypeL
 	}
 }
 
-// Fetch fetches a value from a given reflect.Value using the field indexes.
+// fetch fetches a value from a given reflect.Value using the field indexes.
 // It walks the field indexes in order to find the nested field if necessary.
-func (t *FieldLookup) Fetch(ctx context.Context, req *Request, v reflect.Value, params *ParameterList) (any, error) {
+func (t *fieldLookup) fetch(ctx context.Context, req *Request, v reflect.Value, params *parameterList) (any, error) {
 	switch t.fieldType {
 	case FieldTypeField:
 		return t.fetchField(v)
@@ -240,14 +240,14 @@ func (t *FieldLookup) Fetch(ctx context.Context, req *Request, v reflect.Value, 
 	return nil, NewGraphError(fmt.Sprintf("unknown field type: %v", t.fieldType), params.Pos)
 }
 
-func (t *FieldLookup) fetchField(v reflect.Value) (any, error) {
+func (t *fieldLookup) fetchField(v reflect.Value) (any, error) {
 	for _, i := range t.fieldIndexes {
 		v = v.Field(i)
 	}
 	return v.Interface(), nil
 }
 
-func (t *FieldLookup) fetchGraphFunction(ctx context.Context, req *Request, v reflect.Value, params *ParameterList) (any, error) {
+func (t *fieldLookup) fetchGraphFunction(ctx context.Context, req *Request, v reflect.Value, params *parameterList) (any, error) {
 	obj, err := t.graphFunction.Call(ctx, req, params, v)
 	if err != nil {
 		return nil, AugmentGraphError(err, "error calling graph function", params.Pos)

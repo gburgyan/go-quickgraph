@@ -6,97 +6,97 @@ import (
 	"github.com/alecthomas/participle/v2/lexer"
 )
 
-// Wrapper is the top-level GraphQL wrapper.
-type Wrapper struct {
+// wrapper is the top-level GraphQL wrapper.
+type wrapper struct {
 	Mode         string        `parser:"@Ident?"`
-	OperationDef *OperationDef `parser:"@@?"`
-	Commands     []Command     `parser:"( '{' @@+ '}' )+"`
-	Fragments    []Fragment    `parser:"(FragmentToken @@)*"`
+	OperationDef *operationDef `parser:"@@?"`
+	Commands     []command     `parser:"( '{' @@+ '}' )+"`
+	Fragments    []fragment    `parser:"(FragmentToken @@)*"`
 	Pos          lexer.Position
 }
 
-type OperationDef struct {
+type operationDef struct {
 	Name      string        `parser:"@Ident"`
-	Variables []VariableDef `parser:"( '(' @@ (',' @@)* ')' )?"`
+	Variables []variableDef `parser:"( '(' @@ (',' @@)* ')' )?"`
 	Pos       lexer.Position
 }
 
-type VariableDef struct {
+type variableDef struct {
 	Name  string        `parser:"@Variable ':'"`
 	Type  string        `parser:"'['? @Ident '!'? ']'? '!'?"`
-	Value *GenericValue `parser:"('=' @@)?"`
+	Value *genericValue `parser:"('=' @@)?"`
 	Pos   lexer.Position
 }
 
-// Command is a GraphQL command. This will be 'query' or 'mutation.'
-type Command struct {
+// command is a GraphQL command. This will be 'query' or 'mutation.'
+type command struct {
 	Alias        *string        `parser:"(@Ident ':')?"`
 	Name         string         `parser:"@Ident"`
-	Parameters   *ParameterList `parser:"('(' @@ ')')?"`
+	Parameters   *parameterList `parser:"('(' @@ ')')?"`
 	ResultFilter *ResultFilter  `parser:"('{' @@ '}')?"`
 	Pos          lexer.Position
 }
 
-// ParameterList is a list of parameters for a call to a function.
-type ParameterList struct {
-	Values []NamedValue `parser:"(@@ (',' @@)*)?"`
+// parameterList is a list of parameters for a call to a function.
+type parameterList struct {
+	Values []namedValue `parser:"(@@ (',' @@)*)?"`
 	Pos    lexer.Position
 }
 
-// NamedValue is a named value. This is used for both parameters and object initialization.
-type NamedValue struct {
+// namedValue is a named value. This is used for both parameters and object initialization.
+type namedValue struct {
 	Name  string       `parser:"@Ident ':'"`
-	Value GenericValue `parser:"@@"`
+	Value genericValue `parser:"@@"`
 	Pos   lexer.Position
 }
 
-// GenericValue is a value of some type.
-type GenericValue struct {
+// genericValue is a value of some type.
+type genericValue struct {
 	Variable   *string        `parser:"@Variable"`
 	Identifier *string        `parser:"| @Ident"`
 	String     *string        `parser:"| @String"`
 	Int        *int64         `parser:"| @Int"`
 	Float      *float64       `parser:"| @Float"`
-	Map        []NamedValue   `parser:"| '{' ( @@ (',' @@)*)? '}'"`
-	List       []GenericValue `parser:"| '[' ( @@ (',' @@)*)? ']'"`
+	Map        []namedValue   `parser:"| '{' ( @@ (',' @@)*)? '}'"`
+	List       []genericValue `parser:"| '[' ( @@ (',' @@)*)? ']'"`
 	Pos        lexer.Position
 }
 
 // ResultFilter is a filter for the result.
 type ResultFilter struct {
-	Fields    []ResultField  `parser:"@@*"`
-	Fragments []FragmentCall `parser:"(FragmentStart @@)*"`
+	Fields    []resultField  `parser:"@@*"`
+	Fragments []fragmentCall `parser:"(FragmentStart @@)*"`
 	Pos       lexer.Position
 }
 
-// ResultField is a field in the result to be returned.
-type ResultField struct {
+// resultField is a field in the result to be returned.
+type resultField struct {
 	Name       string         `parser:"@Ident"`
-	Params     *ParameterList `parser:"('(' @@ ')')?"`
-	Directives []Directive    `parser:"@@*"`
+	Params     *parameterList `parser:"('(' @@ ')')?"`
+	Directives []directive    `parser:"@@*"`
 	SubParts   *ResultFilter  `parser:"('{' @@ '}')?"`
 	Pos        lexer.Position
 }
 
-type FragmentCall struct {
-	Inline      *FragmentDef `parser:"@@"`
+type fragmentCall struct {
+	Inline      *fragmentDef `parser:"@@"`
 	FragmentRef *string      `parser:"| @Ident "`
 }
 
-type Fragment struct {
+type fragment struct {
 	Name       string       `parser:"@Ident"`
-	Definition *FragmentDef `parser:"@@"`
+	Definition *fragmentDef `parser:"@@"`
 	Pos        lexer.Position
 }
 
-type FragmentDef struct {
+type fragmentDef struct {
 	TypeName string        `parser:"'on' @Ident"`
 	Filter   *ResultFilter `parser:"'{' @@ '}'"`
 }
 
-type Directive struct {
+type directive struct {
 	Name       string         `parser:"@Directive"`
-	Parameters *ParameterList `parser:"('(' @@ ')')?"`
+	Parameters *parameterList `parser:"('(' @@ ')')?"`
 	Pos        lexer.Position
 }
 
@@ -115,22 +115,22 @@ var (
 		{"Punct", `[-[!@#$%^&*()+_={}\|:;"'<,>.?/]|]`},
 		{"Whitespace", `[ \t\n\r]+`},
 	})
-	parser = participle.MustBuild[Wrapper](
+	parser = participle.MustBuild[wrapper](
 		participle.Lexer(graphQLLexer),
 		participle.Elide("Whitespace", "Comment"),
 		participle.UseLookahead(2),
 	)
 )
 
-func ParseRequest(input string) (Wrapper, error) {
+func parseRequest(input string) (wrapper, error) {
 	r, err := parser.ParseString("", input)
 	if err != nil {
 		var pErr participle.Error
 		if errors.As(err, &pErr) {
-			return Wrapper{}, AugmentGraphError(err, "error parsing request", pErr.Position())
+			return wrapper{}, AugmentGraphError(err, "error parsing request", pErr.Position())
 		} else {
 			// We should never get here.
-			return Wrapper{}, err
+			return wrapper{}, err
 		}
 	}
 	return *r, nil

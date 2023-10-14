@@ -14,7 +14,7 @@ import (
 // and returns a single value and an error if there is any.
 // Currently, it only supports slices, maps, and structs,
 // and returns an error if the function returns a different kind of value.
-func (f *GraphFunction) processCallOutput(ctx context.Context, req *Request, filter *ResultFilter, callResult reflect.Value) (any, error) {
+func (f *graphFunction) processCallOutput(ctx context.Context, req *Request, filter *ResultFilter, callResult reflect.Value) (any, error) {
 	var pos lexer.Position
 	if filter != nil {
 		pos = filter.Pos
@@ -69,7 +69,7 @@ func (f *GraphFunction) processCallOutput(ctx context.Context, req *Request, fil
 
 // processOutputStruct takes a result filter and a struct, processes the struct according to the filter,
 // and returns a map and an error if there is any. The map contains the processed fields of the struct.
-func (f *GraphFunction) processOutputStruct(ctx context.Context, req *Request, filter *ResultFilter, anyStruct any) (map[string]any, error) {
+func (f *graphFunction) processOutputStruct(ctx context.Context, req *Request, filter *ResultFilter, anyStruct any) (map[string]any, error) {
 	r := map[string]any{}
 
 	// If the anyStruct is a pointer, dereference it.
@@ -94,16 +94,16 @@ func (f *GraphFunction) processOutputStruct(ctx context.Context, req *Request, f
 	typeName := t.Name()
 	fieldMap := f.g.typeLookup(t)
 
-	fieldsToProcess := []ResultField{}
+	fieldsToProcess := []resultField{}
 	for _, field := range filter.Fields {
 		fieldsToProcess = append(fieldsToProcess, field)
 	}
 	for _, fragmentCall := range filter.Fragments {
-		var f *FragmentDef
+		var f *fragmentDef
 		if fragmentCall.Inline != nil {
 			f = fragmentCall.Inline
 		} else if fragmentCall.FragmentRef != nil {
-			f = req.Stub.Fragments[*fragmentCall.FragmentRef].Definition
+			f = req.stub.fragments[*fragmentCall.FragmentRef].Definition
 		}
 		if found, tl := fieldMap.ImplementsInterface(f.TypeName); found {
 			fieldMap = tl
@@ -123,9 +123,9 @@ func (f *GraphFunction) processOutputStruct(ctx context.Context, req *Request, f
 				// TODO: Is this an error?
 				continue
 			}
-			// Todo: Check for directives. Either here or in Fetch.
+			// Todo: Check for directives. Either here or in fetch.
 
-			fieldAny, err := fieldInfo.Fetch(ctx, req, reflect.ValueOf(anyStruct), field.Params)
+			fieldAny, err := fieldInfo.fetch(ctx, req, reflect.ValueOf(anyStruct), field.Params)
 			if err != nil {
 				return nil, AugmentGraphError(err, fmt.Sprintf("error fetching field %v", field.Name), field.Pos, field.Name)
 			}

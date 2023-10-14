@@ -9,20 +9,20 @@ import (
 func (g *Graphy) SchemaDefinition(ctx context.Context) (string, error) {
 	sb := strings.Builder{}
 
-	procByMode := map[GraphFunctionMode][]*GraphFunction{}
+	procByMode := map[GraphFunctionMode][]*graphFunction{}
 
 	for _, function := range g.processors {
 		function := function
 		byMode, ok := procByMode[function.mode]
 		if !ok {
-			byMode = []*GraphFunction{}
+			byMode = []*graphFunction{}
 			procByMode[function.mode] = byMode
 		}
 		procByMode[function.mode] = append(byMode, &function)
 	}
 
-	outputTypes := []*TypeLookup{}
-	enumTypes := []*TypeLookup{}
+	outputTypes := []*typeLookup{}
+	enumTypes := []*typeLookup{}
 
 	for mode, functions := range procByMode {
 
@@ -88,10 +88,10 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) (string, error) {
 	return sb.String(), nil
 }
 
-func (g *Graphy) schemaForFunctionParameters(f *GraphFunction) (string, []*TypeLookup, error) {
+func (g *Graphy) schemaForFunctionParameters(f *graphFunction) (string, []*typeLookup, error) {
 	sb := strings.Builder{}
 
-	mappings := []FunctionNameMapping{}
+	mappings := []functionNameMapping{}
 	for _, param := range f.nameMapping {
 		mappings = append(mappings, param)
 	}
@@ -110,7 +110,7 @@ func (g *Graphy) schemaForFunctionParameters(f *GraphFunction) (string, []*TypeL
 		sb.WriteString(schemaRef)
 	}
 
-	ret := []*TypeLookup{
+	ret := []*typeLookup{
 		f.baseReturnType,
 	}
 

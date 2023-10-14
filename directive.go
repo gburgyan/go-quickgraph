@@ -5,12 +5,12 @@ import (
 	"reflect"
 )
 
-type DirectiveInput struct {
+type directiveInput struct {
 	Name string
 	Type reflect.Type
 }
 
-type DirectiveHandler interface {
-	InputTypes() []DirectiveInput
-	HandlePreFetch(ctx context.Context, request *Request, directive *directive) (bool, error)
+type directiveHandler interface {
+	InputTypes() []directiveInput
+	HandlePreFetch(ctx context.Context, request *request, directive *directive) (bool, error)
 }

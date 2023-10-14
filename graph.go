@@ -82,7 +82,7 @@ func (g *Graphy) ProcessRequest(ctx context.Context, request string, variableJso
 		return formatError(err), err
 	}
 
-	newRequest, err := rs.NewRequest(variableJson)
+	newRequest, err := rs.newRequest(variableJson)
 	if err != nil {
 		return formatError(err), err
 	}

@@ -87,7 +87,7 @@ func Test_parseFloatIntoValue_Base(t *testing.T) {
 	var outVal float64
 	v := reflect.ValueOf(&outVal).Elem()
 
-	req := &Request{}
+	req := &request{}
 	err := parseInputIntoValue(req, inVal, v)
 
 	assert.NoError(t, err)
@@ -104,7 +104,7 @@ func Test_parseFloatIntoValue_Ptr(t *testing.T) {
 	var outVal *float64
 	v := reflect.ValueOf(&outVal).Elem()
 
-	req := &Request{}
+	req := &request{}
 	err := parseInputIntoValue(req, inVal, v)
 
 	assert.NoError(t, err)
@@ -121,7 +121,7 @@ func Test_parseIntIntoValue_Base(t *testing.T) {
 	var outVal int64
 	v := reflect.ValueOf(&outVal).Elem()
 
-	req := &Request{}
+	req := &request{}
 	err := parseInputIntoValue(req, inVal, v)
 
 	assert.NoError(t, err)
@@ -138,7 +138,7 @@ func Test_parseIntIntoValue_Ptr(t *testing.T) {
 	var outVal *int64
 	v := reflect.ValueOf(&outVal).Elem()
 
-	req := &Request{}
+	req := &request{}
 	err := parseInputIntoValue(req, inVal, v)
 
 	assert.NoError(t, err)

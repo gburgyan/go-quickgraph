@@ -14,7 +14,7 @@ import (
 // and returns a single value and an error if there is any.
 // Currently, it only supports slices, maps, and structs,
 // and returns an error if the function returns a different kind of value.
-func (f *graphFunction) processCallOutput(ctx context.Context, req *Request, filter *ResultFilter, callResult reflect.Value) (any, error) {
+func (f *graphFunction) processCallOutput(ctx context.Context, req *request, filter *resultFilter, callResult reflect.Value) (any, error) {
 	var pos lexer.Position
 	if filter != nil {
 		pos = filter.Pos
@@ -69,7 +69,7 @@ func (f *graphFunction) processCallOutput(ctx context.Context, req *Request, fil
 
 // processOutputStruct takes a result filter and a struct, processes the struct according to the filter,
 // and returns a map and an error if there is any. The map contains the processed fields of the struct.
-func (f *graphFunction) processOutputStruct(ctx context.Context, req *Request, filter *ResultFilter, anyStruct any) (map[string]any, error) {
+func (f *graphFunction) processOutputStruct(ctx context.Context, req *request, filter *resultFilter, anyStruct any) (map[string]any, error) {
 	r := map[string]any{}
 
 	// If the anyStruct is a pointer, dereference it.

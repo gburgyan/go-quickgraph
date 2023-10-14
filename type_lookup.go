@@ -7,17 +7,17 @@ import (
 	"strings"
 )
 
-type FieldType int
+type fieldType int
 
 const (
-	FieldTypeField FieldType = iota
+	FieldTypeField fieldType = iota
 	FieldTypeGraphFunction
 	FieldTypeUnion
 	FieldTypeEnum
 )
 
 type fieldLookup struct {
-	fieldType     FieldType
+	fieldType     fieldType
 	name          string
 	resultType    reflect.Type
 	fieldIndexes  []int
@@ -229,7 +229,7 @@ func (g *Graphy) addGraphMethodsForType(typ reflect.Type, index []int, tl *typeL
 
 // fetch fetches a value from a given reflect.Value using the field indexes.
 // It walks the field indexes in order to find the nested field if necessary.
-func (t *fieldLookup) fetch(ctx context.Context, req *Request, v reflect.Value, params *parameterList) (any, error) {
+func (t *fieldLookup) fetch(ctx context.Context, req *request, v reflect.Value, params *parameterList) (any, error) {
 	switch t.fieldType {
 	case FieldTypeField:
 		return t.fetchField(v)
@@ -247,7 +247,7 @@ func (t *fieldLookup) fetchField(v reflect.Value) (any, error) {
 	return v.Interface(), nil
 }
 
-func (t *fieldLookup) fetchGraphFunction(ctx context.Context, req *Request, v reflect.Value, params *parameterList) (any, error) {
+func (t *fieldLookup) fetchGraphFunction(ctx context.Context, req *request, v reflect.Value, params *parameterList) (any, error) {
 	obj, err := t.graphFunction.Call(ctx, req, params, v)
 	if err != nil {
 		return nil, AugmentGraphError(err, "error calling graph function", params.Pos)

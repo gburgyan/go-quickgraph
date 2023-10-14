@@ -51,9 +51,9 @@ type GraphRequestCache interface {
 	SetRequestStub(ctx context.Context, request string, stub *RequestStub, err error)
 }
 
-// Request represents a complete GraphQL-like request. It contains the Graphy instance, the request stub,
+// request represents a complete GraphQL-like request. It contains the Graphy instance, the request stub,
 // and the actual variables used in the request.
-type Request struct {
+type request struct {
 	graphy    *Graphy
 	stub      RequestStub
 	variables map[string]reflect.Value
@@ -222,7 +222,7 @@ func (g *Graphy) addTypedInputVariable(varName string, variableTypeMap map[strin
 	return nil
 }
 
-func (g *Graphy) addAndValidateResultVariables(typ *typeLookup, filter *ResultFilter, variableTypeMap map[string]*requestVariable, fragments map[string]fragment) error {
+func (g *Graphy) addAndValidateResultVariables(typ *typeLookup, filter *resultFilter, variableTypeMap map[string]*requestVariable, fragments map[string]fragment) error {
 
 	if filter == nil {
 		return nil
@@ -415,9 +415,9 @@ func (g *Graphy) validateFunctionVarParam(variableTypeMap map[string]*requestVar
 	return nil
 }
 
-// NewRequest creates a new request from a request stub and a JSON string representing the variables used in the request.
+// newRequest creates a new request from a request stub and a JSON string representing the variables used in the request.
 // It unmarshals the variables and assigns them to the corresponding variables in the request.
-func (rs *RequestStub) NewRequest(variableJson string) (*Request, error) {
+func (rs *RequestStub) newRequest(variableJson string) (*request, error) {
 	rawVariables := map[string]json.RawMessage{}
 	if variableJson != "" {
 		err := json.Unmarshal([]byte(variableJson), &rawVariables)
@@ -449,7 +449,7 @@ func (rs *RequestStub) NewRequest(variableJson string) (*Request, error) {
 		}
 	}
 
-	return &Request{
+	return &request{
 		graphy:    rs.graphy,
 		stub:      *rs,
 		variables: variables,
@@ -464,7 +464,7 @@ type commandResult struct {
 
 // execute executes a GraphQL request. It looks up the appropriate processor for each command and invokes it.
 // It returns the result of the request as a JSON string.
-func (r *Request) execute(ctx context.Context) (string, error) {
+func (r *request) execute(ctx context.Context) (string, error) {
 	result := map[string]any{}
 	data := map[string]any{}
 	var errColl []error
@@ -537,7 +537,7 @@ func (r *Request) execute(ctx context.Context) (string, error) {
 	return string(marshal), retErr
 }
 
-func (r *Request) executeCommand(ctx context.Context, command command) commandResult {
+func (r *request) executeCommand(ctx context.Context, command command) commandResult {
 	processor, ok := r.graphy.processors[command.Name]
 	if !ok {
 		// This shouldn't happen since we validate the commands when we create the request stub.

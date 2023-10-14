@@ -33,7 +33,7 @@ type command struct {
 	Alias        *string        `parser:"(@Ident ':')?"`
 	Name         string         `parser:"@Ident"`
 	Parameters   *parameterList `parser:"('(' @@ ')')?"`
-	ResultFilter *ResultFilter  `parser:"('{' @@ '}')?"`
+	ResultFilter *resultFilter  `parser:"('{' @@ '}')?"`
 	Pos          lexer.Position
 }
 
@@ -62,8 +62,8 @@ type genericValue struct {
 	Pos        lexer.Position
 }
 
-// ResultFilter is a filter for the result.
-type ResultFilter struct {
+// resultFilter is a filter for the result.
+type resultFilter struct {
 	Fields    []resultField  `parser:"@@*"`
 	Fragments []fragmentCall `parser:"(FragmentStart @@)*"`
 	Pos       lexer.Position
@@ -74,7 +74,7 @@ type resultField struct {
 	Name       string         `parser:"@Ident"`
 	Params     *parameterList `parser:"('(' @@ ')')?"`
 	Directives []directive    `parser:"@@*"`
-	SubParts   *ResultFilter  `parser:"('{' @@ '}')?"`
+	SubParts   *resultFilter  `parser:"('{' @@ '}')?"`
 	Pos        lexer.Position
 }
 
@@ -91,7 +91,7 @@ type fragment struct {
 
 type fragmentDef struct {
 	TypeName string        `parser:"'on' @Ident"`
-	Filter   *ResultFilter `parser:"'{' @@ '}'"`
+	Filter   *resultFilter `parser:"'{' @@ '}'"`
 }
 
 type directive struct {

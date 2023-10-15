@@ -26,6 +26,8 @@ go get github.com/gburgyan/go-quickgraph
 
 The examples here, as well as many of the unit tests are based directly on the examples from the GraphQL [documentation examples](https://graphql.org/learn/queries/).
 
+An example service that uses this can be found in the https://github.com/gburgyan/go-quickgraph-sample repo.
+
 ```go
 type Character struct {
 	Id        string       `json:"id"`

@@ -555,8 +555,14 @@ func (r *request) executeCommand(ctx context.Context, command command) commandRe
 
 	res, err := processor.GenerateResult(ctx, r, obj, command.ResultFilter)
 	if err != nil {
+		var pos lexer.Position
+		if command.ResultFilter != nil {
+			pos = command.ResultFilter.Pos
+		} else {
+			pos = command.Pos
+		}
 		return commandResult{
-			err: AugmentGraphError(err, fmt.Sprintf("error generating result for %s", command.Name), command.ResultFilter.Pos, command.Name),
+			err: AugmentGraphError(err, fmt.Sprintf("error generating result for %s", command.Name), pos, command.Name),
 		}
 	}
 

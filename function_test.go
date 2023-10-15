@@ -162,6 +162,32 @@ query {
 	assert.Equal(t, `{"data":{"f":{"Func":"InputString"}}}`, response)
 }
 
+func TestGraphFunction_FuncNoResultFilter(t *testing.T) {
+	type in struct {
+		InString string
+	}
+	f := func(ctx context.Context, i in) resultWithFunc {
+		return resultWithFunc{OutString: i.InString}
+	}
+
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterProcessor(ctx, "f", f)
+
+	gf := g.newGraphFunction(FunctionDefinition{Name: "f", Function: f}, false)
+	assert.Equal(t, "f", gf.name)
+	assert.Equal(t, NamedParamsStruct, gf.paramType)
+
+	gql := `
+query {
+  f(InString: "InputString")
+}`
+
+	response, err := g.ProcessRequest(ctx, gql, "")
+	assert.Error(t, err)
+	assert.Equal(t, `{"data":{},"errors":[{"message":"output filter is not present","locations":[{"line":3,"column":3}],"path":["f"]}]}`, response)
+}
+
 func TestGraphFunction_PointerFuncReturn(t *testing.T) {
 	type in struct {
 		InString string

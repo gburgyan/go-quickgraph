@@ -114,6 +114,52 @@ query {
 	assert.Equal(t, `{"data":{"f":{"OutString":"InputString"}}}`, response)
 }
 
+func TestGraphFunction_ScalarResult(t *testing.T) {
+	f := func(ctx context.Context, input string) string {
+		return input + "!"
+	}
+
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterProcessor(ctx, "f", f)
+
+	gf := g.newGraphFunction(FunctionDefinition{Name: "f", Function: f}, false)
+	assert.Equal(t, "f", gf.name)
+	assert.Equal(t, AnonymousParamsInline, gf.paramType)
+
+	gql := `
+query {
+  f(FooBar: "InputString")
+}`
+
+	response, err := g.ProcessRequest(ctx, gql, "")
+	assert.NoError(t, err)
+	assert.Equal(t, `{"data":{"f":"InputString!"}}`, response)
+}
+
+func TestGraphFunction_SliceScalarResult(t *testing.T) {
+	f := func(ctx context.Context, input string) []string {
+		return []string{input + "!", input + "!!"}
+	}
+
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterProcessor(ctx, "f", f)
+
+	gf := g.newGraphFunction(FunctionDefinition{Name: "f", Function: f}, false)
+	assert.Equal(t, "f", gf.name)
+	assert.Equal(t, AnonymousParamsInline, gf.paramType)
+
+	gql := `
+query {
+  f(FooBar: "InputString")
+}`
+
+	response, err := g.ProcessRequest(ctx, gql, "")
+	assert.NoError(t, err)
+	assert.Equal(t, `{"data":{"f":["InputString!","InputString!!"]}}`, response)
+}
+
 type resultWithFunc struct {
 	OutString string
 }

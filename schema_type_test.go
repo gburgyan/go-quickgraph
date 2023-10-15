@@ -12,7 +12,7 @@ func TestGraphy_schemaForType(t *testing.T) {
 	c := Character{}
 
 	cl := g.typeLookup(reflect.TypeOf(c))
-	schema, extraTypes, err := g.schemaForOutputType(cl)
+	schema, extraTypes, err := g.schemaForType(TypeOutput, cl)
 	assert.NoError(t, err)
 	expected := `type Character {
 	appearsIn: [episode!]!
@@ -23,7 +23,7 @@ func TestGraphy_schemaForType(t *testing.T) {
 }
 `
 	assert.Equal(t, expected, schema)
-	assert.Len(t, extraTypes, 3)
+	assert.Len(t, extraTypes, 4)
 
 	assert.Equal(t, "episode", extraTypes[0].name)
 	assert.Equal(t, "Character", extraTypes[1].name)
@@ -227,6 +227,102 @@ type FriendsConnection {
 
 type ConnectionEdge {
 	node: Character
+}
+
+enum episode {
+	NEWHOPE
+	EMPIRE
+	JEDI
+}
+
+`
+	assert.Equal(t, expected, schema)
+}
+
+func TestGraphy_MutationWithObject(t *testing.T) {
+	g := Graphy{}
+	ctx := context.Background()
+
+	f := func(code int, ship Starship) bool {
+		return true
+	}
+
+	g.RegisterFunction(ctx, FunctionDefinition{
+		Name:           "AddShip",
+		Function:       f,
+		Mode:           ModeMutation,
+		ParameterNames: []string{"code", "ship"},
+	})
+
+	schema, err := g.SchemaDefinition(ctx)
+	assert.NoError(t, err)
+
+	expected := `type Mutation {
+	AddShip(code: Int!, ship: Starship!): Boolean!
+}
+
+input Starship {
+	id: String!
+	name: String!
+}
+
+`
+	assert.Equal(t, expected, schema)
+}
+
+func TestGraphy_MutationObjectFunction(t *testing.T) {
+	g := Graphy{}
+	ctx := context.Background()
+
+	f := func(characterId int, input FriendsConnection) FriendsConnection {
+		return input
+	}
+
+	g.RegisterFunction(ctx, FunctionDefinition{
+		Name:           "AddShip",
+		Function:       f,
+		Mode:           ModeMutation,
+		ParameterNames: []string{"code", "friends"},
+	})
+
+	schema, err := g.SchemaDefinition(ctx)
+	assert.NoError(t, err)
+
+	expected := `type Mutation {
+	AddShip(code: Int!, friends: FriendsConnection!): FriendsConnection!
+}
+
+input FriendsConnection {
+	edges: [ConnectionEdge]!
+	totalCount: Int!
+}
+
+input ConnectionEdge {
+	node: Character
+}
+
+input Character {
+	appearsIn: [episode!]!
+	friends: [Character]!
+	id: String!
+	name: String!
+}
+
+type FriendsConnection {
+	edges: [ConnectionEdge]!
+	totalCount: Int!
+}
+
+type ConnectionEdge {
+	node: Character
+}
+
+type Character {
+	appearsIn: [episode!]!
+	friends: [Character]!
+	FriendsConnection(arg1: Int!): FriendsConnection
+	id: String!
+	name: String!
 }
 
 enum episode {

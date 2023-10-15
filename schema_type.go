@@ -7,7 +7,14 @@ import (
 	"strings"
 )
 
-func (g *Graphy) schemaForOutputTypes(types ...*typeLookup) (string, []*typeLookup, error) {
+type TypeKind int
+
+const (
+	TypeInput TypeKind = iota
+	TypeOutput
+)
+
+func (g *Graphy) schemaForTypes(kind TypeKind, types ...*typeLookup) (string, []*typeLookup, error) {
 
 	completed := make(map[string]bool)
 
@@ -29,7 +36,7 @@ func (g *Graphy) schemaForOutputTypes(types ...*typeLookup) (string, []*typeLook
 		if t.fundamental {
 			continue
 		}
-		schema, extra, err := g.schemaForOutputType(t)
+		schema, extra, err := g.schemaForType(kind, t)
 		if err != nil {
 			return "", nil, err
 		}
@@ -90,7 +97,7 @@ func (g *Graphy) schemaForEnum(et *typeLookup) string {
 	return sb.String()
 }
 
-func (g *Graphy) schemaForOutputType(t *typeLookup) (string, []*typeLookup, error) {
+func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup) (string, []*typeLookup, error) {
 	var extraTypes []*typeLookup
 
 	// TODO: this can use some refactoring -- the function seems too complex as it is.
@@ -121,7 +128,11 @@ func (g *Graphy) schemaForOutputType(t *typeLookup) (string, []*typeLookup, erro
 	}
 
 	sb := strings.Builder{}
-	sb.WriteString("type ")
+	if kind == TypeInput {
+		sb.WriteString("input ")
+	} else {
+		sb.WriteString("type ")
+	}
 	sb.WriteString(t.name)
 
 	if len(t.implements) > 0 {
@@ -165,24 +176,27 @@ func (g *Graphy) schemaForOutputType(t *typeLookup) (string, []*typeLookup, erro
 			sb.WriteString(typeString)
 			sb.WriteString("\n")
 		} else if field.fieldType == FieldTypeGraphFunction {
-			if len(field.fieldIndexes) > 1 {
-				// These are going to be either union or implemented interfaces. These need
-				// to be handled differently.
-				continue
+			if kind == TypeOutput {
+				if len(field.fieldIndexes) > 1 {
+					// These are going to be either union or implemented interfaces. These need
+					// to be handled differently.
+					continue
+				}
+				sb.WriteString("\t")
+				sb.WriteString(field.name)
+				sb.WriteString("(")
+				funcParams, fEnums, fParamTypes, err := g.schemaForFunctionParameters(field.graphFunction)
+				if err != nil {
+					return "", nil, err
+				}
+				extraTypes = append(extraTypes, fEnums...)
+				extraTypes = append(extraTypes, fParamTypes...)
+				sb.WriteString(funcParams)
+				sb.WriteString("): ")
+				schemaRef, _ := g.schemaRefForType(field.graphFunction.baseReturnType)
+				sb.WriteString(schemaRef)
+				sb.WriteString("\n")
 			}
-			sb.WriteString("\t")
-			sb.WriteString(field.name)
-			sb.WriteString("(")
-			funcParams, fEnums, err := g.schemaForFunctionParameters(field.graphFunction)
-			if err != nil {
-				return "", nil, err
-			}
-			extraTypes = append(extraTypes, fEnums...)
-			sb.WriteString(funcParams)
-			sb.WriteString("): ")
-			schemaRef, _ := g.schemaRefForType(field.graphFunction.baseReturnType)
-			sb.WriteString(schemaRef)
-			sb.WriteString("\n")
 		} else {
 			panic("unknown field type")
 		}

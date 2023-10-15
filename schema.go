@@ -22,6 +22,7 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) (string, error) {
 	}
 
 	outputTypes := []*typeLookup{}
+	inputTypes := []*typeLookup{}
 	enumTypes := []*typeLookup{}
 
 	for mode, functions := range procByMode {
@@ -47,10 +48,19 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) (string, error) {
 			sb.WriteString(function.name)
 			sb.WriteString("(")
 
-			funcParams, fOuput, err := g.schemaForFunctionParameters(function)
+			funcParams, fOuput, fInput, err := g.schemaForFunctionParameters(function)
 			if err != nil {
 				return "", err
 			}
+			sb.WriteString(funcParams)
+			sb.WriteString("): ")
+			schemaRef, _ := g.schemaRefForType(function.baseReturnType)
+			outputTypes = append(outputTypes, function.baseReturnType)
+			inputTypes = append(inputTypes, fInput...)
+
+			sb.WriteString(schemaRef)
+			sb.WriteString("\n")
+
 			for _, outTypeLookup := range fOuput {
 				if outTypeLookup.rootType != nil {
 					if outTypeLookup.rootType.AssignableTo(stringEnumValuesType) {
@@ -60,18 +70,29 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) (string, error) {
 					outputTypes = append(outputTypes, outTypeLookup)
 				}
 			}
-			sb.WriteString(funcParams)
 
-			sb.WriteString("): ")
-			schemaRef, _ := g.schemaRefForType(function.baseReturnType)
-			outputTypes = append(outputTypes, function.baseReturnType)
-			sb.WriteString(schemaRef)
-			sb.WriteString("\n")
+			for _, inTypeLookup := range fInput {
+				if inTypeLookup.rootType != nil {
+					if inTypeLookup.rootType.AssignableTo(stringEnumValuesType) {
+						enumTypes = append(enumTypes, inTypeLookup)
+					}
+				} else {
+					inputTypes = append(inputTypes, inTypeLookup)
+				}
+			}
+
 		}
 		sb.WriteString("}\n\n")
 	}
 
-	outputSchema, oEnumTypes, err := g.schemaForOutputTypes(outputTypes...)
+	inputSchema, iEnumTypes, err := g.schemaForTypes(TypeInput, inputTypes...)
+	if err != nil {
+		return "", err
+	}
+	enumTypes = append(enumTypes, iEnumTypes...)
+	sb.WriteString(inputSchema)
+
+	outputSchema, oEnumTypes, err := g.schemaForTypes(TypeOutput, outputTypes...)
 	if err != nil {
 		return "", err
 	}
@@ -88,7 +109,7 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) (string, error) {
 	return sb.String(), nil
 }
 
-func (g *Graphy) schemaForFunctionParameters(f *graphFunction) (string, []*typeLookup, error) {
+func (g *Graphy) schemaForFunctionParameters(f *graphFunction) (string, []*typeLookup, []*typeLookup, error) {
 	sb := strings.Builder{}
 
 	mappings := []functionNameMapping{}
@@ -100,19 +121,23 @@ func (g *Graphy) schemaForFunctionParameters(f *graphFunction) (string, []*typeL
 		return mappings[i].paramIndex < mappings[j].paramIndex
 	})
 
+	var paramLookups []*typeLookup
+
 	for i, param := range mappings {
 		if i > 0 {
 			sb.WriteString(", ")
 		}
 		sb.WriteString(param.name)
 		sb.WriteString(": ")
-		schemaRef, _ := g.schemaRefForType(g.typeLookup(param.paramType))
+		paramTl := g.typeLookup(param.paramType)
+		schemaRef, _ := g.schemaRefForType(paramTl)
 		sb.WriteString(schemaRef)
+		paramLookups = append(paramLookups, paramTl)
 	}
 
-	ret := []*typeLookup{
+	refLookups := []*typeLookup{
 		f.baseReturnType,
 	}
 
-	return sb.String(), ret, nil
+	return sb.String(), refLookups, paramLookups, nil
 }

@@ -509,7 +509,6 @@ This will create a GraphQL schema that represents the state of the `graphy` obje
 
 ## Limitations
 
-* Presently the input and output objects are treated equivalently
 * If there are multiple types with the same name, but from different packages, the results will not be valid.
  
 # Caching

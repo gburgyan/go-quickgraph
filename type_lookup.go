@@ -212,7 +212,7 @@ func (g *Graphy) addGraphMethodsForType(typ reflect.Type, index []int, tl *typeL
 			//  both the struct as well as the type that includes it as anonymous.
 			tfl := fieldLookup{
 				name:          m.Name,
-				resultType:    m.Type,
+				resultType:    gf.rawReturnType,
 				fieldIndexes:  index,
 				fieldType:     FieldTypeGraphFunction,
 				graphFunction: &gf,

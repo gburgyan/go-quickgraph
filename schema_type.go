@@ -14,7 +14,7 @@ const (
 	TypeOutput
 )
 
-func (g *Graphy) schemaForTypes(kind TypeKind, types ...*typeLookup) (string, []*typeLookup, error) {
+func (g *Graphy) schemaForTypes(kind TypeKind, mapping typeNameMapping, types ...*typeLookup) (string, []*typeLookup, error) {
 
 	completed := make(map[string]bool)
 
@@ -28,15 +28,16 @@ func (g *Graphy) schemaForTypes(kind TypeKind, types ...*typeLookup) (string, []
 		if typeQueue[i] == nil {
 			panic(fmt.Sprintf("typeQueue[%d] is nil", i))
 		}
-		if completed[typeQueue[i].name] {
+		name := mapping[typeQueue[i]]
+		if completed[name] {
 			continue
 		}
-		completed[typeQueue[i].name] = true
+		completed[name] = true
 		t := typeQueue[i]
 		if t.fundamental {
 			continue
 		}
-		schema, extra, err := g.schemaForType(kind, t)
+		schema, extra, err := g.schemaForType(kind, t, mapping)
 		if err != nil {
 			return "", nil, err
 		}
@@ -97,20 +98,22 @@ func (g *Graphy) schemaForEnum(et *typeLookup) string {
 	return sb.String()
 }
 
-func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup) (string, []*typeLookup, error) {
+func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup, mapping typeNameMapping) (string, []*typeLookup, error) {
 	var extraTypes []*typeLookup
+
+	name := mapping[t]
 
 	// TODO: this can use some refactoring -- the function seems too complex as it is.
 	if len(t.union) > 0 {
 		sb := strings.Builder{}
 		sb.WriteString("union ")
-		sb.WriteString(t.name)
+		sb.WriteString(name)
 		sb.WriteString(" =")
 		unionCount := 0
 		// Get the union names in alphabetical order.
 		var unionNames []string
-		for n := range t.union {
-			unionNames = append(unionNames, n)
+		for _, utl := range t.union {
+			unionNames = append(unionNames, mapping[utl])
 		}
 		sort.Strings(unionNames)
 		for _, unionName := range unionNames {
@@ -133,7 +136,7 @@ func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup) (string, []*typeLoo
 	} else {
 		sb.WriteString("type ")
 	}
-	sb.WriteString(t.name)
+	sb.WriteString(name)
 
 	if len(t.implements) > 0 {
 		sb.WriteString(" implements")
@@ -144,7 +147,7 @@ func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup) (string, []*typeLoo
 				sb.WriteString("& ")
 			}
 			interfaceCount++
-			sb.WriteString(implementedType.name)
+			sb.WriteString(mapping[implementedType])
 			extraTypes = append(extraTypes, implementedType)
 		}
 	}
@@ -166,7 +169,7 @@ func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup) (string, []*typeLoo
 				// to be handled differently.
 				continue
 			}
-			typeString, extraType := g.schemaRefForType(g.typeLookup(field.resultType))
+			typeString, extraType := g.schemaRefForType(g.typeLookup(field.resultType), mapping)
 			if extraType != nil {
 				extraTypes = append(extraTypes, extraType)
 			}
@@ -184,16 +187,19 @@ func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup) (string, []*typeLoo
 				}
 				sb.WriteString("\t")
 				sb.WriteString(field.name)
-				sb.WriteString("(")
-				funcParams, fEnums, fParamTypes, err := g.schemaForFunctionParameters(field.graphFunction)
-				if err != nil {
-					return "", nil, err
+				if len(field.graphFunction.nameMapping) > 0 {
+					sb.WriteString("(")
+					funcParams, fEnums, fParamTypes, err := g.schemaForFunctionParameters(field.graphFunction, mapping)
+					if err != nil {
+						return "", nil, err
+					}
+					extraTypes = append(extraTypes, fEnums...)
+					extraTypes = append(extraTypes, fParamTypes...)
+					sb.WriteString(funcParams)
+					sb.WriteString(")")
 				}
-				extraTypes = append(extraTypes, fEnums...)
-				extraTypes = append(extraTypes, fParamTypes...)
-				sb.WriteString(funcParams)
-				sb.WriteString("): ")
-				schemaRef, _ := g.schemaRefForType(field.graphFunction.baseReturnType)
+				sb.WriteString(": ")
+				schemaRef, _ := g.schemaRefForType(field.graphFunction.baseReturnType, mapping)
 				sb.WriteString(schemaRef)
 				sb.WriteString("\n")
 			}
@@ -206,7 +212,7 @@ func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup) (string, []*typeLoo
 	return sb.String(), extraTypes, nil
 }
 
-func (g *Graphy) schemaRefForType(t *typeLookup) (string, *typeLookup) {
+func (g *Graphy) schemaRefForType(t *typeLookup, mapping typeNameMapping) (string, *typeLookup) {
 	var extraType *typeLookup
 
 	optional := t.isPointer
@@ -240,8 +246,7 @@ func (g *Graphy) schemaRefForType(t *typeLookup) (string, *typeLookup) {
 		case reflect.Struct:
 			extraType = t
 			if t != nil {
-				// TODO: Handle same type name in different packages.
-				baseType = t.name
+				baseType = mapping[t]
 			}
 
 		default:

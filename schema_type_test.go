@@ -12,7 +12,11 @@ func TestGraphy_schemaForType(t *testing.T) {
 	c := Character{}
 
 	cl := g.typeLookup(reflect.TypeOf(c))
-	schema, extraTypes, err := g.schemaForType(TypeOutput, cl)
+
+	typeLookups := g.expandTypeLookups([]*typeLookup{cl})
+	_, outputMap := solveInputOutputNameMapping(nil, typeLookups)
+
+	schema, extraTypes, err := g.schemaForType(TypeOutput, cl, outputMap)
 	assert.NoError(t, err)
 	expected := `type Character {
 	appearsIn: [episode!]!
@@ -45,7 +49,7 @@ func TestGraphy_simpleSchema(t *testing.T) {
 	assert.NoError(t, err)
 
 	expected := `type Query {
-	sample(): Character
+	sample: Character
 }
 
 type Character {
@@ -56,13 +60,13 @@ type Character {
 	name: String!
 }
 
+type ConnectionEdge {
+	node: Character
+}
+
 type FriendsConnection {
 	edges: [ConnectionEdge]!
 	totalCount: Int!
-}
-
-type ConnectionEdge {
-	node: Character
 }
 
 enum episode {
@@ -101,13 +105,13 @@ type Character {
 	name: String!
 }
 
+type ConnectionEdge {
+	node: Character
+}
+
 type FriendsConnection {
 	edges: [ConnectionEdge]!
 	totalCount: Int!
-}
-
-type ConnectionEdge {
-	node: Character
 }
 
 enum episode {
@@ -134,13 +138,7 @@ func TestGraphy_implementsSchema(t *testing.T) {
 	assert.NoError(t, err)
 
 	expected := `type Query {
-	humans(): [Human!]!
-}
-
-type Human implements Character {
-	FriendsConnection(arg1: Int!): FriendsConnection
-	Height(arg1: String): Float!
-	HeightMeters: Float!
+	humans: [Human!]!
 }
 
 type Character {
@@ -151,13 +149,19 @@ type Character {
 	name: String!
 }
 
+type ConnectionEdge {
+	node: Character
+}
+
 type FriendsConnection {
 	edges: [ConnectionEdge]!
 	totalCount: Int!
 }
 
-type ConnectionEdge {
-	node: Character
+type Human implements Character {
+	FriendsConnection(arg1: Int!): FriendsConnection
+	Height(arg1: String): Float!
+	HeightMeters: Float!
 }
 
 enum episode {
@@ -194,24 +198,6 @@ func TestGraphy_enumSchema(t *testing.T) {
 	search(search: String!): [SearchResult!]!
 }
 
-union SearchResult = Droid | Human | Starship
-
-type Droid implements Character {
-	FriendsConnection(arg1: Int!): FriendsConnection
-	primaryFunction: String!
-}
-
-type Human implements Character {
-	FriendsConnection(arg1: Int!): FriendsConnection
-	Height(arg1: String): Float!
-	HeightMeters: Float!
-}
-
-type Starship {
-	id: String!
-	name: String!
-}
-
 type Character {
 	appearsIn: [episode!]!
 	friends: [Character]!
@@ -220,13 +206,31 @@ type Character {
 	name: String!
 }
 
+type ConnectionEdge {
+	node: Character
+}
+
+type Droid implements Character {
+	FriendsConnection(arg1: Int!): FriendsConnection
+	primaryFunction: String!
+}
+
 type FriendsConnection {
 	edges: [ConnectionEdge]!
 	totalCount: Int!
 }
 
-type ConnectionEdge {
-	node: Character
+type Human implements Character {
+	FriendsConnection(arg1: Int!): FriendsConnection
+	Height(arg1: String): Float!
+	HeightMeters: Float!
+}
+
+union SearchResult = Droid | Human | Starship
+
+type Starship {
+	id: String!
+	name: String!
 }
 
 enum episode {
@@ -279,7 +283,7 @@ func TestGraphy_MutationObjectFunction(t *testing.T) {
 	}
 
 	g.RegisterFunction(ctx, FunctionDefinition{
-		Name:           "AddShip",
+		Name:           "AddCharacterConnection",
 		Function:       f,
 		Mode:           ModeMutation,
 		ParameterNames: []string{"code", "friends"},
@@ -289,32 +293,23 @@ func TestGraphy_MutationObjectFunction(t *testing.T) {
 	assert.NoError(t, err)
 
 	expected := `type Mutation {
-	AddShip(code: Int!, friends: FriendsConnection!): FriendsConnection!
+	AddCharacterConnection(code: Int!, friends: FriendsConnectionInput!): FriendsConnection!
 }
 
-input FriendsConnection {
-	edges: [ConnectionEdge]!
-	totalCount: Int!
-}
-
-input ConnectionEdge {
-	node: Character
-}
-
-input Character {
+input CharacterInput {
 	appearsIn: [episode!]!
-	friends: [Character]!
+	friends: [CharacterInput]!
 	id: String!
 	name: String!
 }
 
-type FriendsConnection {
-	edges: [ConnectionEdge]!
-	totalCount: Int!
+input ConnectionEdgeInput {
+	node: CharacterInput
 }
 
-type ConnectionEdge {
-	node: Character
+input FriendsConnectionInput {
+	edges: [ConnectionEdgeInput]!
+	totalCount: Int!
 }
 
 type Character {
@@ -323,6 +318,15 @@ type Character {
 	FriendsConnection(arg1: Int!): FriendsConnection
 	id: String!
 	name: String!
+}
+
+type ConnectionEdge {
+	node: Character
+}
+
+type FriendsConnection {
+	edges: [ConnectionEdge]!
+	totalCount: Int!
 }
 
 enum episode {

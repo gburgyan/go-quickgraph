@@ -25,41 +25,15 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) (string, error) {
 	inputTypes := []*typeLookup{}
 	enumTypes := []*typeLookup{}
 
-	for mode, functions := range procByMode {
-
-		sb.WriteString("type ")
-		switch mode {
-		case ModeQuery:
-			sb.WriteString("Query")
-		case ModeMutation:
-			sb.WriteString("Mutation")
-		default:
-			panic("unknown mode")
-		}
-		sb.WriteString(" {\n")
-
-		// Sort the functions by name
-		sort.Slice(functions, func(i, j int) bool {
-			return functions[i].name < functions[j].name
-		})
-
+	for _, functions := range procByMode {
 		for _, function := range functions {
-			sb.WriteString("\t")
-			sb.WriteString(function.name)
-			sb.WriteString("(")
-
-			funcParams, fOuput, fInput, err := g.schemaForFunctionParameters(function)
+			_, fOuput, fInput, err := g.schemaForFunctionParameters(function, nil)
 			if err != nil {
 				return "", err
 			}
-			sb.WriteString(funcParams)
-			sb.WriteString("): ")
-			schemaRef, _ := g.schemaRefForType(function.baseReturnType)
+
 			outputTypes = append(outputTypes, function.baseReturnType)
 			inputTypes = append(inputTypes, fInput...)
-
-			sb.WriteString(schemaRef)
-			sb.WriteString("\n")
 
 			for _, outTypeLookup := range fOuput {
 				if outTypeLookup.rootType != nil {
@@ -80,19 +54,61 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) (string, error) {
 					inputTypes = append(inputTypes, inTypeLookup)
 				}
 			}
+		}
+	}
 
+	inputTypes = g.expandTypeLookups(inputTypes)
+	outputTypes = g.expandTypeLookups(outputTypes)
+
+	inputMapping, outputMapping := solveInputOutputNameMapping(inputTypes, outputTypes)
+
+	for mode, functions := range procByMode {
+		sb.WriteString("type ")
+		switch mode {
+		case ModeQuery:
+			sb.WriteString("Query")
+		case ModeMutation:
+			sb.WriteString("Mutation")
+		default:
+			panic("unknown mode")
+		}
+		sb.WriteString(" {\n")
+
+		// Sort the functions by name
+		sort.Slice(functions, func(i, j int) bool {
+			return functions[i].name < functions[j].name
+		})
+
+		for _, function := range functions {
+			sb.WriteString("\t")
+			sb.WriteString(function.name)
+			if len(function.nameMapping) > 0 {
+				sb.WriteString("(")
+				funcParams, _, _, err := g.schemaForFunctionParameters(function, inputMapping)
+				if err != nil {
+					return "", err
+				}
+				sb.WriteString(funcParams)
+				sb.WriteString(")")
+			}
+
+			sb.WriteString(": ")
+			schemaRef, _ := g.schemaRefForType(function.baseReturnType, outputMapping)
+
+			sb.WriteString(schemaRef)
+			sb.WriteString("\n")
 		}
 		sb.WriteString("}\n\n")
 	}
 
-	inputSchema, iEnumTypes, err := g.schemaForTypes(TypeInput, inputTypes...)
+	inputSchema, iEnumTypes, err := g.schemaForTypes(TypeInput, inputMapping, inputTypes...)
 	if err != nil {
 		return "", err
 	}
 	enumTypes = append(enumTypes, iEnumTypes...)
 	sb.WriteString(inputSchema)
 
-	outputSchema, oEnumTypes, err := g.schemaForTypes(TypeOutput, outputTypes...)
+	outputSchema, oEnumTypes, err := g.schemaForTypes(TypeOutput, outputMapping, outputTypes...)
 	if err != nil {
 		return "", err
 	}
@@ -109,7 +125,73 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) (string, error) {
 	return sb.String(), nil
 }
 
-func (g *Graphy) schemaForFunctionParameters(f *graphFunction) (string, []*typeLookup, []*typeLookup, error) {
+type typeNameMapping map[*typeLookup]string
+
+func solveInputOutputNameMapping(inputTypes []*typeLookup, outputTypes []*typeLookup) (typeNameMapping, typeNameMapping) {
+	// TODO: Handle same type name in different packages.
+
+	inputMapping := make(typeNameMapping)
+	outputMapping := make(typeNameMapping)
+
+	outputNames := map[string]bool{}
+
+	// Populate outputMapping and check for name collisions along the way
+	for _, outputType := range outputTypes {
+		outputMapping[outputType] = outputType.name
+		outputNames[outputType.name] = true
+	}
+
+	// Populate inputMapping, checking for name collisions and resolving them by appending "Input"
+	for _, inputType := range inputTypes {
+		name := inputType.name
+		_, exists := outputNames[name]
+		if exists {
+			// If a collision is found, append "Input" to the input type name
+			name += "Input"
+		}
+		inputMapping[inputType] = name
+	}
+
+	return inputMapping, outputMapping
+}
+
+func (g *Graphy) expandTypeLookups(types []*typeLookup) []*typeLookup {
+	expandedTypeMap := map[*typeLookup]bool{}
+	for _, tl := range types {
+		expandedTypeMap = g.recursiveAddTypeLookup(tl, expandedTypeMap)
+	}
+	expandedTypes := []*typeLookup{}
+	for tl := range expandedTypeMap {
+		expandedTypes = append(expandedTypes, tl)
+	}
+
+	// Sort by name
+	sort.Slice(expandedTypes, func(i, j int) bool {
+		return expandedTypes[i].name < expandedTypes[j].name
+	})
+
+	return expandedTypes
+}
+
+func (g *Graphy) recursiveAddTypeLookup(tl *typeLookup, typeMap map[*typeLookup]bool) map[*typeLookup]bool {
+	if typeMap[tl] {
+		return typeMap
+	}
+	typeMap[tl] = true
+	for _, tl := range tl.implements {
+		typeMap = g.recursiveAddTypeLookup(tl, typeMap)
+	}
+	for _, tl := range tl.union {
+		typeMap = g.recursiveAddTypeLookup(tl, typeMap)
+	}
+	for _, fl := range tl.fields {
+		ftl := g.typeLookup(fl.resultType)
+		typeMap = g.recursiveAddTypeLookup(ftl, typeMap)
+	}
+	return typeMap
+}
+
+func (g *Graphy) schemaForFunctionParameters(f *graphFunction, mapping typeNameMapping) (string, []*typeLookup, []*typeLookup, error) {
 	sb := strings.Builder{}
 
 	mappings := []functionNameMapping{}
@@ -130,7 +212,7 @@ func (g *Graphy) schemaForFunctionParameters(f *graphFunction) (string, []*typeL
 		sb.WriteString(param.name)
 		sb.WriteString(": ")
 		paramTl := g.typeLookup(param.paramType)
-		schemaRef, _ := g.schemaRefForType(paramTl)
+		schemaRef, _ := g.schemaRefForType(paramTl, mapping)
 		sb.WriteString(schemaRef)
 		paramLookups = append(paramLookups, paramTl)
 	}

@@ -98,7 +98,7 @@ query GetCourses($categories: [String!]) {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessorWithParamNames(ctx, "courses", GetCourses, "categories")
+	g.RegisterQuery(ctx, "courses", GetCourses, "categories")
 
 	resultAny, err := g.ProcessRequest(ctx, input, vars)
 	assert.NoError(t, err)
@@ -117,7 +117,7 @@ func TestCourses_Graph_Cache(t *testing.T) {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessor(ctx, "courses", GetCourses)
+	g.RegisterQuery(ctx, "courses", GetCourses)
 
 	g.RequestCache = simpleCache{
 		values: map[string]*simpleCacheEntry{},
@@ -147,7 +147,7 @@ func Test_Missing_Named_Param(t *testing.T) {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessorWithParamNames(ctx, "courses", GetCourses, "categories")
+	g.RegisterQuery(ctx, "courses", GetCourses, "categories")
 
 	_, err := g.ProcessRequest(ctx, input, "")
 	assert.Error(t, err)
@@ -178,7 +178,7 @@ func Test_Missing_Struct_Param(t *testing.T) {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessor(ctx, "courses", f)
+	g.RegisterQuery(ctx, "courses", f)
 
 	_, err := g.ProcessRequest(ctx, input, "")
 	assert.Error(t, err)
@@ -202,7 +202,7 @@ func Test_Missing_OutputParam(t *testing.T) {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessorWithParamNames(ctx, "courses", GetCourses, "categories")
+	g.RegisterQuery(ctx, "courses", GetCourses, "categories")
 
 	_, err := g.ProcessRequest(ctx, input, "")
 	assert.Error(t, err)
@@ -225,7 +225,7 @@ query GetCourses($other: String!) {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessorWithParamNames(ctx, "courses", GetCourses, "categories")
+	g.RegisterQuery(ctx, "courses", GetCourses, "categories")
 
 	_, err := g.ProcessRequest(ctx, input, "")
 	assert.Error(t, err)
@@ -246,7 +246,7 @@ BlahBlah GetCourses {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessorWithParamNames(ctx, "courses", GetCourses, "categories")
+	g.RegisterQuery(ctx, "courses", GetCourses, "categories")
 
 	_, err := g.ProcessRequest(ctx, input, "")
 	assert.Error(t, err)
@@ -267,7 +267,7 @@ query GetCourses {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessorWithParamNames(ctx, "courses", GetCourses, "categories")
+	g.RegisterQuery(ctx, "courses", GetCourses, "categories")
 
 	_, err := g.ProcessRequest(ctx, input, "")
 	assert.Error(t, err)

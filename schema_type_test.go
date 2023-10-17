@@ -83,12 +83,7 @@ func TestGraphy_MultiParamFunction(t *testing.T) {
 	g := Graphy{}
 	ctx := context.Background()
 
-	g.RegisterFunction(ctx, FunctionDefinition{
-		Name:           "Update",
-		Function:       func(ep episode, count int) []Character { return nil },
-		Mode:           ModeMutation,
-		ParameterNames: []string{"Episode", "Count"},
-	})
+	g.RegisterMutation(ctx, "Update", func(ep episode, count int) []Character { return nil }, "Episode", "Count")
 
 	schema, err := g.SchemaDefinition(ctx)
 	assert.NoError(t, err)

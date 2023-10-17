@@ -113,7 +113,7 @@ func TestSimpleFields1(t *testing.T) {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessorWithParamNames(ctx, "hero", heroProvider)
+	g.RegisterQuery(ctx, "hero", heroProvider)
 
 	input := `
 {
@@ -150,7 +150,7 @@ func TestSimpleFields2(t *testing.T) {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessorWithParamNames(ctx, "hero", heroProvider)
+	g.RegisterQuery(ctx, "hero", heroProvider)
 
 	input := `
 {
@@ -195,7 +195,7 @@ func TestArguments(t *testing.T) {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessorWithParamNames(ctx, "Human", getHumanProvider, "id")
+	g.RegisterQuery(ctx, "Human", getHumanProvider, "id")
 
 	input := `
 {
@@ -281,7 +281,7 @@ func TestFragments1(t *testing.T) {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessorWithParamNames(ctx, "hero", getHumanProvider, "episode")
+	g.RegisterQuery(ctx, "hero", getHumanProvider, "episode")
 
 	input := `
 {
@@ -421,7 +421,7 @@ func TestVariableDefaultValue(t *testing.T) {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessorWithParamNames(ctx, "hero", heroProvider, "episode")
+	g.RegisterQuery(ctx, "hero", heroProvider, "episode")
 
 	input := `
 query HeroNameAndFriends($episode: Episode = JEDI) {
@@ -449,7 +449,7 @@ func TestMutatorWithComplexInput(t *testing.T) {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessorWithParamNames(ctx, "createReview", createReview, "episode", "review")
+	g.RegisterQuery(ctx, "createReview", createReview, "episode", "review")
 
 	input := `
 mutation {
@@ -472,7 +472,7 @@ func TestMutatorWithComplexInputVars(t *testing.T) {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessorWithParamNames(ctx, "createReview", createReview, "episode", "review")
+	g.RegisterQuery(ctx, "createReview", createReview, "episode", "review")
 
 	input := `
 mutation CreateReviewForEpisode($ep: Episode!, $review: ReviewInput!) {
@@ -504,7 +504,7 @@ func TestMutatorWithComplexInputVarsWithError(t *testing.T) {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessorWithParamNames(ctx, "createReview", createReview, "episode", "review")
+	g.RegisterQuery(ctx, "createReview", createReview, "episode", "review")
 
 	input := `
 mutation CreateReviewForEpisode($ep: Episode!, $review: ReviewInput!) {
@@ -536,7 +536,7 @@ func TestMutatorWithComplexInputVarsWithErrorReturned(t *testing.T) {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessorWithParamNames(ctx, "createReview", createReview, "episode", "review")
+	g.RegisterQuery(ctx, "createReview", createReview, "episode", "review")
 
 	input := `
 mutation CreateReviewForEpisode($ep: Episode!, $review: ReviewInput!) {
@@ -568,7 +568,7 @@ func TestMutatorWithComplexInputVarsPanic(t *testing.T) {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessorWithParamNames(ctx, "createReview", createReview, "episode", "review")
+	g.RegisterQuery(ctx, "createReview", createReview, "episode", "review")
 
 	input := `
 mutation CreateReviewForEpisode($ep: Episode!, $review: ReviewInput!) {
@@ -618,7 +618,7 @@ func TestEnumInvalid(t *testing.T) {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessorWithParamNames(ctx, "hero", heroProvider, "episode")
+	g.RegisterQuery(ctx, "hero", heroProvider, "episode")
 
 	input := `
 query  {

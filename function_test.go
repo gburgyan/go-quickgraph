@@ -68,7 +68,7 @@ func TestGraphFunction_Struct(t *testing.T) {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessor(ctx, "f", f)
+	g.RegisterQuery(ctx, "f", f)
 
 	gf := g.newGraphFunction(FunctionDefinition{Name: "f", Function: f}, false)
 	assert.Equal(t, "f", gf.name)
@@ -96,7 +96,7 @@ func TestGraphFunction_Anonymous(t *testing.T) {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessor(ctx, "f", f)
+	g.RegisterQuery(ctx, "f", f)
 
 	gf := g.newGraphFunction(FunctionDefinition{Name: "f", Function: f}, false)
 	assert.Equal(t, "f", gf.name)
@@ -121,7 +121,7 @@ func TestGraphFunction_ScalarResult(t *testing.T) {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessor(ctx, "f", f)
+	g.RegisterQuery(ctx, "f", f)
 
 	gf := g.newGraphFunction(FunctionDefinition{Name: "f", Function: f}, false)
 	assert.Equal(t, "f", gf.name)
@@ -144,7 +144,7 @@ func TestGraphFunction_SliceScalarResult(t *testing.T) {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessor(ctx, "f", f)
+	g.RegisterQuery(ctx, "f", f)
 
 	gf := g.newGraphFunction(FunctionDefinition{Name: "f", Function: f}, false)
 	assert.Equal(t, "f", gf.name)
@@ -190,7 +190,7 @@ func TestGraphFunction_FuncReturn(t *testing.T) {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessor(ctx, "f", f)
+	g.RegisterQuery(ctx, "f", f)
 
 	gf := g.newGraphFunction(FunctionDefinition{Name: "f", Function: f}, false)
 	assert.Equal(t, "f", gf.name)
@@ -218,7 +218,7 @@ func TestGraphFunction_FuncNoResultFilter(t *testing.T) {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessor(ctx, "f", f)
+	g.RegisterQuery(ctx, "f", f)
 
 	gf := g.newGraphFunction(FunctionDefinition{Name: "f", Function: f}, false)
 	assert.Equal(t, "f", gf.name)
@@ -244,7 +244,7 @@ func TestGraphFunction_PointerFuncReturn(t *testing.T) {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessor(ctx, "f", f)
+	g.RegisterQuery(ctx, "f", f)
 
 	gf := g.newGraphFunction(FunctionDefinition{Name: "f", Function: f}, false)
 	assert.Equal(t, "f", gf.name)
@@ -272,7 +272,7 @@ func TestGraphFunction_FuncParamReturn(t *testing.T) {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessor(ctx, "f", f)
+	g.RegisterQuery(ctx, "f", f)
 
 	gf := g.newGraphFunction(FunctionDefinition{Name: "f", Function: f}, false)
 	assert.Equal(t, "f", gf.name)
@@ -300,7 +300,7 @@ func TestGraphFunction_FuncVariableParamReturn(t *testing.T) {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessor(ctx, "f", f)
+	g.RegisterQuery(ctx, "f", f)
 
 	gf := g.newGraphFunction(FunctionDefinition{Name: "f", Function: f}, false)
 	assert.Equal(t, "f", gf.name)
@@ -348,7 +348,7 @@ func TestGraphFunction_ImplicitReturnUnion(t *testing.T) {
 
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessor(ctx, "f", f)
+	g.RegisterQuery(ctx, "f", f)
 	g.RegisterFunction(ctx, FunctionDefinition{
 		Name:            "CustomResultFunc",
 		Function:        f,
@@ -415,7 +415,7 @@ type resultB {
 func TestGraphFunction_ParallelQuery(t *testing.T) {
 	ctx := context.Background()
 	g := Graphy{}
-	g.RegisterProcessor(ctx, "delay", DelayedFunc)
+	g.RegisterQuery(ctx, "delay", DelayedFunc)
 
 	startTime := time.Now()
 	gql := `
@@ -444,7 +444,7 @@ func TestGraphFunction_ParallelQuery_Timeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
 	defer cancel()
 	g := Graphy{}
-	g.RegisterProcessor(ctx, "delay", DelayedFunc)
+	g.RegisterQuery(ctx, "delay", DelayedFunc)
 
 	startTime := time.Now()
 	gql := `
@@ -473,7 +473,7 @@ func TestGraphFunction_SerialQuery_Timeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(ctx, 40*time.Millisecond)
 	defer cancel()
 	g := Graphy{}
-	g.RegisterProcessor(ctx, "delay", DelayedFunc)
+	g.RegisterQuery(ctx, "delay", DelayedFunc)
 
 	startTime := time.Now()
 	gql := `
@@ -508,19 +508,19 @@ func TestGraphFunction_Invalid(t *testing.T) {
 	ctx := context.Background()
 	g := Graphy{}
 	assert.PanicsWithValue(t, "not valid graph function: function may have at most one non-pointer return value", func() {
-		g.RegisterProcessor(ctx, "f", func() (episode, episode) { return "foo", "bar" })
+		g.RegisterQuery(ctx, "f", func() (episode, episode) { return "foo", "bar" })
 	})
 
 	assert.PanicsWithValue(t, "not valid graph function: function must have at least one non-error return value", func() {
-		g.RegisterProcessor(ctx, "f", func() error { return nil })
+		g.RegisterQuery(ctx, "f", func() error { return nil })
 	})
 
 	assert.PanicsWithValue(t, "not valid graph function: function may have at most one error return value", func() {
-		g.RegisterProcessor(ctx, "f", func() (episode, error, error) { return "foo", nil, nil })
+		g.RegisterQuery(ctx, "f", func() (episode, error, error) { return "foo", nil, nil })
 	})
 
 	assert.PanicsWithValue(t, "not valid graph function: function f is not a func: string", func() {
-		g.RegisterProcessor(ctx, "f", "Not a function")
+		g.RegisterQuery(ctx, "f", "Not a function")
 	})
 }
 
@@ -556,7 +556,7 @@ func TestGraphFunction_BadVariableType(t *testing.T) {
 	ctx, cancel := context.WithTimeout(ctx, 40*time.Millisecond)
 	defer cancel()
 	g := Graphy{}
-	g.RegisterProcessor(ctx, "delay", DelayedFunc)
+	g.RegisterQuery(ctx, "delay", DelayedFunc)
 
 	gql := `
 query f($time: int!) {
@@ -576,7 +576,7 @@ func TestGraphFunction_BadDefaultVariableType(t *testing.T) {
 	ctx, cancel := context.WithTimeout(ctx, 40*time.Millisecond)
 	defer cancel()
 	g := Graphy{}
-	g.RegisterProcessor(ctx, "delay", DelayedFunc)
+	g.RegisterQuery(ctx, "delay", DelayedFunc)
 
 	gql := `
 query f($time: int! = "foo") {
@@ -596,7 +596,7 @@ func TestGraphFunction_MissingVariable(t *testing.T) {
 	ctx, cancel := context.WithTimeout(ctx, 40*time.Millisecond)
 	defer cancel()
 	g := Graphy{}
-	g.RegisterProcessor(ctx, "delay", DelayedFunc)
+	g.RegisterQuery(ctx, "delay", DelayedFunc)
 
 	gql := `
 query f($time: int!) {

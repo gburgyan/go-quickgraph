@@ -32,26 +32,51 @@ var errorType = reflect.TypeOf((*error)(nil)).Elem()
 var stringType = reflect.TypeOf((*string)(nil)).Elem()
 var anyType = reflect.TypeOf((*any)(nil)).Elem()
 
-func (g *Graphy) RegisterProcessorWithParamNames(ctx context.Context, name string, f any, names ...string) {
+// RegisterQuery registers a function as a query.
+//
+// The function must return a valid result value and may return an error. If the function
+// returns multiple values, they must be pointers and the result will be an implicit
+// union type.
+//
+// If the names are specified, they must match the non-context parameter count of the function.
+// If the names are not specified, then the parameters are dealt with as either anonymous
+// parameters or as a single parameter that is a struct. If the function has a single parameter
+// that is a struct, then the names of the struct fields are used as the parameter names.
+func (g *Graphy) RegisterQuery(ctx context.Context, name string, f any, names ...string) {
 	g.ensureInitialized()
-	//gf := g.newGraphFunctionWithNames(name, reflect.ValueOf(f), names...)
 	gf := g.newGraphFunction(FunctionDefinition{
 		Name:           name,
 		Function:       f,
 		ParameterNames: names,
+		Mode:           ModeQuery,
 	}, false)
 	g.processors[name] = gf
 }
 
-func (g *Graphy) RegisterProcessor(ctx context.Context, name string, f any) {
+// RegisterMutation registers a function as a mutator.
+//
+// The function must return a valid result value and may return an error. If the function
+// returns multiple values, they must be pointers and the result will be an implicit
+// union type.
+//
+// If the names are specified, they must match the non-context parameter count of the function.
+// If the names are not specified, then the parameters are dealt with as either anonymous
+// parameters or as a single parameter that is a struct. If the function has a single parameter
+// that is a struct, then the names of the struct fields are used as the parameter names.
+func (g *Graphy) RegisterMutation(ctx context.Context, name string, f any, names ...string) {
 	g.ensureInitialized()
 	gf := g.newGraphFunction(FunctionDefinition{
-		Name:     name,
-		Function: f,
+		Name:           name,
+		Function:       f,
+		ParameterNames: names,
+		Mode:           ModeMutation,
 	}, false)
 	g.processors[name] = gf
 }
 
+// RegisterFunction is similar to both RegisterQuery and RegisterMutation, but it allows
+// the caller to specify additional parameters that are less commonly used. See the
+// FunctionDefinition documentation for more information.
 func (g *Graphy) RegisterFunction(ctx context.Context, def FunctionDefinition) {
 	g.ensureInitialized()
 	gf := g.newGraphFunction(def, false)

@@ -56,7 +56,7 @@ func HeroProvider(ctx context.Context) Character {
 
 func RunExampleQuery(ctx context.Context) (string, err){
     g := Graphy{}
-    g.RegisterProcessorWithParamNames(ctx, "hero", HeroProvider)
+    g.RegisterQuery(ctx, "hero", HeroProvider)
     input := `
     {
       hero {
@@ -201,7 +201,7 @@ You can register the processor with:
 
 ```go
 g := Graphy{}
-g.RegisterProcessor(ctx, "courses", GetCourses)
+g.RegisterQuery(ctx, "courses", GetCourses)
 ```
 
 The downside of this approach is based on a limitation in reflection in Golang: there is no way to get the _names_ of the parameters. In this case `Graphy` will run assuming the parameters are positional. This is a variance from orthodox GraphQL behavior as it expects named parameters. If a schema is generated from the `Graphy`, these will be rendered as `arg1`, `arg2`, etc. Those are purely placeholders for the schema and the processing of the request will still be treated positionally; the names of the passed parameters are ignored.
@@ -210,7 +210,7 @@ If the named parameters are needed, you can do that via:
 
 ```go
 g := Graphy{}
-g.RegisterProcessorWithParamNames(ctx, "courses", GetCourses, "categories")
+g.RegisterQuery(ctx, "courses", GetCourses, "categories")
 ```
 
 Once you tell `Graphy` the names of the paramters to expect, it can function with named parameters as is typical for GraphQL.
@@ -248,7 +248,7 @@ func GetCourses(ctx context.Context, in CourseInput) []*Course
 }
 
 g := Graphy{}
-g.RegisterProcessor(ctx, "courses", GetCourses)
+g.RegisterQuery(ctx, "courses", GetCourses)
 ```
 
 Since reflection can be used to get the names of the members of the structure, that information will be used to get the names of the parameters that will be exposed for the function.

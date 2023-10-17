@@ -45,7 +45,7 @@ func BenchmarkMutatorWithVars_Cached(b *testing.B) {
 		},
 	}
 
-	g.RegisterProcessorWithParamNames(ctx, "createReview", createReview, "episode", "review")
+	g.RegisterQuery(ctx, "createReview", createReview, "episode", "review")
 
 	input := `
 mutation CreateReviewForEpisode($ep: Episode!, $review: ReviewInput!) {
@@ -78,7 +78,7 @@ func BenchmarkMutatorWithVars(b *testing.B) {
 	ctx := context.Background()
 	g := Graphy{}
 
-	g.RegisterProcessorWithParamNames(ctx, "createReview", createReview, "episode", "review")
+	g.RegisterQuery(ctx, "createReview", createReview, "episode", "review")
 
 	input := `
 mutation CreateReviewForEpisode($ep: Episode!, $review: ReviewInput!) {

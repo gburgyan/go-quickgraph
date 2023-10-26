@@ -729,3 +729,24 @@ func TestFunction_PointerToStruct(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, `{"data":{"f":"foo"}}`, response)
 }
+
+func TestFunction_MismatchedVariables(t *testing.T) {
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterQuery(ctx, "f", func(s string) string {
+		return s
+	}, "in")
+	g.RegisterQuery(ctx, "g", func(s int) string {
+		return fmt.Sprintf("val: %d", s)
+	}, "in")
+
+	gql := `
+query mixed($in: string!) {
+  f(in: $in)
+  g(in: $in)
+}
+`
+	response, err := g.ProcessRequest(ctx, gql, ``)
+	assert.EqualError(t, err, "error adding variable $in [4:5]: variable in is used with different types: existing type: string, new type: int")
+	assert.Equal(t, `{"errors":[{"message":"error adding variable $in: variable in is used with different types: existing type: string, new type: int","locations":[{"line":4,"column":5}]}]}`, response)
+}

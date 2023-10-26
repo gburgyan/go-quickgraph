@@ -57,8 +57,8 @@ type genericValue struct {
 	String     *string        `parser:"| @String"`
 	Int        *int64         `parser:"| @Int"`
 	Float      *float64       `parser:"| @Float"`
-	Map        []namedValue   `parser:"| '{' ( @@ (',' @@)*)? '}'"`
-	List       []genericValue `parser:"| '[' ( @@ (',' @@)*)? ']'"`
+	Map        []namedValue   `parser:"| '{' ( @@ (',' @@)* )? '}'"`
+	List       []genericValue `parser:"| '[' ( @@ (',' @@)* )? ']'"`
 	Pos        lexer.Position
 }
 

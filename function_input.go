@@ -205,6 +205,13 @@ func parseInputIntoValue(req *request, inValue genericValue, targetValue reflect
 		}
 	}()
 
+	typ := targetValue.Type()
+	isPtr := typ.Kind() == reflect.Ptr
+	if isPtr {
+		typ = typ.Elem()
+	}
+	isSlice := typ.Kind() == reflect.Slice
+	isStruct := typ.Kind() == reflect.Struct
 	if inValue.Variable != nil {
 		if req == nil {
 			return fmt.Errorf("variable %s provided but no request", *inValue.Variable)
@@ -226,12 +233,12 @@ func parseInputIntoValue(req *request, inValue genericValue, targetValue reflect
 	} else if inValue.Float != nil {
 		f := *inValue.Float
 		parseFloatIntoValue(f, targetValue)
-	} else if inValue.List != nil {
+	} else if inValue.List != nil || isSlice {
 		err = parseListIntoValue(req, inValue, targetValue)
-	} else if inValue.Map != nil {
+	} else if inValue.Map != nil || isStruct {
 		err = parseMapIntoValue(req, inValue, targetValue)
 	} else {
-		return fmt.Errorf("unknown value type: %v", inValue)
+		return fmt.Errorf("no input found in parse into value")
 	}
 	if err != nil {
 		return err
@@ -409,6 +416,16 @@ func parseMapIntoValue(req *request, inValue genericValue, targetValue reflect.V
 	// Loop through the fields of the target type and make a map of the fields by "json" tag.
 	fieldMap := map[string]reflect.StructField{}
 	requiredFields := map[string]bool{}
+
+	if targetType.Kind() == reflect.Ptr {
+		isNilPtr := targetValue.IsNil()
+		targetType = targetType.Elem()
+		if isNilPtr {
+			targetValue.Set(reflect.New(targetType))
+		}
+		targetValue = targetValue.Elem()
+	}
+
 	for i := 0; i < targetType.NumField(); i++ {
 		field := targetType.Field(i)
 		if tag, ok := field.Tag.Lookup("json"); ok {
@@ -449,14 +466,8 @@ func parseMapIntoValue(req *request, inValue genericValue, targetValue reflect.V
 	}
 
 	if len(requiredFields) > 0 {
-		missingFields := strings.Builder{}
-		for fieldName := range requiredFields {
-			if missingFields.Len() > 0 {
-				missingFields.WriteString(", ")
-			}
-			missingFields.WriteString(fieldName)
-		}
-		return NewGraphError("missing required fields: "+missingFields.String(), inValue.Pos)
+		missingFields := strings.Join(keys(requiredFields), ", ")
+		return NewGraphError("missing required fields: "+missingFields, inValue.Pos)
 	}
 	return nil
 }

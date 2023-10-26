@@ -647,7 +647,7 @@ query {
 	assert.Equal(t, `{"data":{"f":{"Height":5.905512,"HeightMeters":1.8}}}`, response)
 }
 
-func TestFunctionAnyReturn_FunctionVariabe(t *testing.T) {
+func TestFunctionAnyReturn_FunctionVariable(t *testing.T) {
 	ctx := context.Background()
 	g := Graphy{}
 	g.RegisterAnyType(ctx, Human{})
@@ -665,4 +665,67 @@ query f($unit: HeightUnit!) {
 	response, err := g.ProcessRequest(ctx, gql, `{ "unit": "FOOT" }`)
 	assert.NoError(t, err)
 	assert.Equal(t, `{"data":{"f":{"Height":5.905512,"HeightMeters":1.8}}}`, response)
+}
+
+func TestFunction_WrongParam(t *testing.T) {
+	ctx := context.Background()
+	g := Graphy{}
+	type inStruct struct {
+		InString string
+	}
+	g.RegisterQuery(ctx, "f", func(i inStruct) string {
+		return i.InString
+	}, "in")
+
+	gql := `
+{
+  f(in: { WrongName: "foo" } )
+}
+`
+	response, err := g.ProcessRequest(ctx, gql, ``)
+	assert.EqualError(t, err, "field WrongName not found in input struct (path: f/WrongName) [3:11]")
+	assert.Equal(t, `{"data":{},"errors":[{"message":"field WrongName not found in input struct","locations":[{"line":3,"column":11}],"path":["f","WrongName"]}]}`, response)
+}
+
+func TestFunction_MissingParam(t *testing.T) {
+	ctx := context.Background()
+	g := Graphy{}
+	type inStruct struct {
+		InString string
+	}
+	g.RegisterQuery(ctx, "f", func(i inStruct) string {
+		return i.InString
+	}, "in")
+
+	gql := `
+{
+  f(in: { } )
+}
+`
+	response, err := g.ProcessRequest(ctx, gql, ``)
+	assert.EqualError(t, err, "missing required fields: InString (path: f) [3:9]")
+	assert.Equal(t, `{"data":{},"errors":[{"message":"missing required fields: InString","locations":[{"line":3,"column":9}],"path":["f"]}]}`, response)
+}
+
+func TestFunction_PointerToStruct(t *testing.T) {
+	ctx := context.Background()
+	g := Graphy{}
+	type inStruct struct {
+		InString string
+	}
+	g.RegisterQuery(ctx, "f", func(i *inStruct) string {
+		if i == nil {
+			return "no name provided"
+		}
+		return i.InString
+	}, "in")
+
+	gql := `
+{
+  f(in: { InString: "foo" } )
+}
+`
+	response, err := g.ProcessRequest(ctx, gql, ``)
+	assert.NoError(t, err)
+	assert.Equal(t, `{"data":{"f":"foo"}}`, response)
 }

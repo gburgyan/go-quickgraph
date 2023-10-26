@@ -254,3 +254,7 @@ func (t *fieldLookup) fetchGraphFunction(ctx context.Context, req *request, v re
 	}
 	return obj.Interface(), nil
 }
+
+func (t *typeLookup) String() string {
+	return fmt.Sprintf("typeLookup: %v", t.typ)
+}

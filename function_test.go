@@ -610,3 +610,59 @@ query f($time: int!) {
 	assert.Error(t, err)
 	assert.Equal(t, `{"errors":[{"message":"variable time not provided"}]}`, response)
 }
+
+func TestFunctionAnyReturn(t *testing.T) {
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterQuery(ctx, "f", func() any {
+		return "foo"
+	})
+
+	gql := `
+query {
+  f
+}`
+	response, err := g.ProcessRequest(ctx, gql, ``)
+	assert.NoError(t, err)
+	assert.Equal(t, `{"data":{"f":"foo"}}`, response)
+}
+
+func TestFunctionAnyReturn_Function(t *testing.T) {
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterAnyType(ctx, Human{})
+	g.RegisterQuery(ctx, "f", func() any {
+		return Human{HeightMeters: 1.8}
+	})
+
+	gql := `
+query {
+  f {
+    HeightMeters
+    Height(Units: FOOT)
+  }
+}`
+	response, err := g.ProcessRequest(ctx, gql, ``)
+	assert.NoError(t, err)
+	assert.Equal(t, `{"data":{"f":{"Height":5.905512,"HeightMeters":1.8}}}`, response)
+}
+
+func TestFunctionAnyReturn_FunctionVariabe(t *testing.T) {
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterAnyType(ctx, Human{})
+	g.RegisterQuery(ctx, "f", func() any {
+		return Human{HeightMeters: 1.8}
+	})
+
+	gql := `
+query f($unit: HeightUnit!) {
+  f {
+    HeightMeters
+    Height(Units: $unit)
+  }
+}`
+	response, err := g.ProcessRequest(ctx, gql, `{ "unit": "FOOT" }`)
+	assert.NoError(t, err)
+	assert.Equal(t, `{"data":{"f":{"Height":5.905512,"HeightMeters":1.8}}}`, response)
+}

@@ -168,6 +168,13 @@ func (g *Graphy) typeLookup(typ reflect.Type) *typeLookup {
 			result.union[at.name] = at
 			result.unionLowercase[strings.ToLower(at.name)] = at
 		}
+		// For each of the union types, add the fields to the result.
+		for _, at := range result.union {
+			for name, field := range at.fields {
+				result.fields[name] = field
+				result.fieldsLowercase[strings.ToLower(name)] = field
+			}
+		}
 		g.typeLookups[typ] = result
 		g.m.Unlock()
 		return result

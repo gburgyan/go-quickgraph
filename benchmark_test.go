@@ -67,6 +67,8 @@ mutation CreateReviewForEpisode($ep: Episode!, $review: ReviewInput!) {
 	for i := 0; i < b.N; i++ {
 		_, _ = g.ProcessRequest(ctx, input, vars)
 	}
+
+	b.ReportAllocs()
 }
 
 func BenchmarkMutatorWithVars(b *testing.B) {
@@ -100,6 +102,8 @@ mutation CreateReviewForEpisode($ep: Episode!, $review: ReviewInput!) {
 	for i := 0; i < b.N; i++ {
 		_, _ = g.ProcessRequest(ctx, input, vars)
 	}
+
+	b.ReportAllocs()
 }
 
 func BenchmarkMissingProcessor(b *testing.B) {
@@ -130,4 +134,6 @@ mutation CreateReviewForEpisode($ep: Episode!, $review: ReviewInput!) {
 	for i := 0; i < b.N; i++ {
 		_, _ = g.ProcessRequest(ctx, input, vars)
 	}
+
+	b.ReportAllocs()
 }

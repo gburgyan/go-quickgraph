@@ -843,3 +843,78 @@ query {
 	assert.Error(t, err)
 	assert.Equal(t, `{"data":{},"errors":[{"message":"maps not supported","locations":[{"line":4,"column":5}],"path":["mapper"]}]}`, response)
 }
+
+func TestGraphFunction_InvalidParamMap(t *testing.T) {
+	ctx := context.Background()
+	g := Graphy{}
+	assert.PanicsWithValue(t, "not valid graph function: function mapper has a parameter 0 of type map, which is not supported", func() {
+		g.RegisterQuery(ctx, "mapper", func(m map[string]string) string {
+			return "foo"
+		})
+	})
+}
+
+func TestGraphFunction_InvalidParamInterface(t *testing.T) {
+	ctx := context.Background()
+	g := Graphy{}
+	type SampleInterface interface {
+		Value() string
+	}
+	assert.PanicsWithValue(t, "not valid graph function: function interfacer has a parameter 0 of type interface, which is not supported", func() {
+		g.RegisterQuery(ctx, "interfacer", func(i SampleInterface) string {
+			return i.Value()
+		})
+	})
+}
+
+type interfaceInput interface {
+	Value() string
+}
+
+type brokenInputStruct struct {
+	NonBrokenValue string
+}
+
+func (b brokenInputStruct) GetWithInterface(i interfaceInput) string {
+	return i.Value()
+}
+
+func TestGraphFunction_ResultInterfaceFunction(t *testing.T) {
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterQuery(ctx, "interfacer", func() brokenInputStruct {
+		return brokenInputStruct{
+			NonBrokenValue: "foo",
+		}
+	})
+
+	definition, err := g.SchemaDefinition(ctx)
+	assert.NoError(t, err)
+
+	// This is a bit complicated. The function on the result type is not
+	// supported because the input is an interface. This isn't an error,
+	// it just means that the function doesn't get added. We verify by checking
+	// that the schema doesn't have the function.
+
+	schema := `type Query {
+	interfacer: brokenInputStruct!
+}
+
+type brokenInputStruct {
+	NonBrokenValue: String!
+}
+
+`
+	assert.Equal(t, schema, definition)
+
+	gql := `
+query {
+  interfacer {
+    NonBrokenValue
+  }
+}`
+
+	response, err := g.ProcessRequest(ctx, gql, "")
+	assert.NoError(t, err)
+	assert.Equal(t, `{"data":{"interfacer":{"NonBrokenValue":"foo"}}}`, response)
+}

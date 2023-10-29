@@ -103,12 +103,16 @@ func (g *Graphy) validateGraphFunction(graphFunc reflect.Value, name string, met
 		if i == 0 && method {
 			continue
 		} else {
+			logicalParamNumber := i
+			if method {
+				logicalParamNumber--
+			}
 			switch funcParam.Kind() {
-			case reflect.Ptr:
-				return nil
-
 			case reflect.Map:
-				return fmt.Errorf("function %s has a parameter of type map, which is not supported", name)
+				return fmt.Errorf("function %s has a parameter %d of type map, which is not supported", name, logicalParamNumber)
+
+			case reflect.Interface:
+				return fmt.Errorf("function %s has a parameter %d of type interface, which is not supported", name, logicalParamNumber)
 			}
 		}
 	}

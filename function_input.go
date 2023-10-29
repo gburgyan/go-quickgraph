@@ -238,7 +238,9 @@ func parseInputIntoValue(req *request, inValue genericValue, targetValue reflect
 	} else if inValue.Map != nil || isStruct {
 		err = parseMapIntoValue(req, inValue, targetValue)
 	} else {
-		return fmt.Errorf("no input found in parse into value")
+		// This should never occur as this should be a parse error
+		// that gets caught by the parser.
+		return fmt.Errorf("no input found to parse into value")
 	}
 	if err != nil {
 		return err
@@ -334,27 +336,27 @@ func parseIdentifierIntoValue(identifier string, value reflect.Value) error {
 		return nil
 	}
 
-	stringType := reflect.TypeOf("")
 	if value.Type() == stringType {
-		// If the value is a string, set it.
+		// If the value is a string, set it. There is no
+		// possibility that this is a pointer since we're testing
+		// for the string type explicitly.
+		value.SetString(identifier)
+		return nil
+	} else {
 		if ptr {
-			value.Set(reflect.ValueOf(&identifier))
+			strValue := reflect.New(value.Type().Elem())
+			strValue.Elem().SetString(identifier)
+			value.Set(strValue)
 		} else {
+			// This assumes the value is a string or something that
+			// simply wraps a string. No extra checks are done as
+			// that is also handled at the reflection layer. If this
+			// is not a string, it will panic, that will get caught,
+			// and the error will be returned.
 			value.SetString(identifier)
 		}
 		return nil
-	} else {
-		strValue := reflect.New(value.Type()).Elem()
-		if ptr {
-			strValue.Set(reflect.ValueOf(&identifier))
-		} else {
-			strValue.SetString(identifier)
-		}
-		value.Set(strValue)
-		return nil
 	}
-
-	return fmt.Errorf("cannot unmarshal identifier %s into type: %v", identifier, value.Type())
 }
 
 func unmarshalWithEnumUnmarshaler(identifier string, value reflect.Value) (bool, error) {

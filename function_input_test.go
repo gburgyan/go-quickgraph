@@ -32,6 +32,16 @@ func (e *MyEnum) UnmarshalString(input string) (interface{}, error) {
 	}
 }
 
+func Test_parseNothing_Error(t *testing.T) {
+	var x int
+	v := reflect.ValueOf(&x).Elem()
+
+	req := &request{}
+	err := parseInputIntoValue(req, genericValue{}, v)
+
+	assert.EqualError(t, err, "no input found to parse into value")
+}
+
 func Test_parseIdentifierIntoValue_Enum(t *testing.T) {
 	var x MyEnum
 	v := reflect.ValueOf(&x)
@@ -143,4 +153,108 @@ func Test_parseIntIntoValue_Ptr(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, x, *outVal)
+}
+
+func Test_parseStringIntoValue_Base(t *testing.T) {
+	x := "\"hello\""
+
+	inVal := genericValue{
+		String: &x,
+	}
+
+	var outVal string
+	v := reflect.ValueOf(&outVal).Elem()
+
+	req := &request{}
+	err := parseInputIntoValue(req, inVal, v)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "hello", outVal)
+}
+
+func Test_parseStringIntoValue_Ptr(t *testing.T) {
+	x := "\"hello\""
+
+	inVal := genericValue{
+		String: &x,
+	}
+
+	var outVal *string
+	v := reflect.ValueOf(&outVal).Elem()
+
+	req := &request{}
+	err := parseInputIntoValue(req, inVal, v)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "hello", *outVal)
+}
+
+func Test_parseIdentifierIntoValue_Base(t *testing.T) {
+	x := "hello"
+
+	inVal := genericValue{
+		Identifier: &x,
+	}
+
+	var outVal string
+	v := reflect.ValueOf(&outVal).Elem()
+
+	req := &request{}
+	err := parseInputIntoValue(req, inVal, v)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "hello", outVal)
+}
+
+func Test_parseIdentifierIntoValue_Ptr(t *testing.T) {
+	x := "hello"
+
+	inVal := genericValue{
+		Identifier: &x,
+	}
+
+	var outVal *string
+	v := reflect.ValueOf(&outVal).Elem()
+
+	req := &request{}
+	err := parseInputIntoValue(req, inVal, v)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "hello", *outVal)
+}
+
+func Test_parseIdentifierIntoValue_BaseType(t *testing.T) {
+	x := "hello"
+
+	inVal := genericValue{
+		Identifier: &x,
+	}
+
+	type myType string
+	var outVal myType
+	v := reflect.ValueOf(&outVal).Elem()
+
+	req := &request{}
+	err := parseInputIntoValue(req, inVal, v)
+
+	assert.NoError(t, err)
+	assert.Equal(t, myType("hello"), outVal)
+}
+
+func Test_parseIdentifierIntoValue_PtrType(t *testing.T) {
+	x := "hello"
+
+	inVal := genericValue{
+		Identifier: &x,
+	}
+
+	type myType string
+	var outVal *myType
+	v := reflect.ValueOf(&outVal).Elem()
+
+	req := &request{}
+	err := parseInputIntoValue(req, inVal, v)
+
+	assert.NoError(t, err)
+	assert.Equal(t, myType("hello"), *outVal)
 }

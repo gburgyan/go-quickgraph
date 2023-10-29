@@ -303,9 +303,10 @@ func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflec
 		gf.rawReturnType = returnType.typ
 	}
 
-	// The parameter type must be a pointer to a struct. We will panic if it is
-	// not.
 	if paramType.Kind() != reflect.Struct {
+		// We should never get here because the upstream code should have already
+		// checked this and wouldn't have called this function if it wasn't a
+		// struct.
 		panic("paramType must a struct")
 	}
 

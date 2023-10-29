@@ -172,6 +172,9 @@ func (g *Graphy) processBaseTypeFieldLookup(typ reflect.Type, prevIndex []int, t
 		typ = reflect.PtrTo(typ)
 		g.addGraphMethodsForType(typ, prevIndex, tl)
 	} else if typ.Kind() == reflect.Ptr {
+		// There should be no way of getting here as the upstream code
+		// should only pass in a struct, not a pointer to a struct. But
+		// just in case, handle it.
 		typ = typ.Elem()
 		g.addGraphMethodsForType(typ, prevIndex, tl)
 	}

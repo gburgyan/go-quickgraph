@@ -750,3 +750,60 @@ query mixed($in: string!) {
 	assert.EqualError(t, err, "error adding variable $in [4:5]: variable in is used with different types: existing type: string, new type: int")
 	assert.Equal(t, `{"errors":[{"message":"error adding variable $in: variable in is used with different types: existing type: string, new type: int","locations":[{"line":4,"column":5}]}]}`, response)
 }
+
+type TestA struct {
+	B *TestB
+}
+
+type TestB struct {
+	Val string `json:"-"`
+}
+
+func (b TestB) NonPointer() string {
+	return b.Val
+}
+
+func (b *TestB) Pointer() string {
+	return b.Val
+}
+
+func TestFunction_PointerToStructMethod(t *testing.T) {
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterQuery(ctx, "GetA", func() TestA {
+		return TestA{B: &TestB{Val: "foo"}}
+	})
+
+	gql := `
+{
+  GetA {
+    B {
+      NonPointer
+      Pointer
+    }
+  }
+}
+`
+	response, err := g.ProcessRequest(ctx, gql, ``)
+	assert.NoError(t, err)
+	assert.Equal(t, `{"data":{"GetA":{"B":{"NonPointer":"foo","Pointer":"foo"}}}}`, response)
+
+	// Verify the schema.
+	expected := `type Query {
+	GetA: TestA!
+}
+
+type TestA {
+	B: TestB
+}
+
+type TestB {
+	NonPointer: String!
+	Pointer: String!
+}
+
+`
+	schema, err := g.SchemaDefinition(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, schema)
+}

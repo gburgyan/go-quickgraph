@@ -146,4 +146,15 @@ func Test_JsonError_RandomError(t *testing.T) {
 	var ge GraphError
 	errors.As(err, &ge)
 	assert.Equal(t, rErr, ge.InnerError)
+	assert.Equal(t, rErr, ge.Unwrap())
+}
+
+func Test_formatError(t *testing.T) {
+	err1 := fmt.Errorf("random error")
+	err2 := GraphError{
+		Message:   "graph error",
+		Locations: []ErrorLocation{{Line: 1, Column: 1}},
+	}
+	msg := formatError(err1, err2)
+	assert.Equal(t, `{"errors":[{"message":"random error: random error"},{"message":"graph error","locations":[{"line":1,"column":1}]}]}`, msg)
 }

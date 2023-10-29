@@ -50,7 +50,7 @@ func (g GraphHttpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	// Process the request.
 	res, err := g.graphy.ProcessRequest(request.Context(), query, variables)
 	if err != nil {
-		// Log the error here, but the response still has a GraphQL response that can be returned.
+		// TODO: Log the error here, but the response still has a GraphQL response that can be returned.
 	}
 	// Return the response string.
 	writer.Header().Set("Content-Type", "application/json")

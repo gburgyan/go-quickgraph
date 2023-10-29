@@ -51,6 +51,7 @@ func (f *graphFunction) processCallOutput(ctx context.Context, req *request, fil
 			}
 			return retVal, nil
 		}
+		return []any{}, nil
 	} else if kind == reflect.Map {
 		// TODO: Handle maps?
 		return nil, NewGraphError(fmt.Sprintf("maps not supported"), pos)
@@ -63,8 +64,6 @@ func (f *graphFunction) processCallOutput(ctx context.Context, req *request, fil
 	} else {
 		return callResult.Interface(), nil
 	}
-
-	return nil, nil
 }
 
 // processOutputStruct takes a result filter and a struct, processes the struct according to the filter,

@@ -57,12 +57,7 @@ func (e GraphError) Error() string {
 	}
 	if len(e.Locations) > 0 {
 		s.WriteString(" [")
-		for i, l := range e.Locations {
-			if i > 0 {
-				s.WriteString(", ")
-			}
-			s.WriteString(l.String())
-		}
+		s.WriteString(strings.Join(toStringSlice(e.Locations), ", "))
 		s.WriteString("]")
 	}
 
@@ -260,19 +255,23 @@ func (e *GraphError) AddExtension(key string, value string) {
 	e.Extensions[key] = value
 }
 
-func formatError(err error) string {
-	// If the error is a GraphError, make this into a graph-style error JSON. Otherwise, return "".
-	var ge GraphError
-	if errors.As(err, &ge) {
-		resultMap := map[string]any{
-			"errors": []any{
-				ge,
-			},
+func formatError(errs ...error) string {
+	var resultErrors []GraphError
+	for _, err := range errs {
+		var ge GraphError
+		if !errors.As(err, &ge) {
+			ge = GraphError{
+				Message:    err.Error(),
+				InnerError: err,
+			}
 		}
-		resultJson, _ := json.Marshal(resultMap)
-		return string(resultJson)
+		resultErrors = append(resultErrors, ge)
 	}
-	return ""
+	resultMap := map[string]any{
+		"errors": resultErrors,
+	}
+	resultJson, _ := json.Marshal(resultMap)
+	return string(resultJson)
 }
 
 func (e UnknownCommandError) Unwrap() error {

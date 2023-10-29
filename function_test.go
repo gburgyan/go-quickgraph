@@ -807,3 +807,39 @@ type TestB {
 	assert.NoError(t, err)
 	assert.Equal(t, expected, schema)
 }
+
+func TestGraphFunction_ReturnNilSlice(t *testing.T) {
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterQuery(ctx, "mapper", func() []string {
+		return nil
+	})
+
+	gql := `
+query {
+  mapper
+}
+`
+	response, err := g.ProcessRequest(ctx, gql, "")
+	assert.NoError(t, err)
+	assert.Equal(t, `{"data":{"mapper":[]}}`, response)
+}
+
+func TestGraphFunction_ReturnMap(t *testing.T) {
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterQuery(ctx, "mapper", func() map[string]string {
+		return map[string]string{"foo": "bar"}
+	})
+
+	gql := `
+query {
+  mapper {
+    foo
+  }
+}
+`
+	response, err := g.ProcessRequest(ctx, gql, "")
+	assert.Error(t, err)
+	assert.Equal(t, `{"data":{},"errors":[{"message":"maps not supported","locations":[{"line":4,"column":5}],"path":["mapper"]}]}`, response)
+}

@@ -26,10 +26,8 @@ func (g GraphHttpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	if request.Method == "GET" {
 		schema := g.graphy.SchemaDefinition(request.Context())
 		writer.WriteHeader(200)
-		_, err := writer.Write([]byte(schema))
-		if err != nil {
-			panic(err)
-		}
+		_, _ = writer.Write([]byte(schema))
+		// TODO: log an error if there is one, but there's not much we can do about it.
 		return
 	}
 
@@ -47,8 +45,6 @@ func (g GraphHttpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	// Return the response string.
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(200) // Errors are in the response body, and there may be mixed errors and results.
-	_, err = writer.Write([]byte(res))
-	if err != nil {
-		panic(err)
-	}
+	_, _ = writer.Write([]byte(res))
+	// TODO: log an error if there is one, but there's not much we can do about it.
 }

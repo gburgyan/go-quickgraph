@@ -915,3 +915,42 @@ query {
 	assert.NoError(t, err)
 	assert.Equal(t, `{"data":{"interfacer":{"NonBrokenValue":"foo"}}}`, response)
 }
+
+type methodTest struct {
+	Val string
+}
+
+func (m methodTest) StructCall() string {
+	return m.Val
+}
+
+func (m *methodTest) PointerCall() string {
+	return m.Val
+}
+
+func TestGraphFunction_MethodCall(t *testing.T) {
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterQuery(ctx, "structReturn", func() methodTest {
+		return methodTest{Val: "foo"}
+	})
+	g.RegisterQuery(ctx, "pointerReturn", func() *methodTest {
+		return &methodTest{Val: "foo"}
+	})
+
+	gql := `
+query {
+  structReturn {
+    StructCall
+    PointerCall
+  }
+  pointerReturn {
+    StructCall
+    PointerCall
+  }
+}
+`
+	response, err := g.ProcessRequest(ctx, gql, "")
+	assert.NoError(t, err)
+	assert.Equal(t, `{"data":{"pointerReturn":{"PointerCall":"foo","StructCall":"foo"},"structReturn":{"PointerCall":"foo","StructCall":"foo"}}}`, response)
+}

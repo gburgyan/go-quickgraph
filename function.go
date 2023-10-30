@@ -512,6 +512,13 @@ func (f *graphFunction) receiverValueForFunction(target reflect.Value) reflect.V
 	}
 
 	receiverType := f.function.Type().In(0)
+
+	// This is an odd case -- in all circumstances, the type of the receiver is a pointer.
+	// The way we dereference the value that is passed in is always a struct. Even through
+	// detailed testing, there seems to be no cases where anything other than the first
+	// case is needed. However, it's plausible that there are cases where the other cases
+	// are needed. Those cases have not been found. See the TestGraphFunction_MethodCall
+	// test case for the full matrix of cases that are tested.
 	if receiverType.Kind() == reflect.Ptr && target.Kind() != reflect.Ptr {
 		// Make a new pointer to the target.
 		ptrElem := reflect.New(target.Type())

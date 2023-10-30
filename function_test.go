@@ -1040,7 +1040,7 @@ func TestGraphFunction_StructReturnUnion(t *testing.T) {
 	ctx := context.Background()
 	g := Graphy{}
 	type input struct {
-		Val string
+		Val *string
 	}
 	f := func(ctx context.Context, _ input) (any, error) {
 		return nil, nil
@@ -1053,7 +1053,7 @@ func TestGraphFunction_StructReturnUnion(t *testing.T) {
 
 	schema := g.SchemaDefinition(ctx)
 	expected := `type Query {
-	f(Val: String!): fResultUnion!
+	f(Val: String): fResultUnion!
 }
 
 type Character {

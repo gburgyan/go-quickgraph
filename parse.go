@@ -126,12 +126,11 @@ func parseRequest(input string) (wrapper, error) {
 	r, err := parser.ParseString("", input)
 	if err != nil {
 		var pErr participle.Error
+		var position lexer.Position
 		if errors.As(err, &pErr) {
-			return wrapper{}, AugmentGraphError(err, "error parsing request", pErr.Position())
-		} else {
-			// We should never get here.
-			return wrapper{}, err
+			position = pErr.Position()
 		}
+		return wrapper{}, AugmentGraphError(err, "error parsing request", position)
 	}
 	return *r, nil
 }

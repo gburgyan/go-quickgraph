@@ -954,3 +954,145 @@ query {
 	assert.NoError(t, err)
 	assert.Equal(t, `{"data":{"pointerReturn":{"PointerCall":"foo","StructCall":"foo"},"structReturn":{"PointerCall":"foo","StructCall":"foo"}}}`, response)
 }
+
+func TestGraphFunction_InvalidStructReturn(t *testing.T) {
+	ctx := context.Background()
+	g := Graphy{}
+	type input struct {
+		Val string
+	}
+	assert.PanicsWithValue(t, "not valid graph function: function may have at most one error return value", func() {
+		g.RegisterQuery(ctx, "structReturn", func(_ input) (StringResult, error, error) {
+			return StringResult{Out: "foo"}, nil, nil
+		})
+	})
+
+	assert.PanicsWithValue(t, "not valid graph function: function may have at most one non-pointer return value", func() {
+		g.RegisterQuery(ctx, "structReturn", func(_ input) (StringResult, StringResult, error) {
+			return StringResult{Out: "foo"}, StringResult{Out: "bar"}, nil
+		})
+	})
+}
+
+func TestGraphFunction_StructReturnUnionOverride(t *testing.T) {
+	ctx := context.Background()
+	g := Graphy{}
+	type input struct {
+		Val string
+	}
+	f := func(ctx context.Context, _ input) (any, error) {
+		return nil, nil
+	}
+	g.RegisterFunction(ctx, FunctionDefinition{
+		Name:              "f",
+		Function:          f,
+		ReturnUnionName:   "MyUnion",
+		ReturnAnyOverride: []any{Starship{}, Human{}},
+	})
+
+	schema := g.SchemaDefinition(ctx)
+	expected := `type Query {
+	f(Val: String!): MyUnion!
+}
+
+type Character {
+	appearsIn: [episode!]!
+	friends: [Character]!
+	FriendsConnection(arg1: Int!): FriendsConnection
+	id: String!
+	name: String!
+}
+
+type ConnectionEdge {
+	node: Character
+}
+
+type FriendsConnection {
+	edges: [ConnectionEdge]!
+	totalCount: Int!
+}
+
+type Human implements Character {
+	FriendsConnection(arg1: Int!): FriendsConnection
+	Height(arg1: String): Float!
+	HeightMeters: Float!
+}
+
+union MyUnion = Human | Starship
+
+type Starship {
+	id: String!
+	name: String!
+}
+
+enum episode {
+	NEWHOPE
+	EMPIRE
+	JEDI
+}
+
+`
+
+	assert.Equal(t, expected, schema)
+}
+
+func TestGraphFunction_StructReturnUnion(t *testing.T) {
+	ctx := context.Background()
+	g := Graphy{}
+	type input struct {
+		Val string
+	}
+	f := func(ctx context.Context, _ input) (any, error) {
+		return nil, nil
+	}
+	g.RegisterFunction(ctx, FunctionDefinition{
+		Name:              "f",
+		Function:          f,
+		ReturnAnyOverride: []any{Starship{}, Human{}},
+	})
+
+	schema := g.SchemaDefinition(ctx)
+	expected := `type Query {
+	f(Val: String!): fResultUnion!
+}
+
+type Character {
+	appearsIn: [episode!]!
+	friends: [Character]!
+	FriendsConnection(arg1: Int!): FriendsConnection
+	id: String!
+	name: String!
+}
+
+type ConnectionEdge {
+	node: Character
+}
+
+type FriendsConnection {
+	edges: [ConnectionEdge]!
+	totalCount: Int!
+}
+
+type Human implements Character {
+	FriendsConnection(arg1: Int!): FriendsConnection
+	Height(arg1: String): Float!
+	HeightMeters: Float!
+}
+
+type Starship {
+	id: String!
+	name: String!
+}
+
+union fResultUnion = Human | Starship
+
+enum episode {
+	NEWHOPE
+	EMPIRE
+	JEDI
+}
+
+`
+
+	assert.Equal(t, expected, schema)
+}

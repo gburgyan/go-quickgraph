@@ -237,7 +237,7 @@ func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc ref
 		panic(err)
 	}
 	if returnType.typ == anyType && len(def.ReturnAnyOverride) > 0 {
-		gf.baseReturnType = g.convertAnySlice(def.ReturnAnyOverride)
+		gf.baseReturnType = g.convertAnySlice(unionNameGenerator(def), def.ReturnAnyOverride)
 		// We need special handling for the `any` type later.
 		gf.rawReturnType = returnType.typ
 	} else {
@@ -295,12 +295,11 @@ func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflec
 	}
 
 	mft := graphFunc.Type()
-	returnType, err := g.validateFunctionReturnTypes(mft, def)
-	if err != nil {
-		panic(err)
-	}
+	// The error has already been checked earlier.
+	returnType, _ := g.validateFunctionReturnTypes(mft, def)
+
 	if returnType.typ == anyType && len(def.ReturnAnyOverride) > 0 {
-		gf.baseReturnType = g.convertAnySlice(def.ReturnAnyOverride)
+		gf.baseReturnType = g.convertAnySlice(unionNameGenerator(def), def.ReturnAnyOverride)
 		gf.rawReturnType = returnType.typ
 	} else {
 		gf.baseReturnType = returnType
@@ -351,8 +350,9 @@ func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflec
 	return gf
 }
 
-func (g *Graphy) convertAnySlice(types []any) *typeLookup {
+func (g *Graphy) convertAnySlice(name string, types []any) *typeLookup {
 	result := &typeLookup{
+		name:                name,
 		fields:              make(map[string]fieldLookup),
 		fieldsLowercase:     map[string]fieldLookup{},
 		implements:          map[string]*typeLookup{},
@@ -527,4 +527,12 @@ func (f *graphFunction) receiverValueForFunction(target reflect.Value) reflect.V
 		return target
 	}
 	panic("receiverValueForFunction called with incompatible receiver type")
+}
+
+func unionNameGenerator(def FunctionDefinition) string {
+	if def.ReturnUnionName != "" {
+		return def.ReturnUnionName
+	} else {
+		return def.Name + "ResultUnion"
+	}
 }

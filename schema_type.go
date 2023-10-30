@@ -189,10 +189,7 @@ func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup, mapping typeNameMap
 				sb.WriteString(field.name)
 				if len(field.graphFunction.nameMapping) > 0 {
 					sb.WriteString("(")
-					funcParams, fEnums, fParamTypes, err := g.schemaForFunctionParameters(field.graphFunction, mapping)
-					if err != nil {
-						return "", nil, err
-					}
+					funcParams, fEnums, fParamTypes := g.schemaForFunctionParameters(field.graphFunction, mapping)
 					extraTypes = append(extraTypes, fEnums...)
 					extraTypes = append(extraTypes, fParamTypes...)
 					sb.WriteString(funcParams)

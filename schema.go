@@ -27,10 +27,7 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) (string, error) {
 
 	for _, functions := range procByMode {
 		for _, function := range functions {
-			_, fOuput, fInput, err := g.schemaForFunctionParameters(function, nil)
-			if err != nil {
-				return "", err
-			}
+			_, fOuput, fInput := g.schemaForFunctionParameters(function, nil)
 
 			outputTypes = append(outputTypes, function.baseReturnType)
 			inputTypes = append(inputTypes, fInput...)
@@ -84,10 +81,7 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) (string, error) {
 			sb.WriteString(function.name)
 			if len(function.nameMapping) > 0 {
 				sb.WriteString("(")
-				funcParams, _, _, err := g.schemaForFunctionParameters(function, inputMapping)
-				if err != nil {
-					return "", err
-				}
+				funcParams, _, _ := g.schemaForFunctionParameters(function, inputMapping)
 				sb.WriteString(funcParams)
 				sb.WriteString(")")
 			}
@@ -191,7 +185,7 @@ func (g *Graphy) recursiveAddTypeLookup(tl *typeLookup, typeMap map[*typeLookup]
 	return typeMap
 }
 
-func (g *Graphy) schemaForFunctionParameters(f *graphFunction, mapping typeNameMapping) (string, []*typeLookup, []*typeLookup, error) {
+func (g *Graphy) schemaForFunctionParameters(f *graphFunction, mapping typeNameMapping) (string, []*typeLookup, []*typeLookup) {
 	sb := strings.Builder{}
 
 	mappings := []functionNameMapping{}
@@ -221,5 +215,5 @@ func (g *Graphy) schemaForFunctionParameters(f *graphFunction, mapping typeNameM
 		f.baseReturnType,
 	}
 
-	return sb.String(), refLookups, paramLookups, nil
+	return sb.String(), refLookups, paramLookups
 }

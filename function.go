@@ -440,8 +440,6 @@ func (f *graphFunction) Call(ctx context.Context, req *request, params *paramete
 			var pos lexer.Position
 			if params != nil {
 				pos = params.Pos
-			} else {
-				pos = lexer.Position{}
 			}
 			gErr := NewGraphError(fmt.Sprintf("function %s panicked: %v", f.name, r), pos)
 			gErr.AddExtension("stack", stack)
@@ -454,8 +452,6 @@ func (f *graphFunction) Call(ctx context.Context, req *request, params *paramete
 		var pos lexer.Position
 		if params != nil {
 			pos = params.Pos
-		} else {
-			pos = lexer.Position{}
 		}
 		return reflect.Value{}, AugmentGraphError(err, fmt.Sprintf("error getting call parameters for function %s", f.name), pos)
 	}
@@ -508,6 +504,7 @@ func (f *graphFunction) GenerateResult(ctx context.Context, req *request, obj re
 
 func (f *graphFunction) receiverValueForFunction(target reflect.Value) reflect.Value {
 	if !f.method {
+		// There should be no way of getting here.
 		panic("receiverValueForFunction called on non-method")
 	}
 

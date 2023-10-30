@@ -14,7 +14,7 @@ const (
 	TypeOutput
 )
 
-func (g *Graphy) schemaForTypes(kind TypeKind, mapping typeNameMapping, types ...*typeLookup) (string, []*typeLookup, error) {
+func (g *Graphy) schemaForTypes(kind TypeKind, mapping typeNameMapping, types ...*typeLookup) (string, []*typeLookup) {
 
 	completed := make(map[string]bool)
 
@@ -37,10 +37,7 @@ func (g *Graphy) schemaForTypes(kind TypeKind, mapping typeNameMapping, types ..
 		if t.fundamental {
 			continue
 		}
-		schema, extra, err := g.schemaForType(kind, t, mapping)
-		if err != nil {
-			return "", nil, err
-		}
+		schema, extra := g.schemaForType(kind, t, mapping)
 		for _, et := range extra {
 			if et.rootType.Kind() != reflect.Invalid && et.rootType.AssignableTo(stringEnumValuesType) {
 				enumQueue = append(enumQueue, et)
@@ -55,10 +52,10 @@ func (g *Graphy) schemaForTypes(kind TypeKind, mapping typeNameMapping, types ..
 		sb.WriteString("\n")
 	}
 
-	return sb.String(), enumQueue, nil
+	return sb.String(), enumQueue
 }
 
-func (g *Graphy) schemaForEnumTypes(types ...*typeLookup) (string, error) {
+func (g *Graphy) schemaForEnumTypes(types ...*typeLookup) string {
 	sb := strings.Builder{}
 
 	completed := make(map[string]bool)
@@ -74,7 +71,7 @@ func (g *Graphy) schemaForEnumTypes(types ...*typeLookup) (string, error) {
 		sb.WriteString("\n")
 	}
 
-	return sb.String(), nil
+	return sb.String()
 }
 
 func (g *Graphy) schemaForEnum(et *typeLookup) string {
@@ -98,7 +95,7 @@ func (g *Graphy) schemaForEnum(et *typeLookup) string {
 	return sb.String()
 }
 
-func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup, mapping typeNameMapping) (string, []*typeLookup, error) {
+func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup, mapping typeNameMapping) (string, []*typeLookup) {
 	var extraTypes []*typeLookup
 
 	name := mapping[t]
@@ -127,7 +124,7 @@ func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup, mapping typeNameMap
 			extraTypes = append(extraTypes, unionType)
 		}
 		sb.WriteString("\n")
-		return sb.String(), extraTypes, nil
+		return sb.String(), extraTypes
 	}
 
 	sb := strings.Builder{}
@@ -206,7 +203,7 @@ func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup, mapping typeNameMap
 	}
 
 	sb.WriteString("}\n")
-	return sb.String(), extraTypes, nil
+	return sb.String(), extraTypes
 }
 
 func (g *Graphy) schemaRefForType(t *typeLookup, mapping typeNameMapping) (string, *typeLookup) {

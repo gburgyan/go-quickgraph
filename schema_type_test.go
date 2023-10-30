@@ -17,8 +17,7 @@ func TestGraphy_schemaForType(t *testing.T) {
 	typeLookups := g.expandTypeLookups([]*typeLookup{cl})
 	_, outputMap := solveInputOutputNameMapping(nil, typeLookups)
 
-	schema, extraTypes, err := g.schemaForType(TypeOutput, cl, outputMap)
-	assert.NoError(t, err)
+	schema, extraTypes := g.schemaForType(TypeOutput, cl, outputMap)
 	expected := `type Character {
 	appearsIn: [episode!]!
 	friends: [Character]!
@@ -46,8 +45,7 @@ func TestGraphy_simpleSchema(t *testing.T) {
 		Mode:     ModeQuery,
 	})
 
-	schema, err := g.SchemaDefinition(ctx)
-	assert.NoError(t, err)
+	schema := g.SchemaDefinition(ctx)
 
 	expected := `type Query {
 	sample: Character
@@ -86,8 +84,7 @@ func TestGraphy_MultiParamFunction(t *testing.T) {
 
 	g.RegisterMutation(ctx, "Update", func(ep episode, count int) []Character { return nil }, "Episode", "Count")
 
-	schema, err := g.SchemaDefinition(ctx)
-	assert.NoError(t, err)
+	schema := g.SchemaDefinition(ctx)
 
 	expected := `type Mutation {
 	Update(Episode: episode!, Count: Int!): [Character!]!
@@ -130,8 +127,7 @@ func TestGraphy_implementsSchema(t *testing.T) {
 		Mode:     ModeQuery,
 	})
 
-	schema, err := g.SchemaDefinition(ctx)
-	assert.NoError(t, err)
+	schema := g.SchemaDefinition(ctx)
 
 	expected := `type Query {
 	humans: [Human!]!
@@ -187,8 +183,7 @@ func TestGraphy_enumSchema(t *testing.T) {
 		ParameterNames: []string{"search"},
 	})
 
-	schema, err := g.SchemaDefinition(ctx)
-	assert.NoError(t, err)
+	schema := g.SchemaDefinition(ctx)
 
 	expected := `type Query {
 	search(search: String!): [SearchResult!]!
@@ -254,8 +249,7 @@ func TestGraphy_MutationWithObject(t *testing.T) {
 		ParameterNames: []string{"code", "ship"},
 	})
 
-	schema, err := g.SchemaDefinition(ctx)
-	assert.NoError(t, err)
+	schema := g.SchemaDefinition(ctx)
 
 	expected := `type Mutation {
 	AddShip(code: Int!, ship: Starship!): Boolean!
@@ -285,8 +279,7 @@ func TestGraphy_MutationObjectFunction(t *testing.T) {
 		ParameterNames: []string{"code", "friends"},
 	})
 
-	schema, err := g.SchemaDefinition(ctx)
-	assert.NoError(t, err)
+	schema := g.SchemaDefinition(ctx)
 
 	expected := `type Mutation {
 	AddCharacterConnection(code: Int!, friends: FriendsConnectionInput!): FriendsConnection!

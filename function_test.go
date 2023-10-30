@@ -407,8 +407,7 @@ type resultB {
 
 `
 
-	schema, err := g.SchemaDefinition(ctx)
-	assert.NoError(t, err)
+	schema := g.SchemaDefinition(ctx)
 	assert.Equal(t, expected, schema)
 }
 
@@ -803,8 +802,7 @@ type TestB {
 }
 
 `
-	schema, err := g.SchemaDefinition(ctx)
-	assert.NoError(t, err)
+	schema := g.SchemaDefinition(ctx)
 	assert.Equal(t, expected, schema)
 }
 
@@ -888,8 +886,7 @@ func TestGraphFunction_ResultInterfaceFunction(t *testing.T) {
 		}
 	})
 
-	definition, err := g.SchemaDefinition(ctx)
-	assert.NoError(t, err)
+	definition := g.SchemaDefinition(ctx)
 
 	// This is a bit complicated. The function on the result type is not
 	// supported because the input is an interface. This isn't an error,

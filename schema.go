@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func (g *Graphy) SchemaDefinition(ctx context.Context) (string, error) {
+func (g *Graphy) SchemaDefinition(ctx context.Context) string {
 	sb := strings.Builder{}
 
 	procByMode := map[GraphFunctionMode][]*graphFunction{}
@@ -21,9 +21,9 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) (string, error) {
 		procByMode[function.mode] = append(byMode, &function)
 	}
 
-	outputTypes := []*typeLookup{}
-	inputTypes := []*typeLookup{}
-	enumTypes := []*typeLookup{}
+	var outputTypes []*typeLookup
+	var inputTypes []*typeLookup
+	var enumTypes []*typeLookup
 
 	for _, functions := range procByMode {
 		for _, function := range functions {
@@ -95,28 +95,19 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) (string, error) {
 		sb.WriteString("}\n\n")
 	}
 
-	inputSchema, iEnumTypes, err := g.schemaForTypes(TypeInput, inputMapping, inputTypes...)
-	if err != nil {
-		return "", err
-	}
+	inputSchema, iEnumTypes := g.schemaForTypes(TypeInput, inputMapping, inputTypes...)
 	enumTypes = append(enumTypes, iEnumTypes...)
 	sb.WriteString(inputSchema)
 
-	outputSchema, oEnumTypes, err := g.schemaForTypes(TypeOutput, outputMapping, outputTypes...)
-	if err != nil {
-		return "", err
-	}
+	outputSchema, oEnumTypes := g.schemaForTypes(TypeOutput, outputMapping, outputTypes...)
 	enumTypes = append(enumTypes, oEnumTypes...)
 
 	sb.WriteString(outputSchema)
 
-	enumSchema, err := g.schemaForEnumTypes(enumTypes...)
-	if err != nil {
-		return "", err
-	}
+	enumSchema := g.schemaForEnumTypes(enumTypes...)
 	sb.WriteString(enumSchema)
 
-	return sb.String(), nil
+	return sb.String()
 }
 
 type typeNameMapping map[*typeLookup]string

@@ -24,17 +24,9 @@ func (g GraphHttpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	// Get the query and variables from the request form data.
 
 	if request.Method == "GET" {
-		schema, err := g.graphy.SchemaDefinition(request.Context())
-		if err != nil {
-			writer.WriteHeader(500)
-			_, err := writer.Write([]byte(err.Error()))
-			if err != nil {
-				panic(err)
-			}
-			return
-		}
+		schema := g.graphy.SchemaDefinition(request.Context())
 		writer.WriteHeader(200)
-		_, err = writer.Write([]byte(schema))
+		_, err := writer.Write([]byte(schema))
 		if err != nil {
 			panic(err)
 		}

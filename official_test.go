@@ -437,7 +437,7 @@ query HeroNameAndFriends($episode: Episode = JEDI) {
 	assert.NoError(t, err)
 	assert.Equal(t, `{"data":{"hero":{"friends":[{"name":"Luke Skywalker"},{"name":"Han Solo"},{"name":"Leia Organa"}],"name":"R2-D2"}}}`, resultAny)
 
-	definition, err := g.SchemaDefinition(ctx)
+	definition := g.SchemaDefinition(ctx)
 	fmt.Println(definition)
 }
 

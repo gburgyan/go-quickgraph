@@ -142,6 +142,7 @@ func (g *Graphy) gatherRequestVariables(parsedCall wrapper, fragments map[string
 	for _, command := range parsedCall.Commands {
 		graphFunc, ok := g.processors[command.Name]
 		if !ok {
+			// This should have been caught earlier.
 			return nil, NewGraphError(fmt.Sprintf("unknown command %s", command.Name), command.Pos)
 		}
 		anonArgs := false

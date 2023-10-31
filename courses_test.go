@@ -278,3 +278,16 @@ query GetCourses {
 	jsonError, _ := json.Marshal(err)
 	assert.Equal(t, `{"message":"function PriceConvert returned error: forced error","locations":[{"line":6,"column":15}],"path":["courses","0","priceconvert"]}`, string(jsonError))
 }
+
+func Test_BrokenQuery(t *testing.T) {
+
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterQuery(ctx, "courses", GetCourses, "categories")
+
+	input := `
+query foo())
+`
+	_, err := g.ProcessRequest(ctx, input, "")
+	assert.EqualError(t, err, `error parsing request [2:10]: 2:10: sub-expression ("{" Command+ "}")+ must match at least once`)
+}

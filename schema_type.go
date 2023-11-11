@@ -14,12 +14,11 @@ const (
 	TypeOutput
 )
 
-func (g *Graphy) schemaForTypes(kind TypeKind, mapping typeNameMapping, types ...*typeLookup) (string, []*typeLookup) {
+func (g *Graphy) schemaForTypes(kind TypeKind, mapping typeNameMapping, types ...*typeLookup) string {
 
 	completed := make(map[string]bool)
 
 	typeQueue := make([]*typeLookup, len(types))
-	var enumQueue []*typeLookup
 
 	copy(typeQueue, types)
 
@@ -42,7 +41,7 @@ func (g *Graphy) schemaForTypes(kind TypeKind, mapping typeNameMapping, types ..
 		sb.WriteString("\n")
 	}
 
-	return sb.String(), enumQueue
+	return sb.String()
 }
 
 func (g *Graphy) schemaForEnumTypes(types ...*typeLookup) string {

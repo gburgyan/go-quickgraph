@@ -103,13 +103,10 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) string {
 		sb.WriteString("}\n\n")
 	}
 
-	inputSchema, iEnumTypes := g.schemaForTypes(TypeInput, inputMapping, inputTypes...)
-	enumTypes = append(enumTypes, iEnumTypes...)
+	inputSchema := g.schemaForTypes(TypeInput, inputMapping, inputTypes...)
 	sb.WriteString(inputSchema)
 
-	outputSchema, oEnumTypes := g.schemaForTypes(TypeOutput, outputMapping, outputTypes...)
-	enumTypes = append(enumTypes, oEnumTypes...)
-
+	outputSchema := g.schemaForTypes(TypeOutput, outputMapping, outputTypes...)
 	sb.WriteString(outputSchema)
 
 	enumSchema := g.schemaForEnumTypes(enumTypes...)
@@ -153,10 +150,7 @@ func (g *Graphy) expandTypeLookups(types []*typeLookup) []*typeLookup {
 	for _, tl := range types {
 		expandedTypeMap = g.recursiveAddTypeLookup(tl, expandedTypeMap)
 	}
-	expandedTypes := []*typeLookup{}
-	for tl := range expandedTypeMap {
-		expandedTypes = append(expandedTypes, tl)
-	}
+	expandedTypes := keys(expandedTypeMap)
 
 	// Sort by name
 	sort.Slice(expandedTypes, func(i, j int) bool {

@@ -24,7 +24,18 @@ type Graphy struct {
 	processors  map[string]graphFunction
 	typeLookups map[reflect.Type]*typeLookup
 	anyTypes    []*typeLookup
-	m           sync.Mutex
+
+	// typeMutex is used to ensure that nothing strange happens when multiple threads
+	// are trying to add to the typeLookups map at the same time.
+	typeMutex sync.Mutex
+
+	// structureLock ensures that there cannot be concurrent modifications to the
+	// processors while there are schema-related requests in progress.
+	structureLock sync.RWMutex
+
+	// schemaLock ensures that there is only a single schema-generation request in
+	// progress at a time.
+	schemaLock sync.Mutex
 }
 
 var contextType = reflect.TypeOf((*context.Context)(nil)).Elem()
@@ -78,6 +89,9 @@ func (g *Graphy) RegisterMutation(ctx context.Context, name string, f any, names
 // the caller to specify additional parameters that are less commonly used. See the
 // FunctionDefinition documentation for more information.
 func (g *Graphy) RegisterFunction(ctx context.Context, def FunctionDefinition) {
+	g.structureLock.Lock()
+	defer g.structureLock.Unlock()
+
 	g.ensureInitialized()
 	gf := g.newGraphFunction(def, false)
 	g.processors[def.Name] = gf
@@ -102,6 +116,9 @@ func (g *Graphy) ensureInitialized() {
 }
 
 func (g *Graphy) ProcessRequest(ctx context.Context, request string, variableJson string) (string, error) {
+	g.structureLock.RLock()
+	defer g.structureLock.RUnlock()
+
 	rs, err := g.getRequestStub(ctx, request)
 	if err != nil {
 		return formatError(err), err
@@ -116,14 +133,14 @@ func (g *Graphy) ProcessRequest(ctx context.Context, request string, variableJso
 }
 
 func (g *Graphy) typeLookup(typ reflect.Type) *typeLookup {
-	g.m.Lock()
+	g.typeMutex.Lock()
 
 	if g.typeLookups == nil {
 		g.typeLookups = map[reflect.Type]*typeLookup{}
 	}
 
 	if tl, ok := g.typeLookups[typ]; ok {
-		g.m.Unlock()
+		g.typeMutex.Unlock()
 		return tl
 	}
 
@@ -156,11 +173,11 @@ func (g *Graphy) typeLookup(typ reflect.Type) *typeLookup {
 
 	result.name = rootTyp.Name()
 	if rootTyp.Kind() == reflect.Struct {
-		g.m.Unlock()
+		g.typeMutex.Unlock()
 		g.processFieldLookup(rootTyp, nil, result)
-		g.m.Lock()
+		g.typeMutex.Lock()
 		g.typeLookups[typ] = result
-		g.m.Unlock()
+		g.typeMutex.Unlock()
 		return result
 	}
 	if typ == anyType {
@@ -176,14 +193,14 @@ func (g *Graphy) typeLookup(typ reflect.Type) *typeLookup {
 			}
 		}
 		g.typeLookups[typ] = result
-		g.m.Unlock()
+		g.typeMutex.Unlock()
 		return result
 	}
 	// Fundamental types like floats and ints don't need these lookups because it doesn't make
 	// sense in this context.
 	result.fundamental = true
 	g.typeLookups[typ] = result
-	g.m.Unlock()
+	g.typeMutex.Unlock()
 	return result
 }
 

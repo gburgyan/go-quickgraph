@@ -37,17 +37,7 @@ func (g *Graphy) schemaForTypes(kind TypeKind, mapping typeNameMapping, types ..
 		if t.fundamental {
 			continue
 		}
-		schema, extra := g.schemaForType(kind, t, mapping)
-		for _, et := range extra {
-			if et.rootType.Kind() != reflect.Invalid && et.rootType.AssignableTo(stringEnumValuesType) {
-				enumQueue = append(enumQueue, et)
-			} else {
-				etl := et
-				if !completed[et.name] && etl != nil {
-					typeQueue = append(typeQueue, etl)
-				}
-			}
-		}
+		schema := g.schemaForType(kind, t, mapping)
 		sb.WriteString(schema)
 		sb.WriteString("\n")
 	}
@@ -95,9 +85,7 @@ func (g *Graphy) schemaForEnum(et *typeLookup) string {
 	return sb.String()
 }
 
-func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup, mapping typeNameMapping) (string, []*typeLookup) {
-	var extraTypes []*typeLookup
-
+func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup, mapping typeNameMapping) string {
 	name := mapping[t]
 
 	// TODO: this can use some refactoring -- the function seems too complex as it is.
@@ -121,10 +109,9 @@ func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup, mapping typeNameMap
 			}
 			unionCount++
 			sb.WriteString(unionType.name)
-			extraTypes = append(extraTypes, unionType)
 		}
 		sb.WriteString("\n")
-		return sb.String(), extraTypes
+		return sb.String()
 	}
 
 	sb := strings.Builder{}
@@ -145,7 +132,6 @@ func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup, mapping typeNameMap
 			}
 			interfaceCount++
 			sb.WriteString(mapping[implementedType])
-			extraTypes = append(extraTypes, implementedType)
 		}
 	}
 
@@ -166,10 +152,7 @@ func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup, mapping typeNameMap
 				// to be handled differently.
 				continue
 			}
-			typeString, extraType := g.schemaRefForType(g.typeLookup(field.resultType), mapping)
-			if extraType != nil {
-				extraTypes = append(extraTypes, extraType)
-			}
+			typeString := g.schemaRefForType(g.typeLookup(field.resultType), mapping)
 			sb.WriteString("\t")
 			sb.WriteString(field.name)
 			sb.WriteString(": ")
@@ -186,14 +169,12 @@ func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup, mapping typeNameMap
 				sb.WriteString(field.name)
 				if len(field.graphFunction.nameMapping) > 0 {
 					sb.WriteString("(")
-					funcParams, fEnums, fParamTypes := g.schemaForFunctionParameters(field.graphFunction, mapping)
-					extraTypes = append(extraTypes, fEnums...)
-					extraTypes = append(extraTypes, fParamTypes...)
+					funcParams := g.schemaForFunctionParameters(field.graphFunction, mapping)
 					sb.WriteString(funcParams)
 					sb.WriteString(")")
 				}
 				sb.WriteString(": ")
-				schemaRef, _ := g.schemaRefForType(field.graphFunction.baseReturnType, mapping)
+				schemaRef := g.schemaRefForType(field.graphFunction.baseReturnType, mapping)
 				sb.WriteString(schemaRef)
 				sb.WriteString("\n")
 			}
@@ -203,12 +184,10 @@ func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup, mapping typeNameMap
 	}
 
 	sb.WriteString("}\n")
-	return sb.String(), extraTypes
+	return sb.String()
 }
 
-func (g *Graphy) schemaRefForType(t *typeLookup, mapping typeNameMapping) (string, *typeLookup) {
-	var extraType *typeLookup
-
+func (g *Graphy) schemaRefForType(t *typeLookup, mapping typeNameMapping) string {
 	optional := t.isPointer
 	array := t.isSlice
 	optionalInner := t.isPointerSlice
@@ -216,12 +195,10 @@ func (g *Graphy) schemaRefForType(t *typeLookup, mapping typeNameMapping) (strin
 	var baseType string
 	if t.rootType == nil {
 		baseType = t.name
-		extraType = t
 	} else {
 		switch t.rootType.Kind() {
 		case reflect.String:
 			if t.rootType.AssignableTo(stringEnumValuesType) {
-				extraType = t
 				baseType = t.name
 			} else {
 				baseType = "String"
@@ -238,7 +215,6 @@ func (g *Graphy) schemaRefForType(t *typeLookup, mapping typeNameMapping) (strin
 			baseType = "Boolean"
 
 		case reflect.Struct:
-			extraType = t
 			if t != nil {
 				baseType = mapping[t]
 			}
@@ -259,5 +235,5 @@ func (g *Graphy) schemaRefForType(t *typeLookup, mapping typeNameMapping) (strin
 		work = work + "!"
 	}
 
-	return work, extraType
+	return work
 }

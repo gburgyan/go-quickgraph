@@ -6,7 +6,53 @@ import (
 	"strings"
 )
 
+type usageMap map[*typeLookup]bool
+
 func (g *Graphy) SchemaDefinition(ctx context.Context) string {
+	var outputTypes []*typeLookup
+	var inputTypes []*typeLookup
+	var enumTypes []*typeLookup
+
+	for _, proc := range g.processors {
+		function := &proc
+		inputMap := make(usageMap)
+		outputMap := make(usageMap)
+
+		g.functionIO(function, inputMap, outputMap)
+
+		fInput := keys(inputMap)
+		fOutput := keys(outputMap)
+
+		// Add these to the global lists.
+		outputTypes = append(outputTypes, fOutput...)
+		inputTypes = append(inputTypes, fInput...)
+
+		for _, outTypeLookup := range fOutput {
+			if outTypeLookup.rootType != nil {
+				if outTypeLookup.rootType.AssignableTo(stringEnumValuesType) {
+					enumTypes = append(enumTypes, outTypeLookup)
+				}
+			} else {
+				outputTypes = append(outputTypes, outTypeLookup)
+			}
+		}
+
+		for _, inTypeLookup := range fInput {
+			if inTypeLookup.rootType != nil {
+				if inTypeLookup.rootType.AssignableTo(stringEnumValuesType) {
+					enumTypes = append(enumTypes, inTypeLookup)
+				}
+			} else {
+				inputTypes = append(inputTypes, inTypeLookup)
+			}
+		}
+	}
+
+	inputTypes = g.expandTypeLookups(inputTypes)
+	outputTypes = g.expandTypeLookups(outputTypes)
+
+	inputMapping, outputMapping := solveInputOutputNameMapping(inputTypes, outputTypes)
+
 	sb := strings.Builder{}
 
 	procByMode := map[GraphFunctionMode][]*graphFunction{}
@@ -20,44 +66,6 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) string {
 		}
 		procByMode[function.mode] = append(byMode, &function)
 	}
-
-	var outputTypes []*typeLookup
-	var inputTypes []*typeLookup
-	var enumTypes []*typeLookup
-
-	for _, functions := range procByMode {
-		for _, function := range functions {
-			_, fOuput, fInput := g.schemaForFunctionParameters(function, nil)
-
-			outputTypes = append(outputTypes, function.baseReturnType)
-			inputTypes = append(inputTypes, fInput...)
-
-			for _, outTypeLookup := range fOuput {
-				if outTypeLookup.rootType != nil {
-					if outTypeLookup.rootType.AssignableTo(stringEnumValuesType) {
-						enumTypes = append(enumTypes, outTypeLookup)
-					}
-				} else {
-					outputTypes = append(outputTypes, outTypeLookup)
-				}
-			}
-
-			for _, inTypeLookup := range fInput {
-				if inTypeLookup.rootType != nil {
-					if inTypeLookup.rootType.AssignableTo(stringEnumValuesType) {
-						enumTypes = append(enumTypes, inTypeLookup)
-					}
-				} else {
-					inputTypes = append(inputTypes, inTypeLookup)
-				}
-			}
-		}
-	}
-
-	inputTypes = g.expandTypeLookups(inputTypes)
-	outputTypes = g.expandTypeLookups(outputTypes)
-
-	inputMapping, outputMapping := solveInputOutputNameMapping(inputTypes, outputTypes)
 
 	for mode, functions := range procByMode {
 		sb.WriteString("type ")
@@ -81,13 +89,13 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) string {
 			sb.WriteString(function.name)
 			if len(function.nameMapping) > 0 {
 				sb.WriteString("(")
-				funcParams, _, _ := g.schemaForFunctionParameters(function, inputMapping)
+				funcParams := g.schemaForFunctionParameters(function, inputMapping)
 				sb.WriteString(funcParams)
 				sb.WriteString(")")
 			}
 
 			sb.WriteString(": ")
-			schemaRef, _ := g.schemaRefForType(function.baseReturnType, outputMapping)
+			schemaRef := g.schemaRefForType(function.baseReturnType, outputMapping)
 
 			sb.WriteString(schemaRef)
 			sb.WriteString("\n")
@@ -176,7 +184,7 @@ func (g *Graphy) recursiveAddTypeLookup(tl *typeLookup, typeMap map[*typeLookup]
 	return typeMap
 }
 
-func (g *Graphy) schemaForFunctionParameters(f *graphFunction, mapping typeNameMapping) (string, []*typeLookup, []*typeLookup) {
+func (g *Graphy) schemaForFunctionParameters(f *graphFunction, mapping typeNameMapping) string {
 	sb := strings.Builder{}
 
 	mappings := []functionNameMapping{}
@@ -188,8 +196,6 @@ func (g *Graphy) schemaForFunctionParameters(f *graphFunction, mapping typeNameM
 		return mappings[i].paramIndex < mappings[j].paramIndex
 	})
 
-	var paramLookups []*typeLookup
-
 	for i, param := range mappings {
 		if i > 0 {
 			sb.WriteString(", ")
@@ -197,14 +203,53 @@ func (g *Graphy) schemaForFunctionParameters(f *graphFunction, mapping typeNameM
 		sb.WriteString(param.name)
 		sb.WriteString(": ")
 		paramTl := g.typeLookup(param.paramType)
-		schemaRef, _ := g.schemaRefForType(paramTl, mapping)
+		schemaRef := g.schemaRefForType(paramTl, mapping)
 		sb.WriteString(schemaRef)
-		paramLookups = append(paramLookups, paramTl)
 	}
 
-	refLookups := []*typeLookup{
-		f.baseReturnType,
+	return sb.String()
+}
+
+func (g *Graphy) functionIO(f *graphFunction, inputTypes, outputTypes usageMap) {
+
+	for _, param := range f.nameMapping {
+		g.typeIO(g.typeLookup(param.paramType), TypeInput, inputTypes, outputTypes)
 	}
 
-	return sb.String(), refLookups, paramLookups
+	g.typeIO(f.baseReturnType, TypeOutput, inputTypes, outputTypes)
+}
+
+func (g *Graphy) typeIO(tl *typeLookup, io TypeKind, inputTypes, outputTypes usageMap) {
+	if io == TypeInput {
+		if inputTypes[tl] {
+			return
+		}
+		inputTypes[tl] = true
+	} else {
+		if outputTypes[tl] {
+			return
+		}
+		outputTypes[tl] = true
+	}
+
+	for _, fl := range tl.fields {
+		switch fl.fieldType {
+		case FieldTypeField:
+			g.typeIO(g.typeLookup(fl.resultType), io, inputTypes, outputTypes)
+
+		case FieldTypeGraphFunction:
+			g.functionIO(fl.graphFunction, inputTypes, outputTypes)
+
+		default:
+			panic("unknown field type")
+		}
+	}
+
+	for _, tl := range tl.implements {
+		g.typeIO(tl, io, inputTypes, outputTypes)
+	}
+
+	for _, tl := range tl.union {
+		g.typeIO(tl, io, inputTypes, outputTypes)
+	}
 }

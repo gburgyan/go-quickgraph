@@ -23,13 +23,16 @@ type schemaTypes struct {
 	inputTypesByName  typeNameLookup
 	outputTypesByName typeNameLookup
 	enumTypesByName   typeNameLookup
+
+	introspectionSchema *introspectionSchema
+	introspectionTypes  map[string]*introspectionType
 }
 
 func (g *Graphy) SchemaDefinition(ctx context.Context) string {
 	g.structureLock.RLock()
 	defer g.structureLock.RUnlock()
 
-	st := g.getSchemaBuffer()
+	st := g.getSchemaTypes()
 
 	sb := strings.Builder{}
 
@@ -93,7 +96,7 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) string {
 	return sb.String()
 }
 
-func (g *Graphy) getSchemaBuffer() *schemaTypes {
+func (g *Graphy) getSchemaTypes() *schemaTypes {
 	// We're already in a structure lock, so we are good making this check without
 	// a lock.
 	if g.schemaBuffer != nil {
@@ -174,6 +177,8 @@ func (g *Graphy) getSchemaBuffer() *schemaTypes {
 		outputTypesByName: makeTypeNameLookup(outputMapping),
 		enumTypesByName:   makeTypeNameLookup(enumMapping),
 	}
+
+	g.populateIntrospection(g.schemaBuffer)
 
 	return g.schemaBuffer
 }

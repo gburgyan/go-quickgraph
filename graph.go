@@ -25,6 +25,8 @@ type Graphy struct {
 	typeLookups map[reflect.Type]*typeLookup
 	anyTypes    []*typeLookup
 
+	schemaBuffer *schemaTypes
+
 	// typeMutex is used to ensure that nothing strange happens when multiple threads
 	// are trying to add to the typeLookups map at the same time.
 	typeMutex sync.Mutex

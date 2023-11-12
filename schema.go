@@ -8,12 +8,116 @@ import (
 
 type usageMap map[*typeLookup]bool
 
+type typeNameLookup map[string]*typeLookup
+type typeNameMapping map[*typeLookup]string
+
+type schemaTypes struct {
+	inputTypes  []*typeLookup
+	outputTypes []*typeLookup
+	enumTypes   []*typeLookup
+
+	inputTypeNameLookup  typeNameMapping
+	outputTypeNameLookup typeNameMapping
+	enumTypeNameLookup   typeNameMapping
+
+	inputTypesByName  typeNameLookup
+	outputTypesByName typeNameLookup
+	enumTypesByName   typeNameLookup
+}
+
 func (g *Graphy) SchemaDefinition(ctx context.Context) string {
+	g.structureLock.RLock()
+	defer g.structureLock.RUnlock()
+
+	st := g.getSchemaBuffer()
+
+	sb := strings.Builder{}
+
+	procByMode := map[GraphFunctionMode][]*graphFunction{}
+
+	for _, function := range g.processors {
+		function := function
+		byMode, ok := procByMode[function.mode]
+		if !ok {
+			byMode = []*graphFunction{}
+			procByMode[function.mode] = byMode
+		}
+		procByMode[function.mode] = append(byMode, &function)
+	}
+
+	for mode, functions := range procByMode {
+		sb.WriteString("type ")
+		switch mode {
+		case ModeQuery:
+			sb.WriteString("Query")
+		case ModeMutation:
+			sb.WriteString("Mutation")
+		default:
+			panic("unknown mode")
+		}
+		sb.WriteString(" {\n")
+
+		// Sort the functions by name
+		sort.Slice(functions, func(i, j int) bool {
+			return functions[i].name < functions[j].name
+		})
+
+		for _, function := range functions {
+			sb.WriteString("\t")
+			sb.WriteString(function.name)
+			if len(function.nameMapping) > 0 {
+				sb.WriteString("(")
+				funcParams := g.schemaForFunctionParameters(function, st.inputTypeNameLookup)
+				sb.WriteString(funcParams)
+				sb.WriteString(")")
+			}
+
+			sb.WriteString(": ")
+			schemaRef := g.schemaRefForType(function.baseReturnType, st.outputTypeNameLookup)
+
+			sb.WriteString(schemaRef)
+			sb.WriteString("\n")
+		}
+		sb.WriteString("}\n\n")
+	}
+
+	inputSchema := g.schemaForTypes(TypeInput, st.inputTypeNameLookup, st.inputTypes...)
+	sb.WriteString(inputSchema)
+
+	outputSchema := g.schemaForTypes(TypeOutput, st.outputTypeNameLookup, st.outputTypes...)
+	sb.WriteString(outputSchema)
+
+	enumSchema := g.schemaForEnumTypes(st.enumTypes...)
+	sb.WriteString(enumSchema)
+
+	return sb.String()
+}
+
+func (g *Graphy) getSchemaBuffer() *schemaTypes {
+	// We're already in a structure lock, so we are good making this check without
+	// a lock.
+	if g.schemaBuffer != nil {
+		return g.schemaBuffer
+	}
+
+	// Only one goroutine should be able to get here at a time.
+	g.schemaLock.Lock()
+	defer g.schemaLock.Unlock()
+
+	// Check again in case it was set while waiting for the lock
+	if g.schemaBuffer != nil {
+		return g.schemaBuffer
+	}
+
 	var outputTypes []*typeLookup
 	var inputTypes []*typeLookup
 	var enumTypes []*typeLookup
 
 	for _, proc := range g.processors {
+		if strings.HasPrefix(proc.name, "__") {
+			// These are internal functions, so we can skip them.
+			continue
+		}
 		function := &proc
 		inputMap := make(usageMap)
 		outputMap := make(usageMap)
@@ -52,70 +156,35 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) string {
 	outputTypes = g.expandTypeLookups(outputTypes)
 
 	inputMapping, outputMapping := solveInputOutputNameMapping(inputTypes, outputTypes)
-
-	sb := strings.Builder{}
-
-	procByMode := map[GraphFunctionMode][]*graphFunction{}
-
-	for _, function := range g.processors {
-		function := function
-		byMode, ok := procByMode[function.mode]
-		if !ok {
-			byMode = []*graphFunction{}
-			procByMode[function.mode] = byMode
-		}
-		procByMode[function.mode] = append(byMode, &function)
+	enumMapping := typeNameMapping{}
+	for _, enumType := range enumTypes {
+		enumMapping[enumType] = enumType.name
 	}
 
-	for mode, functions := range procByMode {
-		sb.WriteString("type ")
-		switch mode {
-		case ModeQuery:
-			sb.WriteString("Query")
-		case ModeMutation:
-			sb.WriteString("Mutation")
-		default:
-			panic("unknown mode")
-		}
-		sb.WriteString(" {\n")
+	g.schemaBuffer = &schemaTypes{
+		inputTypes:  inputTypes,
+		outputTypes: outputTypes,
+		enumTypes:   enumTypes,
 
-		// Sort the functions by name
-		sort.Slice(functions, func(i, j int) bool {
-			return functions[i].name < functions[j].name
-		})
+		inputTypeNameLookup:  inputMapping,
+		outputTypeNameLookup: outputMapping,
+		enumTypeNameLookup:   enumMapping,
 
-		for _, function := range functions {
-			sb.WriteString("\t")
-			sb.WriteString(function.name)
-			if len(function.nameMapping) > 0 {
-				sb.WriteString("(")
-				funcParams := g.schemaForFunctionParameters(function, inputMapping)
-				sb.WriteString(funcParams)
-				sb.WriteString(")")
-			}
-
-			sb.WriteString(": ")
-			schemaRef := g.schemaRefForType(function.baseReturnType, outputMapping)
-
-			sb.WriteString(schemaRef)
-			sb.WriteString("\n")
-		}
-		sb.WriteString("}\n\n")
+		inputTypesByName:  makeTypeNameLookup(inputMapping),
+		outputTypesByName: makeTypeNameLookup(outputMapping),
+		enumTypesByName:   makeTypeNameLookup(enumMapping),
 	}
 
-	inputSchema := g.schemaForTypes(TypeInput, inputMapping, inputTypes...)
-	sb.WriteString(inputSchema)
-
-	outputSchema := g.schemaForTypes(TypeOutput, outputMapping, outputTypes...)
-	sb.WriteString(outputSchema)
-
-	enumSchema := g.schemaForEnumTypes(enumTypes...)
-	sb.WriteString(enumSchema)
-
-	return sb.String()
+	return g.schemaBuffer
 }
 
-type typeNameMapping map[*typeLookup]string
+func makeTypeNameLookup(t typeNameMapping) typeNameLookup {
+	result := make(typeNameLookup)
+	for tl, name := range t {
+		result[name] = tl
+	}
+	return result
+}
 
 func solveInputOutputNameMapping(inputTypes []*typeLookup, outputTypes []*typeLookup) (typeNameMapping, typeNameMapping) {
 	// TODO: Handle same type name in different packages.

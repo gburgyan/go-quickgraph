@@ -7,70 +7,80 @@ import (
 	"strings"
 )
 
-type introspectionSchema struct {
-	// Description string `json:"description"`
-	Queries   *introspectionType `json:"queryType"`
-	Mutations *introspectionType `json:"mutationType"`
-
-	Types []*introspectionType `json:"types"`
-
-	typeLookupByName map[string]*introspectionType
+type __Directive struct {
+	Name         string   `json:"name"`
+	Description  *string  `json:"description"`
+	Locations    []string `json:"locations"`
+	Args         []__InputValue
+	IsRepeatable bool `json:"isRepeatable"`
 }
 
-type introspectionType struct {
-	Kind introspectionKind `json:"kind"`
-	Name string            `json:"name"`
-	// Description string `json:"description"`
-	FieldsRaw      []introspectionField `json:"fields"`
-	Interfaces     []*introspectionType `json:"interfaces"`
-	PossibleTypes  []*introspectionType `json:"possibleTypes"`
-	EnumValuesRaw  []introspectionEnumValue
-	InputFields    []introspectionInputValue
-	OfType         *introspectionType `json:"ofType"`
-	SpecifiedByUrl string             `json:"specifiedByUrl"`
+type __Schema struct {
+	Description  *string `json:"description"`
+	Queries      *__Type `json:"queryType"`
+	Mutations    *__Type `json:"mutationType"`
+	Subscription *__Type `json:"subscriptionType"`
+
+	Types      []*__Type      `json:"types"`
+	Directives []*__Directive `json:"directives"`
+
+	typeLookupByName map[string]*__Type
 }
 
-type introspectionEnumValue struct {
-	Name string `json:"name"`
-	// Description string `json:"description"`
+type __Type struct {
+	Kind           __TypeKind `json:"kind"`
+	Name           string     `json:"name"`
+	Description    *string    `json:"description"`
+	FieldsRaw      []__Field  `json:"fields"`
+	Interfaces     []*__Type  `json:"interfaces"`
+	PossibleTypes  []*__Type  `json:"possibleTypes"`
+	EnumValuesRaw  []__EnumValue
+	InputFields    []__InputValue
+	OfType         *__Type `json:"ofType"`
+	SpecifiedByUrl string  `json:"specifiedByUrl"`
+}
+
+type __EnumValue struct {
+	Name              string  `json:"name"`
+	Description       *string `json:"description"`
 	IsDeprecated      bool    `json:"isDeprecated"`
 	DeprecationReason *string `json:"deprecationReason"`
 }
 
-type introspectionField struct {
-	Name string `json:"name"`
-	// Description string `json:"description"
-	Args              []introspectionInputValue `json:"args"`
-	Type              *introspectionType        `json:"type"`
-	IsDeprecated      bool                      `json:"isDeprecated"`
-	DeprecationReason *string                   `json:"deprecationReason"`
+type __Field struct {
+	Name              string         `json:"name"`
+	Description       *string        `json:"description"`
+	Args              []__InputValue `json:"args"`
+	Type              *__Type        `json:"type"`
+	IsDeprecated      bool           `json:"isDeprecated"`
+	DeprecationReason *string        `json:"deprecationReason"`
 }
 
-type introspectionKind string
+type __TypeKind string
 
 const (
-	IntrospectionKindScalar      introspectionKind = "SCALAR"
-	IntrospectionKindObject      introspectionKind = "OBJECT"
-	IntrospectionKindInterface   introspectionKind = "INTERFACE"
-	IntrospectionKindUnion       introspectionKind = "UNION"
-	IntrospectionKindEnum        introspectionKind = "ENUM"
-	IntrospectionKindInputObject introspectionKind = "INPUT_OBJECT"
-	IntrospectionKindList        introspectionKind = "LIST"
-	IntrospectionKindNonNull     introspectionKind = "NON_NULL"
+	IntrospectionKindScalar      __TypeKind = "SCALAR"
+	IntrospectionKindObject      __TypeKind = "OBJECT"
+	IntrospectionKindInterface   __TypeKind = "INTERFACE"
+	IntrospectionKindUnion       __TypeKind = "UNION"
+	IntrospectionKindEnum        __TypeKind = "ENUM"
+	IntrospectionKindInputObject __TypeKind = "INPUT_OBJECT"
+	IntrospectionKindList        __TypeKind = "LIST"
+	IntrospectionKindNonNull     __TypeKind = "NON_NULL"
 )
 
-type introspectionInputValue struct {
-	Name string `json:"name"`
-	// Description string `json:"description"`
-	Type introspectionType `json:"type"`
-	// DefaultValue string `json:"defaultValue"`
+type __InputValue struct {
+	Name         string  `json:"name"`
+	Description  *string `json:"description"`
+	Type         __Type  `json:"type"`
+	DefaultValue *string `json:"defaultValue"`
 }
 
-func (it *introspectionType) Fields(includeDeprecated bool) []introspectionField {
+func (it *__Type) Fields(includeDeprecated bool) []__Field {
 	if includeDeprecated {
 		return it.FieldsRaw
 	}
-	result := []introspectionField{}
+	result := []__Field{}
 	for _, field := range it.FieldsRaw {
 		if !field.IsDeprecated {
 			result = append(result, field)
@@ -79,11 +89,11 @@ func (it *introspectionType) Fields(includeDeprecated bool) []introspectionField
 	return result
 }
 
-func (it *introspectionType) EnumValues(includeDeprecated bool) []introspectionEnumValue {
+func (it *__Type) EnumValues(includeDeprecated bool) []__EnumValue {
 	if includeDeprecated {
 		return it.EnumValuesRaw
 	}
-	result := []introspectionEnumValue{}
+	result := []__EnumValue{}
 	for _, enumValue := range it.EnumValuesRaw {
 		if !enumValue.IsDeprecated {
 			result = append(result, enumValue)
@@ -93,11 +103,11 @@ func (it *introspectionType) EnumValues(includeDeprecated bool) []introspectionE
 }
 
 func (g *Graphy) EnableIntrospection(ctx context.Context) {
-	schemaFunc := func() *introspectionSchema {
+	schemaFunc := func() *__Schema {
 		st := g.getSchemaTypes()
 		return st.introspectionSchema
 	}
-	typesFunc := func(name string) (*introspectionType, error) {
+	typesFunc := func(name string) (*__Type, error) {
 		st := g.getSchemaTypes()
 		tl, ok := st.introspectionTypes[name]
 		if !ok {
@@ -111,20 +121,20 @@ func (g *Graphy) EnableIntrospection(ctx context.Context) {
 
 func (g *Graphy) populateIntrospection(st *schemaTypes) {
 
-	queries := &introspectionType{
+	queries := &__Type{
 		Kind: IntrospectionKindObject,
-		Name: "Query",
+		Name: "__query",
 	}
-	mutations := &introspectionType{
+	mutations := &__Type{
 		Kind: IntrospectionKindObject,
-		Name: "Mutation",
+		Name: "__mutation",
 	}
 
-	is := &introspectionSchema{
+	is := &__Schema{
 		Queries:          queries,
 		Mutations:        mutations,
-		Types:            []*introspectionType{},
-		typeLookupByName: map[string]*introspectionType{},
+		Types:            []*__Type{},
+		typeLookupByName: map[string]*__Type{},
 	}
 
 	for _, f := range g.processors {
@@ -132,7 +142,7 @@ func (g *Graphy) populateIntrospection(st *schemaTypes) {
 			continue
 		}
 		t := g.introspectionCall(is, &f)
-		qf := introspectionField{
+		qf := __Field{
 			Name: f.name,
 			Type: t,
 		}
@@ -149,14 +159,17 @@ func (g *Graphy) populateIntrospection(st *schemaTypes) {
 		is.Types = append(is.Types, refType)
 	}
 
+	is.Types = append(is.Types, queries)
+	is.Types = append(is.Types, mutations)
+
 	g.schemaBuffer.introspectionSchema = is
 }
 
-func (g *Graphy) getIntrospectionType(is *introspectionSchema, tl *typeLookup, io TypeKind) *introspectionType {
+func (g *Graphy) getIntrospectionType(is *__Schema, tl *typeLookup, io TypeKind) *__Type {
 	if existing, ok := is.typeLookupByName[tl.name]; ok {
 		return existing
 	}
-	result := &introspectionType{
+	result := &__Type{
 		Name: tl.name,
 	}
 	is.typeLookupByName[tl.name] = result
@@ -185,9 +198,9 @@ func (g *Graphy) getIntrospectionType(is *introspectionSchema, tl *typeLookup, i
 		enumValue := reflect.New(tl.rootType)
 		sev := enumValue.Convert(stringEnumValuesType)
 		se := sev.Interface().(StringEnumValues)
-		result.EnumValuesRaw = []introspectionEnumValue{}
+		result.EnumValuesRaw = []__EnumValue{}
 		for _, s := range se.EnumValues() {
-			result.EnumValuesRaw = append(result.EnumValuesRaw, introspectionEnumValue{
+			result.EnumValuesRaw = append(result.EnumValuesRaw, __EnumValue{
 				Name: s,
 			})
 		}
@@ -204,12 +217,12 @@ func (g *Graphy) getIntrospectionType(is *introspectionSchema, tl *typeLookup, i
 	}
 	for name, ft := range tl.fields {
 		if ft.fieldType == FieldTypeField {
-			result.FieldsRaw = append(result.FieldsRaw, introspectionField{
+			result.FieldsRaw = append(result.FieldsRaw, __Field{
 				Name: name,
 				Type: g.getIntrospectionType(is, g.typeLookup(ft.resultType), io),
 			})
 		} else if ft.fieldType == FieldTypeGraphFunction {
-			result.FieldsRaw = append(result.FieldsRaw, introspectionField{
+			result.FieldsRaw = append(result.FieldsRaw, __Field{
 				Name: name,
 				Type: g.introspectionCall(is, ft.graphFunction),
 			})
@@ -218,10 +231,10 @@ func (g *Graphy) getIntrospectionType(is *introspectionSchema, tl *typeLookup, i
 	return result
 }
 
-func (g *Graphy) introspectionCall(is *introspectionSchema, f *graphFunction) *introspectionType {
+func (g *Graphy) introspectionCall(is *__Schema, f *graphFunction) *__Type {
 	result := g.getIntrospectionType(is, f.baseReturnType, TypeOutput)
 	for _, param := range f.nameMapping {
-		result.FieldsRaw = append(result.FieldsRaw, introspectionField{
+		result.FieldsRaw = append(result.FieldsRaw, __Field{
 			Name: param.name,
 			Type: g.getIntrospectionType(is, g.typeLookup(param.paramType), TypeInput),
 		})

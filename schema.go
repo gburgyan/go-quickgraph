@@ -24,8 +24,8 @@ type schemaTypes struct {
 	outputTypesByName typeNameLookup
 	enumTypesByName   typeNameLookup
 
-	introspectionSchema *introspectionSchema
-	introspectionTypes  map[string]*introspectionType
+	introspectionSchema *__Schema
+	introspectionTypes  map[string]*__Type
 }
 
 func (g *Graphy) SchemaDefinition(ctx context.Context) string {

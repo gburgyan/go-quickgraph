@@ -2,6 +2,7 @@ package quickgraph
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 )
 
@@ -21,8 +22,6 @@ type graphqlRequest struct {
 }
 
 func (g GraphHttpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	// Get the query and variables from the request form data.
-
 	if request.Method == "GET" {
 		schema := g.graphy.SchemaDefinition(request.Context())
 		writer.WriteHeader(200)

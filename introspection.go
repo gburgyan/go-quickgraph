@@ -167,12 +167,12 @@ func (g *Graphy) populateIntrospection(st *schemaTypes) {
 
 func (g *Graphy) getIntrospectionBaseType(is *__Schema, tl *typeLookup, io TypeKind) *__Type {
 	var name string
-	switch io {
-	case TypeInput:
-		name = g.schemaBuffer.inputTypeNameLookup[tl]
-	case TypeOutput:
+
+	if io == TypeOutput || tl.fundamental {
 		name = g.schemaBuffer.outputTypeNameLookup[tl]
-	default:
+	} else if io == TypeInput {
+		name = g.schemaBuffer.inputTypeNameLookup[tl]
+	} else {
 		panic("unknown IO type")
 	}
 

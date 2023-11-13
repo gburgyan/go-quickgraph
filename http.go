@@ -41,6 +41,9 @@ func (g GraphHttpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	if err != nil {
 		// TODO: Log the error here, but the response still has a GraphQL response that can be returned.
 	}
+
+	fmt.Println("response:\n", res)
+
 	// Return the response string.
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(200) // Errors are in the response body, and there may be mixed errors and results.

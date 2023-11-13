@@ -72,7 +72,7 @@ const (
 type __InputValue struct {
 	Name         string  `json:"name"`
 	Description  *string `json:"description"`
-	Type         __Type  `json:"type"`
+	Type         *__Type `json:"type"`
 	DefaultValue *string `json:"defaultValue"`
 }
 
@@ -141,12 +141,12 @@ func (g *Graphy) populateIntrospection(st *schemaTypes) {
 		if strings.HasPrefix(f.name, "__") {
 			continue
 		}
-		t := g.introspectionCall(is, &f)
+		t, args := g.introspectionCall(is, &f)
 		qf := __Field{
 			Name: f.name,
 			Type: t,
+			Args: args,
 		}
-		t.Name = f.name
 		switch f.mode {
 		case ModeQuery:
 			queries.FieldsRaw = append(queries.FieldsRaw, qf)
@@ -165,23 +165,30 @@ func (g *Graphy) populateIntrospection(st *schemaTypes) {
 	g.schemaBuffer.introspectionSchema = is
 }
 
-func (g *Graphy) getIntrospectionType(is *__Schema, tl *typeLookup, io TypeKind) *__Type {
-	if existing, ok := is.typeLookupByName[tl.name]; ok {
+func (g *Graphy) getIntrospectionBaseType(is *__Schema, tl *typeLookup, io TypeKind) *__Type {
+	var name string
+	switch io {
+	case TypeInput:
+		name = g.schemaBuffer.inputTypeNameLookup[tl]
+	case TypeOutput:
+		name = g.schemaBuffer.outputTypeNameLookup[tl]
+	default:
+		panic("unknown IO type")
+	}
+
+	if existing, ok := is.typeLookupByName[name]; ok {
 		return existing
 	}
+
 	result := &__Type{
-		Name: tl.name,
+		Name: name,
 	}
-	is.typeLookupByName[tl.name] = result
-	if tl.isSlice {
-		result.Kind = IntrospectionKindList
-		result.OfType = g.getIntrospectionType(is, g.typeLookup(tl.rootType), io)
-		return result
-	}
+
+	is.typeLookupByName[name] = result
 	if len(tl.union) > 0 {
 		result.Kind = IntrospectionKindUnion
 		for _, ul := range tl.union {
-			result.PossibleTypes = append(result.PossibleTypes, g.getIntrospectionType(is, ul, io))
+			result.PossibleTypes = append(result.PossibleTypes, g.getIntrospectionModifiedType(is, ul, io))
 		}
 		return result
 	}
@@ -217,27 +224,70 @@ func (g *Graphy) getIntrospectionType(is *__Schema, tl *typeLookup, io TypeKind)
 	}
 	for name, ft := range tl.fields {
 		if ft.fieldType == FieldTypeField {
-			result.FieldsRaw = append(result.FieldsRaw, __Field{
-				Name: name,
-				Type: g.getIntrospectionType(is, g.typeLookup(ft.resultType), io),
-			})
+			if io == TypeOutput {
+				result.FieldsRaw = append(result.FieldsRaw, __Field{
+					Name: name,
+					Type: g.getIntrospectionModifiedType(is, g.typeLookup(ft.resultType), io),
+				})
+			} else {
+				result.InputFields = append(result.InputFields, __InputValue{
+					Name: name,
+					Type: g.getIntrospectionModifiedType(is, g.typeLookup(ft.resultType), io),
+				})
+			}
 		} else if ft.fieldType == FieldTypeGraphFunction {
+			call, args := g.introspectionCall(is, ft.graphFunction)
 			result.FieldsRaw = append(result.FieldsRaw, __Field{
 				Name: name,
-				Type: g.introspectionCall(is, ft.graphFunction),
+				Type: call,
+				Args: args,
 			})
 		}
 	}
 	return result
 }
 
-func (g *Graphy) introspectionCall(is *__Schema, f *graphFunction) *__Type {
-	result := g.getIntrospectionType(is, f.baseReturnType, TypeOutput)
+func (g *Graphy) introspectionCall(is *__Schema, f *graphFunction) (*__Type, []__InputValue) {
+	result := g.getIntrospectionModifiedType(is, f.baseReturnType, TypeOutput)
+	var args []__InputValue
 	for _, param := range f.nameMapping {
-		result.FieldsRaw = append(result.FieldsRaw, __Field{
+		args = append(args, __InputValue{
 			Name: param.name,
-			Type: g.getIntrospectionType(is, g.typeLookup(param.paramType), TypeInput),
+			Type: g.getIntrospectionModifiedType(is, g.typeLookup(param.paramType), TypeInput),
 		})
 	}
-	return result
+	return result, args
+}
+
+func (g *Graphy) getIntrospectionModifiedType(is *__Schema, tl *typeLookup, io TypeKind) *__Type {
+	ret := g.getIntrospectionBaseType(is, tl, io)
+
+	if tl.isSlice {
+		if !tl.isPointerSlice {
+			wrapper := &__Type{
+				Name:   "required",
+				Kind:   IntrospectionKindNonNull,
+				OfType: ret,
+			}
+			ret = wrapper
+		}
+
+		wrapper := &__Type{
+			Name:   "list",
+			Kind:   IntrospectionKindList,
+			OfType: ret,
+		}
+		ret = wrapper
+	}
+
+	if !tl.isPointer {
+		wrapper := &__Type{
+			Name:   "required",
+			Kind:   IntrospectionKindNonNull,
+			OfType: ret,
+		}
+		ret = wrapper
+	}
+
+	return ret
 }

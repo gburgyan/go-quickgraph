@@ -72,6 +72,7 @@ func main() {
 
 	graph := quickgraph.Graphy{}
 	graph.RegisterQuery(ctx, "hero", HeroProvider)
+	graph.EnableIntrospection(ctx)
 
 	http.Handle("/graphql", graph.HttpHandler())
 	err := http.ListenAndServe(":8080", nil)
@@ -95,6 +96,14 @@ Finally, we set up a `Graphy` object and tell it about the function that will pr
 In normal usage, we would initialize the `Graphy` object once, and then use it to process multiple requests. The `Graphy` object is thread-safe, so it can be used concurrently. It also caches all the reflection information that instructs it how to process the requests, so it is more efficient to reuse the same object. Additionally, it caches the parsed *queries* as well so if the same query is processed multiple times, it will be faster. This allows for the same query to be resused with different variable values.
 
 Finally, `Graphy` provides a default HTTP handler that works with the native Go HTTP server. It allows for both schema output if it's called with a GET request, and a POST will execute the query.
+
+To enable schema generation with the default HTTP server, you must also enable introspection:
+
+```go
+graph.EnableIntrospection(ctx)
+```
+
+This is to ensure that if you don't want the be able to serve up the introspection schema, you won't get schema generation either. These are enabled together as they have the potential to "leak" internal information.
 
 # Theory of Operation
 
@@ -523,6 +532,10 @@ schema, err := g.SchemaDefinition(ctx)
 ```
 
 This will create a GraphQL schema that represents the state of the `graphy` object. Explore the `schema_type_test.go` test file for more examples of generated schemata.
+
+## Introspection
+
+By calling `graph.EnableIntrospection(ctx)` you also enable the introspection queries. Internally this is handled by the schema generation subsystem. This also turns on implicit schema generation by the built-in HTTP handler.
 
 ## Limitations
 

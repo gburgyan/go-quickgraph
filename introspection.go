@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 )
 
@@ -31,10 +32,10 @@ type __Type struct {
 	Kind           __TypeKind `json:"kind"`
 	Name           string     `json:"name"`
 	Description    *string    `json:"description"`
-	FieldsRaw      []__Field  `json:"fields"`
-	Interfaces     []*__Type  `json:"interfaces"`
-	PossibleTypes  []*__Type  `json:"possibleTypes"`
-	EnumValuesRaw  []__EnumValue
+	fieldsRaw      []__Field
+	Interfaces     []*__Type `json:"interfaces"`
+	PossibleTypes  []*__Type `json:"possibleTypes"`
+	enumValuesRaw  []__EnumValue
 	InputFields    []__InputValue
 	OfType         *__Type `json:"ofType"`
 	SpecifiedByUrl string  `json:"specifiedByUrl"`
@@ -76,26 +77,45 @@ type __InputValue struct {
 	DefaultValue *string `json:"defaultValue"`
 }
 
-func (it *__Type) Fields(includeDeprecated bool) []__Field {
-	if includeDeprecated {
-		return it.FieldsRaw
+func (it *__Type) Fields(includeDeprecatedOpt *bool) []__Field {
+	includeDeprecated := false
+	if includeDeprecatedOpt != nil {
+		includeDeprecated = *includeDeprecatedOpt
 	}
+
 	result := []__Field{}
-	for _, field := range it.FieldsRaw {
-		if !field.IsDeprecated {
+
+	fields := it.fieldsRaw
+	// Sort the fields by name
+	sort.Slice(fields, func(i, j int) bool {
+		return fields[i].Name < fields[j].Name
+	})
+
+	for _, field := range fields {
+		field := field
+		if !field.IsDeprecated || includeDeprecated {
 			result = append(result, field)
 		}
 	}
 	return result
 }
 
-func (it *__Type) EnumValues(includeDeprecated bool) []__EnumValue {
-	if includeDeprecated {
-		return it.EnumValuesRaw
+func (it *__Type) EnumValues(includeDeprecatedOpt *bool) []__EnumValue {
+	includeDeprecated := false
+	if includeDeprecatedOpt != nil {
+		includeDeprecated = *includeDeprecatedOpt
 	}
+
 	result := []__EnumValue{}
-	for _, enumValue := range it.EnumValuesRaw {
-		if !enumValue.IsDeprecated {
+	// Sort the enum values by name
+	values := it.enumValuesRaw
+	sort.Slice(values, func(i, j int) bool {
+		return values[i].Name < values[j].Name
+	})
+
+	for _, enumValue := range values {
+		enumValue := enumValue
+		if !enumValue.IsDeprecated || includeDeprecated {
 			result = append(result, enumValue)
 		}
 	}
@@ -137,7 +157,14 @@ func (g *Graphy) populateIntrospection(st *schemaTypes) {
 		typeLookupByName: map[string]*__Type{},
 	}
 
-	for _, f := range g.processors {
+	processorNames := keys(g.processors)
+	// Sort the processors by name
+	sort.Slice(processorNames, func(i, j int) bool {
+		return processorNames[i] < processorNames[j]
+	})
+
+	for _, name := range processorNames {
+		f := g.processors[name]
 		if strings.HasPrefix(f.name, "__") {
 			continue
 		}
@@ -149,13 +176,19 @@ func (g *Graphy) populateIntrospection(st *schemaTypes) {
 		}
 		switch f.mode {
 		case ModeQuery:
-			queries.FieldsRaw = append(queries.FieldsRaw, qf)
+			queries.fieldsRaw = append(queries.fieldsRaw, qf)
 		case ModeMutation:
-			mutations.FieldsRaw = append(mutations.FieldsRaw, qf)
+			mutations.fieldsRaw = append(mutations.fieldsRaw, qf)
 		}
 	}
 
-	for _, refType := range is.typeLookupByName {
+	typeNames := keys(is.typeLookupByName)
+	// Sort the types by name
+	sort.Slice(typeNames, func(i, j int) bool {
+		return typeNames[i] < typeNames[j]
+	})
+	for _, name := range typeNames {
+		refType := is.typeLookupByName[name]
 		is.Types = append(is.Types, refType)
 	}
 
@@ -205,9 +238,9 @@ func (g *Graphy) getIntrospectionBaseType(is *__Schema, tl *typeLookup, io TypeK
 		enumValue := reflect.New(tl.rootType)
 		sev := enumValue.Convert(stringEnumValuesType)
 		se := sev.Interface().(StringEnumValues)
-		result.EnumValuesRaw = []__EnumValue{}
+		result.enumValuesRaw = []__EnumValue{}
 		for _, s := range se.EnumValues() {
-			result.EnumValuesRaw = append(result.EnumValuesRaw, __EnumValue{
+			result.enumValuesRaw = append(result.enumValuesRaw, __EnumValue{
 				Name: s,
 			})
 		}
@@ -222,10 +255,17 @@ func (g *Graphy) getIntrospectionBaseType(is *__Schema, tl *typeLookup, io TypeK
 	} else {
 		result.Kind = IntrospectionKindObject
 	}
-	for name, ft := range tl.fields {
+	fieldNames := keys(tl.fields)
+	// Sort the fields by name
+	sort.Slice(fieldNames, func(i, j int) bool {
+		return fieldNames[i] < fieldNames[j]
+	})
+
+	for _, fieldName := range fieldNames {
+		ft := tl.fields[fieldName]
 		if ft.fieldType == FieldTypeField {
 			if io == TypeOutput {
-				result.FieldsRaw = append(result.FieldsRaw, __Field{
+				result.fieldsRaw = append(result.fieldsRaw, __Field{
 					Name: name,
 					Type: g.getIntrospectionModifiedType(is, g.typeLookup(ft.resultType), io),
 				})
@@ -237,7 +277,7 @@ func (g *Graphy) getIntrospectionBaseType(is *__Schema, tl *typeLookup, io TypeK
 			}
 		} else if ft.fieldType == FieldTypeGraphFunction {
 			call, args := g.introspectionCall(is, ft.graphFunction)
-			result.FieldsRaw = append(result.FieldsRaw, __Field{
+			result.fieldsRaw = append(result.fieldsRaw, __Field{
 				Name: name,
 				Type: call,
 				Args: args,

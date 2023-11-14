@@ -39,6 +39,9 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) string {
 
 	for _, function := range g.processors {
 		function := function
+		if strings.HasPrefix(function.name, "__") {
+			continue
+		}
 		byMode, ok := procByMode[function.mode]
 		if !ok {
 			byMode = []*graphFunction{}

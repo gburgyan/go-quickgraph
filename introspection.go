@@ -123,6 +123,7 @@ func (it *__Type) EnumValues(includeDeprecatedOpt *bool) []__EnumValue {
 }
 
 func (g *Graphy) EnableIntrospection(ctx context.Context) {
+	g.schemaEnabled = true
 	schemaFunc := func() *__Schema {
 		st := g.getSchemaTypes()
 		return st.introspectionSchema
@@ -220,7 +221,15 @@ func (g *Graphy) getIntrospectionBaseType(is *__Schema, tl *typeLookup, io TypeK
 	is.typeLookupByName[name] = result
 	if len(tl.union) > 0 {
 		result.Kind = IntrospectionKindUnion
-		for _, ul := range tl.union {
+
+		unionNames := keys(tl.union)
+		// Sort the union names by name
+		sort.Slice(unionNames, func(i, j int) bool {
+			return unionNames[i] < unionNames[j]
+		})
+
+		for _, name := range unionNames {
+			ul := tl.union[name]
 			result.PossibleTypes = append(result.PossibleTypes, g.getIntrospectionModifiedType(is, ul, io))
 		}
 		return result

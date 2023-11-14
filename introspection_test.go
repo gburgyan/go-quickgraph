@@ -631,12 +631,12 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
           "possibleTypes": [
             {
               "kind": "OBJECT",
-              "name": "Human",
+              "name": "Droid",
               "ofType": null
             },
             {
               "kind": "OBJECT",
-              "name": "Droid",
+              "name": "Human",
               "ofType": null
             },
             {

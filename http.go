@@ -2,7 +2,6 @@ package quickgraph
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 )
 
@@ -23,10 +22,15 @@ type graphqlRequest struct {
 
 func (g GraphHttpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	if request.Method == "GET" {
-		schema := g.graphy.SchemaDefinition(request.Context())
-		writer.WriteHeader(200)
-		_, _ = writer.Write([]byte(schema))
-		// TODO: log an error if there is one, but there's not much we can do about it.
+		if g.graphy.schemaEnabled {
+			schema := g.graphy.SchemaDefinition(request.Context())
+			writer.WriteHeader(200)
+			_, _ = writer.Write([]byte(schema))
+			// TODO: log an error if there is one, but there's not much we can do about it.
+		} else {
+			writer.WriteHeader(404)
+			_, _ = writer.Write([]byte("Not Found"))
+		}
 		return
 	}
 
@@ -41,8 +45,6 @@ func (g GraphHttpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	if err != nil {
 		// TODO: Log the error here, but the response still has a GraphQL response that can be returned.
 	}
-
-	fmt.Println("response:\n", res)
 
 	// Return the response string.
 	writer.Header().Set("Content-Type", "application/json")

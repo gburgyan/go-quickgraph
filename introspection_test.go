@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestGraphy_introspection(t *testing.T) {
+func TestGraphy_Introspection_Schema(t *testing.T) {
 	g := Graphy{}
 	ctx := context.Background()
 
@@ -173,7 +173,7 @@ func TestGraphy_introspection(t *testing.T) {
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "Character",
+              "name": "FriendsConnection",
               "type": {
                 "kind": "OBJECT",
                 "name": "FriendsConnection",
@@ -185,7 +185,7 @@ func TestGraphy_introspection(t *testing.T) {
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "Character",
+              "name": "appearsIn",
               "type": {
                 "kind": "NON_NULL",
                 "name": "required",
@@ -209,7 +209,7 @@ func TestGraphy_introspection(t *testing.T) {
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "Character",
+              "name": "friends",
               "type": {
                 "kind": "NON_NULL",
                 "name": "required",
@@ -229,7 +229,7 @@ func TestGraphy_introspection(t *testing.T) {
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "Character",
+              "name": "id",
               "type": {
                 "kind": "NON_NULL",
                 "name": "required",
@@ -245,7 +245,7 @@ func TestGraphy_introspection(t *testing.T) {
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "Character",
+              "name": "name",
               "type": {
                 "kind": "NON_NULL",
                 "name": "required",
@@ -272,7 +272,7 @@ func TestGraphy_introspection(t *testing.T) {
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "ConnectionEdge",
+              "name": "node",
               "type": {
                 "kind": "OBJECT",
                 "name": "Character",
@@ -310,7 +310,7 @@ func TestGraphy_introspection(t *testing.T) {
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "Droid",
+              "name": "FriendsConnection",
               "type": {
                 "kind": "OBJECT",
                 "name": "FriendsConnection",
@@ -322,7 +322,7 @@ func TestGraphy_introspection(t *testing.T) {
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "Droid",
+              "name": "appearsIn",
               "type": {
                 "kind": "NON_NULL",
                 "name": "required",
@@ -346,7 +346,7 @@ func TestGraphy_introspection(t *testing.T) {
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "Droid",
+              "name": "friends",
               "type": {
                 "kind": "NON_NULL",
                 "name": "required",
@@ -366,7 +366,7 @@ func TestGraphy_introspection(t *testing.T) {
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "Droid",
+              "name": "id",
               "type": {
                 "kind": "NON_NULL",
                 "name": "required",
@@ -382,7 +382,7 @@ func TestGraphy_introspection(t *testing.T) {
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "Droid",
+              "name": "name",
               "type": {
                 "kind": "NON_NULL",
                 "name": "required",
@@ -398,7 +398,7 @@ func TestGraphy_introspection(t *testing.T) {
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "Droid",
+              "name": "primaryFunction",
               "type": {
                 "kind": "NON_NULL",
                 "name": "required",
@@ -425,7 +425,7 @@ func TestGraphy_introspection(t *testing.T) {
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "FriendsConnection",
+              "name": "edges",
               "type": {
                 "kind": "NON_NULL",
                 "name": "required",
@@ -445,7 +445,7 @@ func TestGraphy_introspection(t *testing.T) {
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "FriendsConnection",
+              "name": "totalCount",
               "type": {
                 "kind": "NON_NULL",
                 "name": "required",
@@ -487,7 +487,7 @@ func TestGraphy_introspection(t *testing.T) {
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "Human",
+              "name": "FriendsConnection",
               "type": {
                 "kind": "OBJECT",
                 "name": "FriendsConnection",
@@ -510,7 +510,7 @@ func TestGraphy_introspection(t *testing.T) {
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "Human",
+              "name": "Height",
               "type": {
                 "kind": "NON_NULL",
                 "name": "required",
@@ -526,7 +526,7 @@ func TestGraphy_introspection(t *testing.T) {
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "Human",
+              "name": "HeightMeters",
               "type": {
                 "kind": "NON_NULL",
                 "name": "required",
@@ -542,7 +542,7 @@ func TestGraphy_introspection(t *testing.T) {
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "Human",
+              "name": "appearsIn",
               "type": {
                 "kind": "NON_NULL",
                 "name": "required",
@@ -566,7 +566,7 @@ func TestGraphy_introspection(t *testing.T) {
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "Human",
+              "name": "friends",
               "type": {
                 "kind": "NON_NULL",
                 "name": "required",
@@ -586,7 +586,7 @@ func TestGraphy_introspection(t *testing.T) {
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "Human",
+              "name": "id",
               "type": {
                 "kind": "NON_NULL",
                 "name": "required",
@@ -602,7 +602,7 @@ func TestGraphy_introspection(t *testing.T) {
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "Human",
+              "name": "name",
               "type": {
                 "kind": "NON_NULL",
                 "name": "required",
@@ -655,7 +655,7 @@ func TestGraphy_introspection(t *testing.T) {
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "Starship",
+              "name": "id",
               "type": {
                 "kind": "NON_NULL",
                 "name": "required",
@@ -671,7 +671,7 @@ func TestGraphy_introspection(t *testing.T) {
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "Starship",
+              "name": "name",
               "type": {
                 "kind": "NON_NULL",
                 "name": "required",
@@ -809,6 +809,82 @@ func TestGraphy_introspection(t *testing.T) {
           "possibleTypes": []
         }
       ]
+    }
+  }
+}`
+
+	buff := bytes.Buffer{}
+	err = json.Indent(&buff, []byte(result), "", "  ")
+	assert.NoError(t, err)
+
+	formatted := buff.String()
+
+	assert.Equal(t, expected, formatted)
+}
+
+func TestGraphy_Introspection_Type(t *testing.T) {
+	g := Graphy{}
+	ctx := context.Background()
+
+	g.RegisterFunction(ctx, FunctionDefinition{
+		Name: "search",
+		Function: func(search string) []SearchResultUnion {
+			return []SearchResultUnion{
+				{
+					Human: &Human{},
+				},
+			}
+		},
+		Mode:           ModeQuery,
+		ParameterNames: []string{"search"},
+	})
+	g.EnableIntrospection(ctx)
+
+	// This query is from the RapidAPI app.
+	query := `
+   query IntrospectionQuery {
+     __type(name: "Character") {
+       ...FullType
+     }
+   }
+
+   fragment FullType on __Type {
+     kind
+     name
+     description
+
+     fields(includeDeprecated: false) {
+       name
+     }
+   }
+`
+
+	result, err := g.ProcessRequest(ctx, query, "")
+	assert.NoError(t, err)
+
+	expected := `{
+  "data": {
+    "__type": {
+      "description": null,
+      "fields": [
+        {
+          "name": "FriendsConnection"
+        },
+        {
+          "name": "appearsIn"
+        },
+        {
+          "name": "friends"
+        },
+        {
+          "name": "id"
+        },
+        {
+          "name": "name"
+        }
+      ],
+      "kind": "OBJECT",
+      "name": "Character"
     }
   }
 }`

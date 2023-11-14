@@ -129,7 +129,7 @@ func (g *Graphy) EnableIntrospection(ctx context.Context) {
 	}
 	typesFunc := func(name string) (*__Type, error) {
 		st := g.getSchemaTypes()
-		tl, ok := st.introspectionTypes[name]
+		tl, ok := st.introspectionSchema.typeLookupByName[name]
 		if !ok {
 			return nil, fmt.Errorf("type %s not found", name)
 		}
@@ -266,19 +266,19 @@ func (g *Graphy) getIntrospectionBaseType(is *__Schema, tl *typeLookup, io TypeK
 		if ft.fieldType == FieldTypeField {
 			if io == TypeOutput {
 				result.fieldsRaw = append(result.fieldsRaw, __Field{
-					Name: name,
+					Name: fieldName,
 					Type: g.getIntrospectionModifiedType(is, g.typeLookup(ft.resultType), io),
 				})
 			} else {
 				result.InputFields = append(result.InputFields, __InputValue{
-					Name: name,
+					Name: fieldName,
 					Type: g.getIntrospectionModifiedType(is, g.typeLookup(ft.resultType), io),
 				})
 			}
 		} else if ft.fieldType == FieldTypeGraphFunction {
 			call, args := g.introspectionCall(is, ft.graphFunction)
 			result.fieldsRaw = append(result.fieldsRaw, __Field{
-				Name: name,
+				Name: fieldName,
 				Type: call,
 				Args: args,
 			})

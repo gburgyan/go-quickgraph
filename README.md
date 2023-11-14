@@ -634,5 +634,10 @@ While potentially caching the variable JSON would be possible, the decision was 
 
 # General Limitations
 
+## Interfaces
+
+While interfaces are handled appropriately when processing responses, due to limitations in the Go reflection system there is no way to find all types that implement that interface. Because of this, when looking at the generated schemata or using the introspection system, there may be implementing types that are not known. 
+
 ## Validation of Input
 
+Queries ignore the type specifiers on the input. The types are always inferred from the actual function inputs.

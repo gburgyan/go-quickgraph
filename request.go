@@ -267,7 +267,7 @@ func (g *Graphy) addAndValidateResultVariables(typ *typeLookup, filter *resultFi
 
 			if childType != nil {
 				// Recurse
-				err := g.addAndValidateResultVariables(childType, field.SubParts, variableTypeMap, nil)
+				err := g.addAndValidateResultVariables(childType, field.SubParts, variableTypeMap, fragments)
 				if err != nil {
 					return AugmentGraphError(err, fmt.Sprintf("error validating field for %s", field.Name), field.SubParts.Pos, field.Name)
 				}

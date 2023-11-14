@@ -17,7 +17,7 @@ func TestGraphy_schemaForType(t *testing.T) {
 	typeLookups := g.expandTypeLookups([]*typeLookup{cl})
 	_, outputMap := solveInputOutputNameMapping(nil, typeLookups)
 
-	schema, extraTypes := g.schemaForType(TypeOutput, cl, outputMap)
+	schema := g.schemaForType(TypeOutput, cl, outputMap)
 	expected := `type Character {
 	appearsIn: [episode!]!
 	friends: [Character]!
@@ -27,11 +27,6 @@ func TestGraphy_schemaForType(t *testing.T) {
 }
 `
 	assert.Equal(t, expected, schema)
-	assert.Len(t, extraTypes, 4)
-
-	assert.Equal(t, "episode", extraTypes[0].name)
-	assert.Equal(t, "Character", extraTypes[1].name)
-	assert.Equal(t, "FriendsConnection", extraTypes[2].name)
 }
 
 func TestGraphy_simpleSchema(t *testing.T) {

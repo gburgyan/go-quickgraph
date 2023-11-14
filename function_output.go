@@ -39,7 +39,7 @@ func (f *graphFunction) processCallOutput(ctx context.Context, req *request, fil
 
 	if kind == reflect.Slice {
 		if !callResult.IsNil() {
-			var retVal []any
+			retVal := []any{}
 			count := callResult.Len()
 			for i := 0; i < count; i++ {
 				a := callResult.Index(i).Interface()

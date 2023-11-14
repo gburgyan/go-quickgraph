@@ -6,13 +6,42 @@ import (
 	"strings"
 )
 
+type usageMap map[*typeLookup]bool
+
+type typeNameLookup map[string]*typeLookup
+type typeNameMapping map[*typeLookup]string
+
+type schemaTypes struct {
+	inputTypes  []*typeLookup
+	outputTypes []*typeLookup
+	enumTypes   []*typeLookup
+
+	inputTypeNameLookup  typeNameMapping
+	outputTypeNameLookup typeNameMapping
+	enumTypeNameLookup   typeNameMapping
+
+	inputTypesByName  typeNameLookup
+	outputTypesByName typeNameLookup
+	enumTypesByName   typeNameLookup
+
+	introspectionSchema *__Schema
+}
+
 func (g *Graphy) SchemaDefinition(ctx context.Context) string {
+	g.structureLock.RLock()
+	defer g.structureLock.RUnlock()
+
+	st := g.getSchemaTypes()
+
 	sb := strings.Builder{}
 
 	procByMode := map[GraphFunctionMode][]*graphFunction{}
 
 	for _, function := range g.processors {
 		function := function
+		if strings.HasPrefix(function.name, "__") {
+			continue
+		}
 		byMode, ok := procByMode[function.mode]
 		if !ok {
 			byMode = []*graphFunction{}
@@ -20,44 +49,6 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) string {
 		}
 		procByMode[function.mode] = append(byMode, &function)
 	}
-
-	var outputTypes []*typeLookup
-	var inputTypes []*typeLookup
-	var enumTypes []*typeLookup
-
-	for _, functions := range procByMode {
-		for _, function := range functions {
-			_, fOuput, fInput := g.schemaForFunctionParameters(function, nil)
-
-			outputTypes = append(outputTypes, function.baseReturnType)
-			inputTypes = append(inputTypes, fInput...)
-
-			for _, outTypeLookup := range fOuput {
-				if outTypeLookup.rootType != nil {
-					if outTypeLookup.rootType.AssignableTo(stringEnumValuesType) {
-						enumTypes = append(enumTypes, outTypeLookup)
-					}
-				} else {
-					outputTypes = append(outputTypes, outTypeLookup)
-				}
-			}
-
-			for _, inTypeLookup := range fInput {
-				if inTypeLookup.rootType != nil {
-					if inTypeLookup.rootType.AssignableTo(stringEnumValuesType) {
-						enumTypes = append(enumTypes, inTypeLookup)
-					}
-				} else {
-					inputTypes = append(inputTypes, inTypeLookup)
-				}
-			}
-		}
-	}
-
-	inputTypes = g.expandTypeLookups(inputTypes)
-	outputTypes = g.expandTypeLookups(outputTypes)
-
-	inputMapping, outputMapping := solveInputOutputNameMapping(inputTypes, outputTypes)
 
 	for mode, functions := range procByMode {
 		sb.WriteString("type ")
@@ -81,13 +72,13 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) string {
 			sb.WriteString(function.name)
 			if len(function.nameMapping) > 0 {
 				sb.WriteString("(")
-				funcParams, _, _ := g.schemaForFunctionParameters(function, inputMapping)
+				funcParams := g.schemaForFunctionParameters(function, st.inputTypeNameLookup)
 				sb.WriteString(funcParams)
 				sb.WriteString(")")
 			}
 
 			sb.WriteString(": ")
-			schemaRef, _ := g.schemaRefForType(function.baseReturnType, outputMapping)
+			schemaRef := g.schemaRefForType(function.baseReturnType, st.outputTypeNameLookup)
 
 			sb.WriteString(schemaRef)
 			sb.WriteString("\n")
@@ -95,22 +86,112 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) string {
 		sb.WriteString("}\n\n")
 	}
 
-	inputSchema, iEnumTypes := g.schemaForTypes(TypeInput, inputMapping, inputTypes...)
-	enumTypes = append(enumTypes, iEnumTypes...)
+	inputSchema := g.schemaForTypes(TypeInput, st.inputTypeNameLookup, st.inputTypes...)
 	sb.WriteString(inputSchema)
 
-	outputSchema, oEnumTypes := g.schemaForTypes(TypeOutput, outputMapping, outputTypes...)
-	enumTypes = append(enumTypes, oEnumTypes...)
-
+	outputSchema := g.schemaForTypes(TypeOutput, st.outputTypeNameLookup, st.outputTypes...)
 	sb.WriteString(outputSchema)
 
-	enumSchema := g.schemaForEnumTypes(enumTypes...)
+	enumSchema := g.schemaForEnumTypes(st.enumTypes...)
 	sb.WriteString(enumSchema)
 
 	return sb.String()
 }
 
-type typeNameMapping map[*typeLookup]string
+func (g *Graphy) getSchemaTypes() *schemaTypes {
+	// We're already in a structure lock, so we are good making this check without
+	// a lock.
+	if g.schemaBuffer != nil {
+		return g.schemaBuffer
+	}
+
+	// Only one goroutine should be able to get here at a time.
+	g.schemaLock.Lock()
+	defer g.schemaLock.Unlock()
+
+	// Check again in case it was set while waiting for the lock
+	if g.schemaBuffer != nil {
+		return g.schemaBuffer
+	}
+
+	var outputTypes []*typeLookup
+	var inputTypes []*typeLookup
+	var enumTypes []*typeLookup
+
+	for _, proc := range g.processors {
+		if strings.HasPrefix(proc.name, "__") {
+			// These are internal functions, so we can skip them.
+			continue
+		}
+		function := &proc
+		inputMap := make(usageMap)
+		outputMap := make(usageMap)
+
+		g.functionIO(function, inputMap, outputMap)
+
+		fInput := keys(inputMap)
+		fOutput := keys(outputMap)
+
+		// Add these to the global lists.
+		outputTypes = append(outputTypes, fOutput...)
+		inputTypes = append(inputTypes, fInput...)
+
+		for _, outTypeLookup := range fOutput {
+			if outTypeLookup.rootType != nil {
+				if outTypeLookup.rootType.AssignableTo(stringEnumValuesType) {
+					enumTypes = append(enumTypes, outTypeLookup)
+				}
+			} else {
+				outputTypes = append(outputTypes, outTypeLookup)
+			}
+		}
+
+		for _, inTypeLookup := range fInput {
+			if inTypeLookup.rootType != nil {
+				if inTypeLookup.rootType.AssignableTo(stringEnumValuesType) {
+					enumTypes = append(enumTypes, inTypeLookup)
+				}
+			} else {
+				inputTypes = append(inputTypes, inTypeLookup)
+			}
+		}
+	}
+
+	inputTypes = g.expandTypeLookups(inputTypes)
+	outputTypes = g.expandTypeLookups(outputTypes)
+
+	inputMapping, outputMapping := solveInputOutputNameMapping(inputTypes, outputTypes)
+	enumMapping := typeNameMapping{}
+	for _, enumType := range enumTypes {
+		enumMapping[enumType] = enumType.name
+	}
+
+	g.schemaBuffer = &schemaTypes{
+		inputTypes:  inputTypes,
+		outputTypes: outputTypes,
+		enumTypes:   enumTypes,
+
+		inputTypeNameLookup:  inputMapping,
+		outputTypeNameLookup: outputMapping,
+		enumTypeNameLookup:   enumMapping,
+
+		inputTypesByName:  makeTypeNameLookup(inputMapping),
+		outputTypesByName: makeTypeNameLookup(outputMapping),
+		enumTypesByName:   makeTypeNameLookup(enumMapping),
+	}
+
+	g.populateIntrospection(g.schemaBuffer)
+
+	return g.schemaBuffer
+}
+
+func makeTypeNameLookup(t typeNameMapping) typeNameLookup {
+	result := make(typeNameLookup)
+	for tl, name := range t {
+		result[name] = tl
+	}
+	return result
+}
 
 func solveInputOutputNameMapping(inputTypes []*typeLookup, outputTypes []*typeLookup) (typeNameMapping, typeNameMapping) {
 	// TODO: Handle same type name in different packages.
@@ -145,10 +226,7 @@ func (g *Graphy) expandTypeLookups(types []*typeLookup) []*typeLookup {
 	for _, tl := range types {
 		expandedTypeMap = g.recursiveAddTypeLookup(tl, expandedTypeMap)
 	}
-	expandedTypes := []*typeLookup{}
-	for tl := range expandedTypeMap {
-		expandedTypes = append(expandedTypes, tl)
-	}
+	expandedTypes := keys(expandedTypeMap)
 
 	// Sort by name
 	sort.Slice(expandedTypes, func(i, j int) bool {
@@ -176,7 +254,7 @@ func (g *Graphy) recursiveAddTypeLookup(tl *typeLookup, typeMap map[*typeLookup]
 	return typeMap
 }
 
-func (g *Graphy) schemaForFunctionParameters(f *graphFunction, mapping typeNameMapping) (string, []*typeLookup, []*typeLookup) {
+func (g *Graphy) schemaForFunctionParameters(f *graphFunction, mapping typeNameMapping) string {
 	sb := strings.Builder{}
 
 	mappings := []functionNameMapping{}
@@ -188,8 +266,6 @@ func (g *Graphy) schemaForFunctionParameters(f *graphFunction, mapping typeNameM
 		return mappings[i].paramIndex < mappings[j].paramIndex
 	})
 
-	var paramLookups []*typeLookup
-
 	for i, param := range mappings {
 		if i > 0 {
 			sb.WriteString(", ")
@@ -197,14 +273,53 @@ func (g *Graphy) schemaForFunctionParameters(f *graphFunction, mapping typeNameM
 		sb.WriteString(param.name)
 		sb.WriteString(": ")
 		paramTl := g.typeLookup(param.paramType)
-		schemaRef, _ := g.schemaRefForType(paramTl, mapping)
+		schemaRef := g.schemaRefForType(paramTl, mapping)
 		sb.WriteString(schemaRef)
-		paramLookups = append(paramLookups, paramTl)
 	}
 
-	refLookups := []*typeLookup{
-		f.baseReturnType,
+	return sb.String()
+}
+
+func (g *Graphy) functionIO(f *graphFunction, inputTypes, outputTypes usageMap) {
+
+	for _, param := range f.nameMapping {
+		g.typeIO(g.typeLookup(param.paramType), TypeInput, inputTypes, outputTypes)
 	}
 
-	return sb.String(), refLookups, paramLookups
+	g.typeIO(f.baseReturnType, TypeOutput, inputTypes, outputTypes)
+}
+
+func (g *Graphy) typeIO(tl *typeLookup, io TypeKind, inputTypes, outputTypes usageMap) {
+	if io == TypeInput {
+		if inputTypes[tl] {
+			return
+		}
+		inputTypes[tl] = true
+	} else {
+		if outputTypes[tl] {
+			return
+		}
+		outputTypes[tl] = true
+	}
+
+	for _, fl := range tl.fields {
+		switch fl.fieldType {
+		case FieldTypeField:
+			g.typeIO(g.typeLookup(fl.resultType), io, inputTypes, outputTypes)
+
+		case FieldTypeGraphFunction:
+			g.functionIO(fl.graphFunction, inputTypes, outputTypes)
+
+		default:
+			panic("unknown field type")
+		}
+	}
+
+	for _, tl := range tl.implements {
+		g.typeIO(tl, io, inputTypes, outputTypes)
+	}
+
+	for _, tl := range tl.union {
+		g.typeIO(tl, io, inputTypes, outputTypes)
+	}
 }

@@ -13,10 +13,12 @@ import (
 
 func TestGraphHttpHandler_ServeHTTP_GetSchema(t *testing.T) {
 	g := Graphy{}
-	g.RegisterQuery(nil, "greeting", func(ctx context.Context, name string) (string, error) {
+	ctx := context.Background()
+	g.RegisterQuery(ctx, "greeting", func(ctx context.Context, name string) (string, error) {
 		return "Hello, " + name, nil
 	}, "name")
 
+	g.EnableIntrospection(ctx)
 	h := g.HttpHandler()
 
 	req, err := http.NewRequest("GET", "/", nil)
@@ -45,6 +47,30 @@ func TestGraphHttpHandler_ServeHTTP_GetSchema(t *testing.T) {
 `
 	// Here you can also assert the content of the response if you know what the schema should look like
 	assert.Equal(t, schema, string(genSchema))
+}
+
+func TestGraphHttpHandler_ServeHTTP_GetSchema_Error(t *testing.T) {
+	g := Graphy{}
+	ctx := context.Background()
+	g.RegisterQuery(ctx, "greeting", func(ctx context.Context, name string) (string, error) {
+		return "Hello, " + name, nil
+	}, "name")
+
+	h := g.HttpHandler()
+
+	req, err := http.NewRequest("GET", "/", nil)
+	if err != nil {
+		t.Fatalf("could not create request: %v", err)
+	}
+	rec := httptest.NewRecorder()
+
+	h.ServeHTTP(rec, req)
+
+	res := rec.Result()
+
+	if res.StatusCode != http.StatusNotFound {
+		t.Errorf("expected status 404; got %v", res.Status)
+	}
 }
 
 func TestGraphHttpHandler_ServeHTTP_PostQuery(t *testing.T) {

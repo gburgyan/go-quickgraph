@@ -78,10 +78,7 @@ type __InputValue struct {
 }
 
 func (it *__Type) Fields(includeDeprecatedOpt *bool) []__Field {
-	includeDeprecated := false
-	if includeDeprecatedOpt != nil {
-		includeDeprecated = *includeDeprecatedOpt
-	}
+	includeDeprecated := includeDeprecatedOpt != nil && *includeDeprecatedOpt
 
 	result := []__Field{}
 
@@ -101,10 +98,7 @@ func (it *__Type) Fields(includeDeprecatedOpt *bool) []__Field {
 }
 
 func (it *__Type) EnumValues(includeDeprecatedOpt *bool) []__EnumValue {
-	includeDeprecated := false
-	if includeDeprecatedOpt != nil {
-		includeDeprecated = *includeDeprecatedOpt
-	}
+	includeDeprecated := includeDeprecatedOpt != nil && *includeDeprecatedOpt
 
 	result := []__EnumValue{}
 	// Sort the enum values by name
@@ -141,28 +135,18 @@ func (g *Graphy) EnableIntrospection(ctx context.Context) {
 }
 
 func (g *Graphy) populateIntrospection(st *schemaTypes) {
-
-	queries := &__Type{
-		Kind: IntrospectionKindObject,
-		Name: "__query",
-	}
-	mutations := &__Type{
-		Kind: IntrospectionKindObject,
-		Name: "__mutation",
-	}
+	queries := &__Type{Kind: IntrospectionKindObject, Name: "__query"}
+	mutations := &__Type{Kind: IntrospectionKindObject, Name: "__mutation"}
 
 	is := &__Schema{
 		Queries:          queries,
 		Mutations:        mutations,
 		Types:            []*__Type{},
-		typeLookupByName: map[string]*__Type{},
+		typeLookupByName: make(map[string]*__Type),
 	}
 
 	processorNames := keys(g.processors)
-	// Sort the processors by name
-	sort.Slice(processorNames, func(i, j int) bool {
-		return processorNames[i] < processorNames[j]
-	})
+	sort.Strings(processorNames)
 
 	for _, name := range processorNames {
 		f := g.processors[name]
@@ -170,11 +154,8 @@ func (g *Graphy) populateIntrospection(st *schemaTypes) {
 			continue
 		}
 		t, args := g.introspectionCall(is, &f)
-		qf := __Field{
-			Name: f.name,
-			Type: t,
-			Args: args,
-		}
+		qf := __Field{Name: f.name, Type: t, Args: args}
+
 		switch f.mode {
 		case ModeQuery:
 			queries.fieldsRaw = append(queries.fieldsRaw, qf)
@@ -184,18 +165,13 @@ func (g *Graphy) populateIntrospection(st *schemaTypes) {
 	}
 
 	typeNames := keys(is.typeLookupByName)
-	// Sort the types by name
-	sort.Slice(typeNames, func(i, j int) bool {
-		return typeNames[i] < typeNames[j]
-	})
+	sort.Strings(typeNames)
+
 	for _, name := range typeNames {
-		refType := is.typeLookupByName[name]
-		is.Types = append(is.Types, refType)
+		is.Types = append(is.Types, is.typeLookupByName[name])
 	}
 
-	is.Types = append(is.Types, queries)
-	is.Types = append(is.Types, mutations)
-
+	is.Types = append(is.Types, queries, mutations)
 	g.schemaBuffer.introspectionSchema = is
 }
 
@@ -299,7 +275,7 @@ func (g *Graphy) getIntrospectionBaseType(is *__Schema, tl *typeLookup, io TypeK
 func (g *Graphy) introspectionCall(is *__Schema, f *graphFunction) (*__Type, []__InputValue) {
 	result := g.getIntrospectionModifiedType(is, f.baseReturnType, TypeOutput)
 	var args []__InputValue
-	for _, param := range f.nameMapping {
+	for _, param := range f.indexMapping {
 		args = append(args, __InputValue{
 			Name: param.name,
 			Type: g.getIntrospectionModifiedType(is, g.typeLookup(param.paramType), TypeInput),
@@ -308,35 +284,62 @@ func (g *Graphy) introspectionCall(is *__Schema, f *graphFunction) (*__Type, []_
 	return result, args
 }
 
+// getIntrospectionModifiedType is a method of the Graphy struct. It is used to generate a modified
+// introspection type based on a given base type and its characteristics. This is used in the process of
+// generating the introspection schema of a GraphQL server.
+//
+// The method takes three parameters:
+// - is: a pointer to the __Schema struct representing the introspection schema.
+// - tl: a pointer to the typeLookup struct representing the base type.
+// - io: a TypeKind value representing whether the base type is used for input or output.
+//
+// The method first calls the getIntrospectionBaseType method to get the introspection type of the base type.
+//
+// If the base type is a slice, the method wraps the introspection type as a list. If the base type is not
+// a pointer slice, the method also wraps the introspection type as a non-null type.
+//
+// If the base type is not a pointer, the method wraps the introspection type as a non-null type.
+//
+// The method returns a pointer to the modified introspection type.
 func (g *Graphy) getIntrospectionModifiedType(is *__Schema, tl *typeLookup, io TypeKind) *__Type {
+	// Get the introspection type of the base type
 	ret := g.getIntrospectionBaseType(is, tl, io)
 
+	// If the base type is a slice, wrap the introspection type as a list
 	if tl.isSlice {
+		// If the base type is not a pointer slice, also wrap the introspection type as a non-null type
 		if !tl.isPointerSlice {
-			wrapper := &__Type{
-				Name:   "required",
-				Kind:   IntrospectionKindNonNull,
-				OfType: ret,
-			}
-			ret = wrapper
+			ret = g.wrapType(ret, "required", IntrospectionKindNonNull)
 		}
-
-		wrapper := &__Type{
-			Name:   "list",
-			Kind:   IntrospectionKindList,
-			OfType: ret,
-		}
-		ret = wrapper
+		ret = g.wrapType(ret, "list", IntrospectionKindList)
 	}
 
+	// If the base type is not a pointer, wrap the introspection type as a non-null type
 	if !tl.isPointer {
-		wrapper := &__Type{
-			Name:   "required",
-			Kind:   IntrospectionKindNonNull,
-			OfType: ret,
-		}
-		ret = wrapper
+		ret = g.wrapType(ret, "required", IntrospectionKindNonNull)
 	}
 
+	// Return the modified introspection type
 	return ret
+}
+
+// wrapType is a method of the Graphy struct. It is used to create a new __Type struct
+// that wraps a given type with a given name and kind. This is used in the process of
+// generating the introspection schema of a GraphQL server, specifically when modifying
+// a base type to represent a list or a non-null type.
+//
+// The method takes three parameters:
+// - t: a pointer to the __Type struct to be wrapped.
+// - name: a string representing the name of the new type. This is typically "list" or "required".
+// - kind: a __TypeKind value representing the kind of the new type. This is typically IntrospectionKindList or IntrospectionKindNonNull.
+//
+// The method returns a pointer to the new __Type struct. The new type has the given name and kind,
+// and its OfType field is set to the given type. This represents that the new type is a list of
+// or a non-null version of the given type.
+func (g *Graphy) wrapType(t *__Type, name string, kind __TypeKind) *__Type {
+	return &__Type{
+		Name:   name,
+		Kind:   kind,
+		OfType: t,
+	}
 }

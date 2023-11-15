@@ -246,13 +246,12 @@ func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc ref
 	}
 
 	hasNames := false
+	gf.indexMapping = make([]functionNameMapping, len(inputs))
 	if len(def.ParameterNames) > 0 {
 		if len(def.ParameterNames) != len(inputs) {
 			panic("parameter names count must match parameter count")
 		}
 		hasNames = true
-	} else {
-		gf.indexMapping = make([]functionNameMapping, len(inputs))
 	}
 
 	// Iterate over the parameters and create the anonymous arguments.
@@ -270,6 +269,7 @@ func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc ref
 			mapping.name = def.ParameterNames[i]
 			mapping.anonymousArgument = false
 			gf.nameMapping[def.ParameterNames[i]] = mapping
+			gf.indexMapping[i] = mapping
 		} else {
 			mapping.name = fmt.Sprintf("arg%d", mapping.paramIndex)
 			mapping.anonymousArgument = true

@@ -87,30 +87,8 @@ func (g *Graphy) schemaForEnum(et *typeLookup) string {
 func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup, mapping typeNameMapping) string {
 	name := mapping[t]
 
-	// TODO: this can use some refactoring -- the function seems too complex as it is.
 	if len(t.union) > 0 {
-		sb := strings.Builder{}
-		sb.WriteString("union ")
-		sb.WriteString(name)
-		sb.WriteString(" =")
-		unionCount := 0
-		// Get the union names in alphabetical order.
-		var unionNames []string
-		for _, utl := range t.union {
-			unionNames = append(unionNames, mapping[utl])
-		}
-		sort.Strings(unionNames)
-		for _, unionName := range unionNames {
-			unionType := t.union[unionName]
-			sb.WriteString(" ")
-			if unionCount > 0 {
-				sb.WriteString("| ")
-			}
-			unionCount++
-			sb.WriteString(unionType.name)
-		}
-		sb.WriteString("\n")
-		return sb.String()
+		return g.schemaForUnion(name, t, mapping)
 	}
 
 	sb := strings.Builder{}
@@ -137,11 +115,7 @@ func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup, mapping typeNameMap
 	sb.WriteString(" {\n")
 
 	// Get the field names in alphabetical order.
-	var fieldNames []string
-	for n := range t.fieldsLowercase {
-		fieldNames = append(fieldNames, n)
-	}
-	sort.Strings(fieldNames)
+	fieldNames := sortedKeys(t.fieldsLowercase)
 
 	for _, name := range fieldNames {
 		field := t.fieldsLowercase[name]
@@ -183,6 +157,31 @@ func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup, mapping typeNameMap
 	}
 
 	sb.WriteString("}\n")
+	return sb.String()
+}
+
+func (g *Graphy) schemaForUnion(name string, t *typeLookup, mapping typeNameMapping) string {
+	sb := strings.Builder{}
+	sb.WriteString("union ")
+	sb.WriteString(name)
+	sb.WriteString(" =")
+	unionCount := 0
+	// Get the union names in alphabetical order.
+	var unionNames []string
+	for _, utl := range t.union {
+		unionNames = append(unionNames, mapping[utl])
+	}
+	sort.Strings(unionNames)
+	for _, unionName := range unionNames {
+		unionType := t.union[unionName]
+		sb.WriteString(" ")
+		if unionCount > 0 {
+			sb.WriteString("| ")
+		}
+		unionCount++
+		sb.WriteString(unionType.name)
+	}
+	sb.WriteString("\n")
 	return sb.String()
 }
 

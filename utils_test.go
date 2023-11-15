@@ -35,3 +35,35 @@ func Test_toStringSlice(t *testing.T) {
 	assert.Equal(t, "foo", result[0])
 	assert.Equal(t, "bar", result[1])
 }
+
+func Test_sortedKeys_ReturnsSortedKeys(t *testing.T) {
+	m := map[string]int{
+		"banana": 1,
+		"apple":  2,
+		"cherry": 3,
+	}
+	expected := []string{"apple", "banana", "cherry"}
+
+	result := sortedKeys(m)
+
+	assert.Equal(t, expected, result)
+}
+
+func Test_sortedKeys_WhenMapIsEmpty_ReturnsEmptySlice(t *testing.T) {
+	m := map[string]int{}
+
+	result := sortedKeys(m)
+
+	assert.Empty(t, result)
+}
+
+func Test_sortedKeys_WhenMapHasOneElement_ReturnsSliceWithOneElement(t *testing.T) {
+	m := map[string]int{
+		"apple": 1,
+	}
+	expected := []string{"apple"}
+
+	result := sortedKeys(m)
+
+	assert.Equal(t, expected, result)
+}

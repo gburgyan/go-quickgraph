@@ -190,85 +190,49 @@ func (g *Graphy) getIntrospectionBaseType(is *__Schema, tl *typeLookup, io TypeK
 		return existing
 	}
 
-	result := &__Type{
-		Name: name,
-	}
-
+	result := &__Type{Name: name}
 	is.typeLookupByName[name] = result
-	if len(tl.union) > 0 {
+
+	switch {
+	case len(tl.union) > 0:
 		result.Kind = IntrospectionKindUnion
-
-		unionNames := keys(tl.union)
-		// Sort the union names by name
-		sort.Slice(unionNames, func(i, j int) bool {
-			return unionNames[i] < unionNames[j]
-		})
-
-		for _, name := range unionNames {
+		for _, name := range sortedKeys(tl.union) {
 			ul := tl.union[name]
 			result.PossibleTypes = append(result.PossibleTypes, g.getIntrospectionModifiedType(is, ul, io))
 		}
-		return result
-	}
-	if tl.rootType.Kind() == reflect.Interface {
+	case tl.rootType.Kind() == reflect.Interface:
 		result.Kind = IntrospectionKindInterface
-		// We don't have a good way of getting the objects that implement this interface.
-		// TODO: Come up with something.
-		return result
-	}
-	if tl.rootType.ConvertibleTo(stringEnumValuesType) {
+	case tl.rootType.ConvertibleTo(stringEnumValuesType):
 		result.Kind = IntrospectionKindEnum
-
-		// Create an instance of the enum type and get the values
 		enumValue := reflect.New(tl.rootType)
 		sev := enumValue.Convert(stringEnumValuesType)
 		se := sev.Interface().(StringEnumValues)
-		result.enumValuesRaw = []__EnumValue{}
 		for _, s := range se.EnumValues() {
-			result.enumValuesRaw = append(result.enumValuesRaw, __EnumValue{
-				Name: s,
-			})
+			result.enumValuesRaw = append(result.enumValuesRaw, __EnumValue{Name: s})
 		}
-		return result
-	}
-	if tl.fundamental {
+	case tl.fundamental:
 		result.Kind = IntrospectionKindScalar
-		return result
-	}
-	if io == TypeInput {
+	case io == TypeInput:
 		result.Kind = IntrospectionKindInputObject
-	} else {
+	default:
 		result.Kind = IntrospectionKindObject
-	}
-	fieldNames := keys(tl.fields)
-	// Sort the fields by name
-	sort.Slice(fieldNames, func(i, j int) bool {
-		return fieldNames[i] < fieldNames[j]
-	})
-
-	for _, fieldName := range fieldNames {
-		ft := tl.fields[fieldName]
-		if ft.fieldType == FieldTypeField {
-			if io == TypeOutput {
-				result.fieldsRaw = append(result.fieldsRaw, __Field{
-					Name: fieldName,
-					Type: g.getIntrospectionModifiedType(is, g.typeLookup(ft.resultType), io),
-				})
-			} else {
-				result.InputFields = append(result.InputFields, __InputValue{
-					Name: fieldName,
-					Type: g.getIntrospectionModifiedType(is, g.typeLookup(ft.resultType), io),
-				})
+		for _, fieldName := range sortedKeys(tl.fields) {
+			ft := tl.fields[fieldName]
+			if ft.fieldType == FieldTypeField {
+				if io == TypeOutput {
+					field := __Field{Name: fieldName, Type: g.getIntrospectionModifiedType(is, g.typeLookup(ft.resultType), io)}
+					result.fieldsRaw = append(result.fieldsRaw, field)
+				} else {
+					input := __InputValue{Name: fieldName, Type: g.getIntrospectionModifiedType(is, g.typeLookup(ft.resultType), io)}
+					result.InputFields = append(result.InputFields, input)
+				}
+			} else if ft.fieldType == FieldTypeGraphFunction {
+				call, args := g.introspectionCall(is, ft.graphFunction)
+				result.fieldsRaw = append(result.fieldsRaw, __Field{Name: fieldName, Type: call, Args: args})
 			}
-		} else if ft.fieldType == FieldTypeGraphFunction {
-			call, args := g.introspectionCall(is, ft.graphFunction)
-			result.fieldsRaw = append(result.fieldsRaw, __Field{
-				Name: fieldName,
-				Type: call,
-				Args: args,
-			})
 		}
 	}
+
 	return result
 }
 

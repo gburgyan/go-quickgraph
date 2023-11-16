@@ -12,8 +12,6 @@ type fieldType int
 const (
 	FieldTypeField fieldType = iota
 	FieldTypeGraphFunction
-	FieldTypeUnion
-	FieldTypeEnum
 )
 
 type fieldLookup struct {

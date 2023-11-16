@@ -77,7 +77,7 @@ func (g *Graphy) schemaForEnum(et *typeLookup) string {
 
 	for _, s := range se.EnumValues() {
 		sb.WriteString("\t")
-		sb.WriteString(s)
+		sb.WriteString(s.Name) // TODO: Add deprecated support.
 		sb.WriteString("\n")
 	}
 	sb.WriteString("}\n")

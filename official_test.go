@@ -63,11 +63,11 @@ type Review struct {
 
 type episode string
 
-func (e episode) EnumValues() []string {
-	return []string{
-		"NEWHOPE",
-		"EMPIRE",
-		"JEDI",
+func (e episode) EnumValues() []EnumValue {
+	return []EnumValue{
+		{Name: "NEWHOPE"},
+		{Name: "EMPIRE"},
+		{Name: "JEDI"},
 	}
 }
 

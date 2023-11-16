@@ -383,7 +383,7 @@ func unmarshalWithEnumUnmarshaler(identifier string, value reflect.Value) (bool,
 		stringEnumValues := destinationVal.Convert(stringEnumValuesType).Interface().(StringEnumValues)
 		enumValues := stringEnumValues.EnumValues()
 		for _, enumValue := range enumValues {
-			if enumValue == identifier {
+			if enumValue.Name == identifier {
 				interfaceVal.SetString(identifier)
 				return true, nil
 			}

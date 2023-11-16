@@ -208,7 +208,15 @@ func (g *Graphy) getIntrospectionBaseType(is *__Schema, tl *typeLookup, io TypeK
 		sev := enumValue.Convert(stringEnumValuesType)
 		se := sev.Interface().(StringEnumValues)
 		for _, s := range se.EnumValues() {
-			result.enumValuesRaw = append(result.enumValuesRaw, __EnumValue{Name: s})
+			value := __EnumValue{
+				Name:        s.Name,
+				Description: s.Description,
+			}
+			if s.IsDeprecated {
+				value.IsDeprecated = true
+				value.DeprecationReason = &s.DeprecationReason
+			}
+			result.enumValuesRaw = append(result.enumValuesRaw, value)
 		}
 	case tl.fundamental:
 		result.Kind = IntrospectionKindScalar

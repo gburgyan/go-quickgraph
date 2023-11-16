@@ -36,8 +36,12 @@ type typeLookup struct {
 	fieldsLowercase     map[string]fieldLookup
 	implements          map[string]*typeLookup
 	implementsLowercase map[string]*typeLookup
+	implementedBy       []*typeLookup
 	union               map[string]*typeLookup
 	unionLowercase      map[string]*typeLookup
+
+	isDeprecated     bool
+	deprecatedReason string
 }
 
 func (tl *typeLookup) GetField(name string) (fieldLookup, bool) {
@@ -137,6 +141,7 @@ func (g *Graphy) processBaseTypeFieldLookup(typ reflect.Type, prevIndex []int, t
 
 			tl.implements[name] = anonLookup
 			tl.implementsLowercase[strings.ToLower(name)] = anonLookup
+			anonLookup.implementedBy = append(anonLookup.implementedBy, tl)
 		} else {
 			// TODO: Add enum support here. Special processing for strings that implement
 			//  the StringEnumValues interface.

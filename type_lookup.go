@@ -41,6 +41,7 @@ type typeLookup struct {
 	union               map[string]*typeLookup
 	unionLowercase      map[string]*typeLookup
 
+	description      *string
 	isDeprecated     bool
 	deprecatedReason string
 }
@@ -74,9 +75,7 @@ func (tl *typeLookup) ImplementsInterface(name string) (bool, *typeLookup) {
 // a given type, populating the result map with field lookups. It takes into account JSON
 // tags for naming and field exclusion.
 func (g *Graphy) populateTypeLookup(typ reflect.Type, prevIndex []int, tl *typeLookup) {
-	name := typ.Name()
-
-	// If tl.type implements the
+	name := tl.name
 
 	if strings.HasSuffix(name, "Union") {
 		g.processUnionFieldLookup(typ, prevIndex, tl, name)
@@ -231,26 +230,54 @@ func (g *Graphy) baseFieldLookup(field reflect.StructField, index []int) fieldLo
 }
 
 func (g *Graphy) addGraphMethodsForType(typ reflect.Type, index []int, tl *typeLookup) {
+	functionDefs := map[string]FunctionDefinition{}
 	for i := 0; i < typ.NumMethod(); i++ {
 		m := typ.Method(i)
+		if _, found := ignoredFunctions[m.Name]; found {
+			// Ignore functions that are designed to be ignored as
+			// framework functions.
+			continue
+		}
+		fd := FunctionDefinition{
+			Name:     m.Name,
+			Function: m.Func,
+		}
+		functionDefs[m.Name] = fd
+	}
+	if typ.Implements(graphTypeExtensionType) {
+		gtev := reflect.New(typ)
+		gtei := gtev.Elem().Interface().(GraphTypeExtension)
+		typeExtension := gtei.GraphTypeExtension()
+		for _, override := range typeExtension.FunctionDefinitions {
+			functionDefs[override.Name] = override
+		}
+	}
 
+	for _, funcDef := range functionDefs {
 		// Gather the inputs and outputs of the function.
+		var method reflect.Type
+		var function reflect.Value
+		if f, ok := funcDef.Function.(reflect.Value); ok {
+			method = f.Type()
+			function = f
+		} else {
+			method = reflect.TypeOf(funcDef.Function)
+			function = reflect.ValueOf(funcDef.Function)
+		}
+
 		var inTypes []reflect.Type
 		var outTypes []reflect.Type
-		for j := 0; j < m.Type.NumIn(); j++ {
-			inTypes = append(inTypes, m.Type.In(j))
+		for j := 0; j < method.NumIn(); j++ {
+			inTypes = append(inTypes, method.In(j))
 		}
-		for j := 0; j < m.Type.NumOut(); j++ {
-			outTypes = append(outTypes, m.Type.Out(j))
+		for j := 0; j < method.NumOut(); j++ {
+			outTypes = append(outTypes, method.Out(j))
 		}
 
-		err := g.validateGraphFunction(m.Func, m.Name, true)
+		err := g.validateGraphFunction(function, funcDef.Name, true)
 		if err == nil {
 			// Todo: Make this take a reflect.Type instead of an any.
-			gf := g.newGraphFunction(FunctionDefinition{
-				Name:     m.Name,
-				Function: m.Func,
-			}, true)
+			gf := g.newGraphFunction(funcDef, true)
 			// TODO: There seems to be a reflection issue where functions from
 			//  an anonymous struct are not properly recognized as being from
 			//  that struct. We need to figure out what's going on so when emitting
@@ -259,17 +286,17 @@ func (g *Graphy) addGraphMethodsForType(typ reflect.Type, index []int, tl *typeL
 			//  has a function, that will presently be output as a function of
 			//  both the struct as well as the type that includes it as anonymous.
 			tfl := fieldLookup{
-				name:          m.Name,
+				name:          funcDef.Name,
 				resultType:    gf.rawReturnType,
 				fieldIndexes:  index,
 				fieldType:     FieldTypeGraphFunction,
 				graphFunction: &gf,
 			}
-			tl.fields[m.Name] = tfl
+			tl.fields[funcDef.Name] = tfl
 			// If the lowercase version of the field name is not already in the map,
 			// add it.
-			if _, ok := tl.fieldsLowercase[strings.ToLower(m.Name)]; !ok {
-				tl.fieldsLowercase[strings.ToLower(m.Name)] = tfl
+			if _, ok := tl.fieldsLowercase[strings.ToLower(funcDef.Name)]; !ok {
+				tl.fieldsLowercase[strings.ToLower(funcDef.Name)] = tfl
 			}
 		}
 	}

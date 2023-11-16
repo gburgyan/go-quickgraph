@@ -41,39 +41,33 @@ type Graphy struct {
 	schemaLock sync.Mutex
 }
 
-type FunctionOverride struct {
-	// Name is the name of the function to override.
+type GraphTypeExtension interface {
+	GraphTypeExtension() GraphTypeInfo
+}
+
+type GraphTypeInfo struct {
+	// Name is the name of the type.
 	Name string
 
-	// Function is the function to use instead of the original function.
-	Function any
+	// Description is the description of the type.
+	Description string
 
-	// ParameterNames is the list of parameter names to use instead of the original
-	// parameter names.
-	ParameterNames []string
+	// Deprecated is the deprecation status of the type.
+	Deprecated string
 
-	// Deprecated is the deprecation status to use instead of the original deprecation
-	// status.
-	Deprecated *string
-}
-
-type GraphTypeDeprecated interface {
-	TypeDeprecated() *string
-}
-
-type GraphFunctionOverrides interface {
-	FunctionOverrides() map[string]FunctionOverride
+	// Function overrides for the type.
+	FunctionDefinitions []FunctionDefinition
 }
 
 var ignoredFunctions = map[string]bool{
-	"TypeDeprecated":    true,
-	"FunctionOverrides": true,
+	"GraphTypeExtension": true,
 }
 
 var contextType = reflect.TypeOf((*context.Context)(nil)).Elem()
 var errorType = reflect.TypeOf((*error)(nil)).Elem()
 var stringType = reflect.TypeOf((*string)(nil)).Elem()
 var anyType = reflect.TypeOf((*any)(nil)).Elem()
+var graphTypeExtensionType = reflect.TypeOf((*GraphTypeExtension)(nil)).Elem()
 
 // RegisterQuery registers a function as a query.
 //
@@ -203,7 +197,22 @@ func (g *Graphy) typeLookup(typ reflect.Type) *typeLookup {
 
 	result.rootType = rootTyp
 
-	result.name = rootTyp.Name()
+	if typ.Implements(graphTypeExtensionType) {
+		gtev := reflect.New(typ)
+		gtei := gtev.Elem().Interface().(GraphTypeExtension)
+		typeExtension := gtei.GraphTypeExtension()
+		result.name = typeExtension.Name
+		if typeExtension.Deprecated != "" {
+			result.isDeprecated = true
+			result.deprecatedReason = typeExtension.Deprecated
+		}
+		if typeExtension.Description != "" {
+			result.description = &typeExtension.Description
+		}
+	} else {
+		result.name = rootTyp.Name()
+	}
+
 	if rootTyp.Kind() == reflect.Struct {
 		g.typeMutex.Unlock()
 		g.populateTypeLookup(rootTyp, nil, result)

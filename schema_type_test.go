@@ -322,3 +322,88 @@ enum episode {
 `
 	assert.Equal(t, expected, schema)
 }
+
+type extendedObject struct {
+	OldCharacter Character `graphy:"char1,description=The character,deprecated=No longer used"`
+}
+
+func newCharacter(e *extendedObject, name string) Character {
+	return Character{
+		Name: name,
+	}
+}
+
+func (e *extendedObject) GraphTypeExtension() GraphTypeInfo {
+	return GraphTypeInfo{
+		Name:        "ExtendedObject",
+		Description: "An extended object",
+		Deprecated:  "shouldn't use this",
+		FunctionDefinitions: []FunctionDefinition{
+			{
+				Name:           "newCharacter",
+				Function:       newCharacter,
+				ParameterNames: []string{"name"},
+			},
+		},
+	}
+}
+
+func TestGraphy_ExtendedObject(t *testing.T) {
+	g := Graphy{}
+	ctx := context.Background()
+
+	g.RegisterFunction(ctx, FunctionDefinition{
+		Name:     "extended",
+		Function: func() *extendedObject { return &extendedObject{} },
+		Mode:     ModeQuery,
+	})
+
+	schema := g.SchemaDefinition(ctx)
+
+	expected := `type Query {
+	extended: ExtendedObject
+}
+
+type Character {
+	appearsIn: [episode!]!
+	friends: [Character]!
+	FriendsConnection(arg1: Int!): FriendsConnection
+	id: String!
+	name: String!
+}
+
+type ConnectionEdge {
+	node: Character
+}
+
+type ExtendedObject {
+	char1: Character! @deprecated(reason: "No longer used")
+	newCharacter(name: String!): Character!
+}
+
+type FriendsConnection {
+	edges: [ConnectionEdge]!
+	totalCount: Int!
+}
+
+enum episode {
+	NEWHOPE
+	EMPIRE
+	JEDI
+}
+
+`
+	assert.Equal(t, expected, schema)
+
+	query := `{
+  extended {
+    newCharacter(name: "test") {
+      name
+    }
+  }
+}`
+
+	result, err := g.ProcessRequest(ctx, query, "")
+	assert.NoError(t, err)
+	assert.Equal(t, `{"data":{"extended":{"newCharacter":{"name":"test"}}}}`, result)
+}

@@ -130,6 +130,11 @@ func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup, mapping typeNameMap
 			sb.WriteString(field.name)
 			sb.WriteString(": ")
 			sb.WriteString(typeString)
+			if field.isDeprecated {
+				sb.WriteString(" @deprecated(reason: \"")
+				sb.WriteString(field.deprecatedReason)
+				sb.WriteString("\")")
+			}
 			sb.WriteString("\n")
 		} else if field.fieldType == FieldTypeGraphFunction {
 			if kind == TypeOutput {

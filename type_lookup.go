@@ -22,6 +22,9 @@ type fieldLookup struct {
 	resultType    reflect.Type
 	fieldIndexes  []int
 	graphFunction *graphFunction
+
+	isDeprecated     bool
+	deprecatedReason string
 }
 
 type typeLookup struct {
@@ -108,26 +111,6 @@ func (g *Graphy) processBaseTypeFieldLookup(typ reflect.Type, prevIndex []int, t
 
 	for i := 0; i < typ.NumField(); i++ {
 		field := typ.Field(i)
-		// If there's a json tag on the field, use that for the name of the field.
-		// Otherwise, use the name of the field.
-		// If there's a json tag with a "-" value, ignore the field.
-		// If there's a json tag with an "omitempty" value, ignore the field.
-		fieldName := field.Name
-		jsonTag := field.Tag.Get("json")
-		if jsonTag != "" {
-			jsonParts := strings.Split(jsonTag, ",")
-			if jsonParts[0] == "-" {
-				continue
-			}
-			if jsonParts[0] != "" {
-				fieldName = jsonParts[0]
-			}
-		}
-
-		// If we already have a field with that name, ignore it.
-		if _, ok := tl.fields[fieldName]; ok {
-			continue
-		}
 		index := append(prevIndex, i)
 		if field.Anonymous {
 			// Queue up the anonymous field for processing later.
@@ -143,20 +126,26 @@ func (g *Graphy) processBaseTypeFieldLookup(typ reflect.Type, prevIndex []int, t
 			tl.implementsLowercase[strings.ToLower(name)] = anonLookup
 			anonLookup.implementedBy = append(anonLookup.implementedBy, tl)
 		} else {
+
+			tfl := g.baseFieldLookup(field, index)
+
+			if tfl.name == "" {
+				continue
+			}
+
+			// If we already have a field with that name, ignore it.
+			if _, ok := tl.fields[tfl.name]; ok {
+				continue
+			}
+
 			// TODO: Add enum support here. Special processing for strings that implement
 			//  the StringEnumValues interface.
 
-			tfl := fieldLookup{
-				name:         fieldName,
-				resultType:   field.Type,
-				fieldIndexes: index,
-				fieldType:    FieldTypeField,
-			}
-			tl.fields[fieldName] = tfl
+			tl.fields[tfl.name] = tfl
 			// If the lowercase version of the field name is not already in the map,
 			// add it.
-			if _, ok := tl.fieldsLowercase[strings.ToLower(fieldName)]; !ok {
-				tl.fieldsLowercase[strings.ToLower(fieldName)] = tfl
+			if _, ok := tl.fieldsLowercase[strings.ToLower(tfl.name)]; !ok {
+				tl.fieldsLowercase[strings.ToLower(tfl.name)] = tfl
 			}
 		}
 	}
@@ -188,6 +177,57 @@ func (g *Graphy) processBaseTypeFieldLookup(typ reflect.Type, prevIndex []int, t
 	for _, fn := range deferredAnonymous {
 		fn()
 	}
+}
+
+func (g *Graphy) baseFieldLookup(field reflect.StructField, index []int) fieldLookup {
+	// If there's a json tag on the field, use that for the name of the field.
+	// Otherwise, use the name of the field.
+	// If there's a json tag with a "-" value, ignore the field.
+	tfl := fieldLookup{
+		name:         field.Name,
+		resultType:   field.Type,
+		fieldIndexes: index,
+		fieldType:    FieldTypeField,
+	}
+
+	if jsonTag := field.Tag.Get("json"); jsonTag != "" {
+		jsonParts := strings.Split(jsonTag, ",")
+		if jsonParts[0] == "-" {
+			return fieldLookup{}
+		}
+		if jsonParts[0] != "" {
+			tfl.name = jsonParts[0]
+		}
+	}
+
+	if graphyTag := field.Tag.Get("graphy"); graphyTag != "" {
+		graphyParts := strings.Split(graphyTag, ",")
+
+		// First part, if it has no special meaning, is the name of the field.
+		// All the parts are name=value pairs (except the first part, which can be special).
+		// If there are quotes around the value, they are stripped.
+		// The special parts are:
+		//  - name: the name of the field
+		//  - deprecated: if exists, the field is deprecated with the value as the reason
+
+		for _, part := range graphyParts {
+			parts := strings.Split(part, "=")
+			if len(parts) == 1 {
+				tfl.name = parts[0]
+			} else {
+				// If the value is quoted, strip the quotes.
+				switch parts[0] {
+				case "name":
+					tfl.name = parts[1]
+				case "deprecated":
+					tfl.isDeprecated = true
+					tfl.deprecatedReason = parts[1]
+				}
+			}
+		}
+	}
+
+	return tfl
 }
 
 func (g *Graphy) addGraphMethodsForType(typ reflect.Type, index []int, tl *typeLookup) {

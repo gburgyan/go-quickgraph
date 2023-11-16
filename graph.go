@@ -41,6 +41,35 @@ type Graphy struct {
 	schemaLock sync.Mutex
 }
 
+type FunctionOverride struct {
+	// Name is the name of the function to override.
+	Name string
+
+	// Function is the function to use instead of the original function.
+	Function any
+
+	// ParameterNames is the list of parameter names to use instead of the original
+	// parameter names.
+	ParameterNames []string
+
+	// Deprecated is the deprecation status to use instead of the original deprecation
+	// status.
+	Deprecated *string
+}
+
+type GraphTypeDeprecated interface {
+	TypeDeprecated() *string
+}
+
+type GraphFunctionOverrides interface {
+	FunctionOverrides() map[string]FunctionOverride
+}
+
+var ignoredFunctions = map[string]bool{
+	"TypeDeprecated":    true,
+	"FunctionOverrides": true,
+}
+
 var contextType = reflect.TypeOf((*context.Context)(nil)).Elem()
 var errorType = reflect.TypeOf((*error)(nil)).Elem()
 var stringType = reflect.TypeOf((*string)(nil)).Elem()
@@ -177,7 +206,7 @@ func (g *Graphy) typeLookup(typ reflect.Type) *typeLookup {
 	result.name = rootTyp.Name()
 	if rootTyp.Kind() == reflect.Struct {
 		g.typeMutex.Unlock()
-		g.processFieldLookup(rootTyp, nil, result)
+		g.populateTypeLookup(rootTyp, nil, result)
 		g.typeMutex.Lock()
 		g.typeLookups[typ] = result
 		g.typeMutex.Unlock()

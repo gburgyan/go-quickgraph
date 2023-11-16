@@ -70,11 +70,14 @@ func (tl *typeLookup) ImplementsInterface(name string) (bool, *typeLookup) {
 	return false, nil
 }
 
-// processFieldLookup is a helper function for makeTypeFieldLookup. It recursively processes
+// populateTypeLookup is a helper function for makeTypeFieldLookup. It recursively processes
 // a given type, populating the result map with field lookups. It takes into account JSON
 // tags for naming and field exclusion.
-func (g *Graphy) processFieldLookup(typ reflect.Type, prevIndex []int, tl *typeLookup) {
+func (g *Graphy) populateTypeLookup(typ reflect.Type, prevIndex []int, tl *typeLookup) {
 	name := typ.Name()
+
+	// If tl.type implements the
+
 	if strings.HasSuffix(name, "Union") {
 		g.processUnionFieldLookup(typ, prevIndex, tl, name)
 	} else {
@@ -92,8 +95,7 @@ func (g *Graphy) processUnionFieldLookup(typ reflect.Type, prevIndex []int, tl *
 		field := typ.Field(i)
 
 		// TODO: Add some sanity checking here. Right now it's is bit too loose.
-		fieldType := field.Type
-		fieldTypeLookup := g.typeLookup(fieldType)
+		fieldTypeLookup := g.typeLookup(field.Type)
 		tl.union[fieldTypeLookup.name] = fieldTypeLookup
 		// If the lowercase version of the field name is not already in the map,
 		// add it.
@@ -113,7 +115,7 @@ func (g *Graphy) processBaseTypeFieldLookup(typ reflect.Type, prevIndex []int, t
 		if field.Anonymous {
 			// Queue up the anonymous field for processing later.
 			deferredAnonymous = append(deferredAnonymous, func() {
-				g.processFieldLookup(field.Type, index, tl)
+				g.populateTypeLookup(field.Type, index, tl)
 			})
 			// Get the name of the type of the field.
 			name := field.Type.Name()

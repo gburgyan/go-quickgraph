@@ -77,7 +77,7 @@ func (g *Graphy) schemaForEnum(et *typeLookup) string {
 
 	for _, s := range se.EnumValues() {
 		sb.WriteString("\t")
-		sb.WriteString(s)
+		sb.WriteString(s.Name) // TODO: Add deprecated support.
 		sb.WriteString("\n")
 	}
 	sb.WriteString("}\n")
@@ -130,6 +130,11 @@ func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup, mapping typeNameMap
 			sb.WriteString(field.name)
 			sb.WriteString(": ")
 			sb.WriteString(typeString)
+			if field.isDeprecated {
+				sb.WriteString(" @deprecated(reason: \"")
+				sb.WriteString(field.deprecatedReason)
+				sb.WriteString("\")")
+			}
 			sb.WriteString("\n")
 		} else if field.fieldType == FieldTypeGraphFunction {
 			if kind == TypeOutput {

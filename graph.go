@@ -41,10 +41,33 @@ type Graphy struct {
 	schemaLock sync.Mutex
 }
 
+type GraphTypeExtension interface {
+	GraphTypeExtension() GraphTypeInfo
+}
+
+type GraphTypeInfo struct {
+	// Name is the name of the type.
+	Name string
+
+	// Description is the description of the type.
+	Description string
+
+	// Deprecated is the deprecation status of the type.
+	Deprecated string
+
+	// Function overrides for the type.
+	FunctionDefinitions []FunctionDefinition
+}
+
+var ignoredFunctions = map[string]bool{
+	"GraphTypeExtension": true,
+}
+
 var contextType = reflect.TypeOf((*context.Context)(nil)).Elem()
 var errorType = reflect.TypeOf((*error)(nil)).Elem()
 var stringType = reflect.TypeOf((*string)(nil)).Elem()
 var anyType = reflect.TypeOf((*any)(nil)).Elem()
+var graphTypeExtensionType = reflect.TypeOf((*GraphTypeExtension)(nil)).Elem()
 
 // RegisterQuery registers a function as a query.
 //
@@ -174,10 +197,25 @@ func (g *Graphy) typeLookup(typ reflect.Type) *typeLookup {
 
 	result.rootType = rootTyp
 
-	result.name = rootTyp.Name()
+	if typ.Implements(graphTypeExtensionType) {
+		gtev := reflect.New(typ)
+		gtei := gtev.Elem().Interface().(GraphTypeExtension)
+		typeExtension := gtei.GraphTypeExtension()
+		result.name = typeExtension.Name
+		if typeExtension.Deprecated != "" {
+			result.isDeprecated = true
+			result.deprecatedReason = typeExtension.Deprecated
+		}
+		if typeExtension.Description != "" {
+			result.description = &typeExtension.Description
+		}
+	} else {
+		result.name = rootTyp.Name()
+	}
+
 	if rootTyp.Kind() == reflect.Struct {
 		g.typeMutex.Unlock()
-		g.processFieldLookup(rootTyp, nil, result)
+		g.populateTypeLookup(rootTyp, nil, result)
 		g.typeMutex.Lock()
 		g.typeLookups[typ] = result
 		g.typeMutex.Unlock()

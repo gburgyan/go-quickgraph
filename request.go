@@ -305,6 +305,8 @@ func (g *Graphy) validateGraphFunctionParameters(commandField *resultField, gf *
 		return g.validateAnonymousFunctionParams(commandField, gf, variableTypeMap)
 	case NamedParamsStruct:
 		return g.validateNamedFunctionParams(commandField, gf, variableTypeMap)
+	case NamedParamsInline:
+		return g.validateNamedFunctionParams(commandField, gf, variableTypeMap)
 	default:
 		return fmt.Errorf("unknown function paramType %d", gf.paramType)
 	}

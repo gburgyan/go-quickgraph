@@ -51,6 +51,14 @@ type FunctionDefinition struct {
 	// ReturnEnumName is used to provide a custom name for implicit return unions. If this is
 	// not set the default name is the name of the function followed by "ResultUnion".
 	ReturnUnionName string
+
+	// Description is used to provide a description for the function. This will be used in the
+	// schema.
+	Description *string
+
+	// Deprecated is used to mark a function as deprecated. This will cause the function to
+	// be marked as deprecated in the schema.
+	Deprecated *string
 }
 
 type graphFunction struct {

@@ -24,5 +24,12 @@ type EnumUnmarshaler interface {
 // EnumValues should return a slice of strings representing the valid values
 // for the enumeration.
 type StringEnumValues interface {
-	EnumValues() []string
+	EnumValues() []EnumValue
+}
+
+type EnumValue struct {
+	Name              string
+	Description       string
+	IsDeprecated      bool
+	DeprecationReason string
 }

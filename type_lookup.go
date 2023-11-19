@@ -12,8 +12,6 @@ type fieldType int
 const (
 	FieldTypeField fieldType = iota
 	FieldTypeGraphFunction
-	FieldTypeUnion
-	FieldTypeEnum
 )
 
 type fieldLookup struct {
@@ -22,6 +20,9 @@ type fieldLookup struct {
 	resultType    reflect.Type
 	fieldIndexes  []int
 	graphFunction *graphFunction
+
+	isDeprecated     bool
+	deprecatedReason string
 }
 
 type typeLookup struct {
@@ -36,8 +37,13 @@ type typeLookup struct {
 	fieldsLowercase     map[string]fieldLookup
 	implements          map[string]*typeLookup
 	implementsLowercase map[string]*typeLookup
+	implementedBy       []*typeLookup
 	union               map[string]*typeLookup
 	unionLowercase      map[string]*typeLookup
+
+	description      *string
+	isDeprecated     bool
+	deprecatedReason string
 }
 
 func (tl *typeLookup) GetField(name string) (fieldLookup, bool) {
@@ -65,11 +71,12 @@ func (tl *typeLookup) ImplementsInterface(name string) (bool, *typeLookup) {
 	return false, nil
 }
 
-// processFieldLookup is a helper function for makeTypeFieldLookup. It recursively processes
+// populateTypeLookup is a helper function for makeTypeFieldLookup. It recursively processes
 // a given type, populating the result map with field lookups. It takes into account JSON
 // tags for naming and field exclusion.
-func (g *Graphy) processFieldLookup(typ reflect.Type, prevIndex []int, tl *typeLookup) {
-	name := typ.Name()
+func (g *Graphy) populateTypeLookup(typ reflect.Type, prevIndex []int, tl *typeLookup) {
+	name := tl.name
+
 	if strings.HasSuffix(name, "Union") {
 		g.processUnionFieldLookup(typ, prevIndex, tl, name)
 	} else {
@@ -87,8 +94,7 @@ func (g *Graphy) processUnionFieldLookup(typ reflect.Type, prevIndex []int, tl *
 		field := typ.Field(i)
 
 		// TODO: Add some sanity checking here. Right now it's is bit too loose.
-		fieldType := field.Type
-		fieldTypeLookup := g.typeLookup(fieldType)
+		fieldTypeLookup := g.typeLookup(field.Type)
 		tl.union[fieldTypeLookup.name] = fieldTypeLookup
 		// If the lowercase version of the field name is not already in the map,
 		// add it.
@@ -104,31 +110,11 @@ func (g *Graphy) processBaseTypeFieldLookup(typ reflect.Type, prevIndex []int, t
 
 	for i := 0; i < typ.NumField(); i++ {
 		field := typ.Field(i)
-		// If there's a json tag on the field, use that for the name of the field.
-		// Otherwise, use the name of the field.
-		// If there's a json tag with a "-" value, ignore the field.
-		// If there's a json tag with an "omitempty" value, ignore the field.
-		fieldName := field.Name
-		jsonTag := field.Tag.Get("json")
-		if jsonTag != "" {
-			jsonParts := strings.Split(jsonTag, ",")
-			if jsonParts[0] == "-" {
-				continue
-			}
-			if jsonParts[0] != "" {
-				fieldName = jsonParts[0]
-			}
-		}
-
-		// If we already have a field with that name, ignore it.
-		if _, ok := tl.fields[fieldName]; ok {
-			continue
-		}
 		index := append(prevIndex, i)
 		if field.Anonymous {
 			// Queue up the anonymous field for processing later.
 			deferredAnonymous = append(deferredAnonymous, func() {
-				g.processFieldLookup(field.Type, index, tl)
+				g.populateTypeLookup(field.Type, index, tl)
 			})
 			// Get the name of the type of the field.
 			name := field.Type.Name()
@@ -137,21 +123,28 @@ func (g *Graphy) processBaseTypeFieldLookup(typ reflect.Type, prevIndex []int, t
 
 			tl.implements[name] = anonLookup
 			tl.implementsLowercase[strings.ToLower(name)] = anonLookup
+			anonLookup.implementedBy = append(anonLookup.implementedBy, tl)
 		} else {
+
+			tfl := g.baseFieldLookup(field, index)
+
+			if tfl.name == "" {
+				continue
+			}
+
+			// If we already have a field with that name, ignore it.
+			if _, ok := tl.fields[tfl.name]; ok {
+				continue
+			}
+
 			// TODO: Add enum support here. Special processing for strings that implement
 			//  the StringEnumValues interface.
 
-			tfl := fieldLookup{
-				name:         fieldName,
-				resultType:   field.Type,
-				fieldIndexes: index,
-				fieldType:    FieldTypeField,
-			}
-			tl.fields[fieldName] = tfl
+			tl.fields[tfl.name] = tfl
 			// If the lowercase version of the field name is not already in the map,
 			// add it.
-			if _, ok := tl.fieldsLowercase[strings.ToLower(fieldName)]; !ok {
-				tl.fieldsLowercase[strings.ToLower(fieldName)] = tfl
+			if _, ok := tl.fieldsLowercase[strings.ToLower(tfl.name)]; !ok {
+				tl.fieldsLowercase[strings.ToLower(tfl.name)] = tfl
 			}
 		}
 	}
@@ -185,27 +178,106 @@ func (g *Graphy) processBaseTypeFieldLookup(typ reflect.Type, prevIndex []int, t
 	}
 }
 
+func (g *Graphy) baseFieldLookup(field reflect.StructField, index []int) fieldLookup {
+	// If there's a json tag on the field, use that for the name of the field.
+	// Otherwise, use the name of the field.
+	// If there's a json tag with a "-" value, ignore the field.
+	tfl := fieldLookup{
+		name:         field.Name,
+		resultType:   field.Type,
+		fieldIndexes: index,
+		fieldType:    FieldTypeField,
+	}
+
+	if jsonTag := field.Tag.Get("json"); jsonTag != "" {
+		jsonParts := strings.Split(jsonTag, ",")
+		if jsonParts[0] == "-" {
+			return fieldLookup{}
+		}
+		if jsonParts[0] != "" {
+			tfl.name = jsonParts[0]
+		}
+	}
+
+	if graphyTag := field.Tag.Get("graphy"); graphyTag != "" {
+		graphyParts := strings.Split(graphyTag, ",")
+
+		// First part, if it has no special meaning, is the name of the field.
+		// All the parts are name=value pairs (except the first part, which can be special).
+		// If there are quotes around the value, they are stripped.
+		// The special parts are:
+		//  - name: the name of the field
+		//  - deprecated: if exists, the field is deprecated with the value as the reason
+
+		for _, part := range graphyParts {
+			parts := strings.Split(part, "=")
+			if len(parts) == 1 {
+				tfl.name = parts[0]
+			} else {
+				// If the value is quoted, strip the quotes.
+				switch parts[0] {
+				case "name":
+					tfl.name = parts[1]
+				case "deprecated":
+					tfl.isDeprecated = true
+					tfl.deprecatedReason = parts[1]
+				}
+			}
+		}
+	}
+
+	return tfl
+}
+
 func (g *Graphy) addGraphMethodsForType(typ reflect.Type, index []int, tl *typeLookup) {
+	functionDefs := map[string]FunctionDefinition{}
 	for i := 0; i < typ.NumMethod(); i++ {
 		m := typ.Method(i)
+		if _, found := ignoredFunctions[m.Name]; found {
+			// Ignore functions that are designed to be ignored as
+			// framework functions.
+			continue
+		}
+		fd := FunctionDefinition{
+			Name:     m.Name,
+			Function: m.Func,
+		}
+		functionDefs[m.Name] = fd
+	}
+	if typ.Implements(graphTypeExtensionType) {
+		gtev := reflect.New(typ)
+		gtei := gtev.Elem().Interface().(GraphTypeExtension)
+		typeExtension := gtei.GraphTypeExtension()
+		for _, override := range typeExtension.FunctionDefinitions {
+			functionDefs[override.Name] = override
+		}
+	}
 
+	for _, funcDef := range functionDefs {
 		// Gather the inputs and outputs of the function.
+		var method reflect.Type
+		var function reflect.Value
+		if f, ok := funcDef.Function.(reflect.Value); ok {
+			method = f.Type()
+			function = f
+		} else {
+			method = reflect.TypeOf(funcDef.Function)
+			function = reflect.ValueOf(funcDef.Function)
+		}
+
 		var inTypes []reflect.Type
 		var outTypes []reflect.Type
-		for j := 0; j < m.Type.NumIn(); j++ {
-			inTypes = append(inTypes, m.Type.In(j))
+		for j := 0; j < method.NumIn(); j++ {
+			inTypes = append(inTypes, method.In(j))
 		}
-		for j := 0; j < m.Type.NumOut(); j++ {
-			outTypes = append(outTypes, m.Type.Out(j))
+		for j := 0; j < method.NumOut(); j++ {
+			outTypes = append(outTypes, method.Out(j))
 		}
 
-		err := g.validateGraphFunction(m.Func, m.Name, true)
+		err := g.validateGraphFunction(function, funcDef.Name, true)
 		if err == nil {
 			// Todo: Make this take a reflect.Type instead of an any.
-			gf := g.newGraphFunction(FunctionDefinition{
-				Name:     m.Name,
-				Function: m.Func,
-			}, true)
+			gf := g.newGraphFunction(funcDef, true)
 			// TODO: There seems to be a reflection issue where functions from
 			//  an anonymous struct are not properly recognized as being from
 			//  that struct. We need to figure out what's going on so when emitting
@@ -214,17 +286,17 @@ func (g *Graphy) addGraphMethodsForType(typ reflect.Type, index []int, tl *typeL
 			//  has a function, that will presently be output as a function of
 			//  both the struct as well as the type that includes it as anonymous.
 			tfl := fieldLookup{
-				name:          m.Name,
+				name:          funcDef.Name,
 				resultType:    gf.rawReturnType,
 				fieldIndexes:  index,
 				fieldType:     FieldTypeGraphFunction,
 				graphFunction: &gf,
 			}
-			tl.fields[m.Name] = tfl
+			tl.fields[funcDef.Name] = tfl
 			// If the lowercase version of the field name is not already in the map,
 			// add it.
-			if _, ok := tl.fieldsLowercase[strings.ToLower(m.Name)]; !ok {
-				tl.fieldsLowercase[strings.ToLower(m.Name)] = tfl
+			if _, ok := tl.fieldsLowercase[strings.ToLower(funcDef.Name)]; !ok {
+				tl.fieldsLowercase[strings.ToLower(funcDef.Name)] = tfl
 			}
 		}
 	}

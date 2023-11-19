@@ -208,9 +208,12 @@ func (g *Graphy) getIntrospectionBaseType(is *__Schema, tl *typeLookup, io TypeK
 		sev := enumValue.Convert(stringEnumValuesType)
 		se := sev.Interface().(StringEnumValues)
 		for _, s := range se.EnumValues() {
+			s := s
 			value := __EnumValue{
-				Name:        s.Name,
-				Description: s.Description,
+				Name: s.Name,
+			}
+			if s.Description != "" {
+				value.Description = &s.Description
 			}
 			if s.IsDeprecated {
 				value.IsDeprecated = true
@@ -228,10 +231,20 @@ func (g *Graphy) getIntrospectionBaseType(is *__Schema, tl *typeLookup, io TypeK
 			ft := tl.fields[fieldName]
 			if ft.fieldType == FieldTypeField {
 				if io == TypeOutput {
-					field := __Field{Name: fieldName, Type: g.getIntrospectionModifiedType(is, g.typeLookup(ft.resultType), io)}
+					field := __Field{
+						Name:         fieldName,
+						Type:         g.getIntrospectionModifiedType(is, g.typeLookup(ft.resultType), io),
+						IsDeprecated: ft.isDeprecated,
+					}
+					if ft.isDeprecated {
+						field.DeprecationReason = &ft.deprecatedReason
+					}
 					result.fieldsRaw = append(result.fieldsRaw, field)
 				} else {
-					input := __InputValue{Name: fieldName, Type: g.getIntrospectionModifiedType(is, g.typeLookup(ft.resultType), io)}
+					input := __InputValue{
+						Name: fieldName,
+						Type: g.getIntrospectionModifiedType(is, g.typeLookup(ft.resultType), io),
+					}
 					result.InputFields = append(result.InputFields, input)
 				}
 			} else if ft.fieldType == FieldTypeGraphFunction {
@@ -246,6 +259,7 @@ func (g *Graphy) getIntrospectionBaseType(is *__Schema, tl *typeLookup, io TypeK
 
 func (g *Graphy) introspectionCall(is *__Schema, f *graphFunction) (*__Type, []__InputValue) {
 	result := g.getIntrospectionModifiedType(is, f.baseReturnType, TypeOutput)
+
 	var args []__InputValue
 	for _, param := range f.indexMapping {
 		args = append(args, __InputValue{

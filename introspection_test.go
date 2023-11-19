@@ -8,26 +8,7 @@ import (
 	"testing"
 )
 
-func TestGraphy_Introspection_Schema(t *testing.T) {
-	g := Graphy{}
-	ctx := context.Background()
-
-	g.RegisterFunction(ctx, FunctionDefinition{
-		Name: "search",
-		Function: func(search string) []SearchResultUnion {
-			return []SearchResultUnion{
-				{
-					Human: &Human{},
-				},
-			}
-		},
-		Mode:           ModeQuery,
-		ParameterNames: []string{"search"},
-	})
-	g.EnableIntrospection(ctx)
-
-	// This query is from the RapidAPI app.
-	query := `
+var fullIntrospectionQuery = `
    query IntrospectionQuery {
      __schema {
 
@@ -54,7 +35,7 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
      name
      description
 
-     fields(includeDeprecated: false) {
+     fields(includeDeprecated: true) {
        name
        description
        args {
@@ -72,7 +53,7 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
      interfaces {
        ...TypeRef
      }
-     enumValues(includeDeprecated: false) {
+     enumValues(includeDeprecated: true) {
        name
        description
        isDeprecated
@@ -124,7 +105,27 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
    }
 `
 
-	result, err := g.ProcessRequest(ctx, query, "")
+func TestGraphy_Introspection_Schema(t *testing.T) {
+	g := Graphy{}
+	ctx := context.Background()
+
+	g.RegisterFunction(ctx, FunctionDefinition{
+		Name: "search",
+		Function: func(search string) []SearchResultUnion {
+			return []SearchResultUnion{
+				{
+					Human: &Human{},
+				},
+			}
+		},
+		Mode:           ModeQuery,
+		ParameterNames: []string{"search"},
+	})
+	g.EnableIntrospection(ctx)
+
+	// This query is from the RapidAPI app.
+
+	result, err := g.ProcessRequest(ctx, fullIntrospectionQuery, "")
 	assert.NoError(t, err)
 
 	expected := `{
@@ -885,6 +886,212 @@ func TestGraphy_Introspection_Type(t *testing.T) {
       ],
       "kind": "OBJECT",
       "name": "Character"
+    }
+  }
+}`
+
+	buff := bytes.Buffer{}
+	err = json.Indent(&buff, []byte(result), "", "  ")
+	assert.NoError(t, err)
+
+	formatted := buff.String()
+
+	assert.Equal(t, expected, formatted)
+}
+
+type enumWithDescription string
+
+func (e enumWithDescription) EnumValues() []EnumValue {
+	return []EnumValue{
+		{Name: "ENUM1", Description: "This is the first enum."},
+		{Name: "ENUM-HALF", Description: "This is a half enum?", IsDeprecated: true, DeprecationReason: "This is deprecated."},
+		{Name: "ENUM2", Description: "This is the second enum."},
+	}
+}
+
+func TestGraphy_Introspection_Deprecation(t *testing.T) {
+	g := Graphy{}
+	ctx := context.Background()
+
+	type TestType struct {
+		// This field is deprecated.
+		DeprecatedField string `graphy:"name=deprecatedField,deprecated=This field is deprecated."`
+		AnEnum          enumWithDescription
+	}
+
+	g.RegisterFunction(ctx, FunctionDefinition{
+		Name: "sample",
+		Function: func(input string) []TestType {
+			return []TestType{
+				{
+					DeprecatedField: input,
+				},
+			}
+		},
+		Mode:           ModeQuery,
+		ParameterNames: []string{"input"},
+	})
+	g.EnableIntrospection(ctx)
+
+	// This query is from the RapidAPI app.
+	result, err := g.ProcessRequest(ctx, fullIntrospectionQuery, "")
+	assert.NoError(t, err)
+
+	expected := `{
+  "data": {
+    "__schema": {
+      "directives": [],
+      "mutationType": {
+        "name": "__mutation"
+      },
+      "queryType": {
+        "name": "__query"
+      },
+      "subscriptionType": null,
+      "types": [
+        {
+          "description": null,
+          "enumValues": [],
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "AnEnum",
+              "type": {
+                "kind": "NON_NULL",
+                "name": "required",
+                "ofType": {
+                  "kind": "ENUM",
+                  "name": "enumWithDescription",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": "This field is deprecated.",
+              "description": null,
+              "isDeprecated": true,
+              "name": "deprecatedField",
+              "type": {
+                "kind": "NON_NULL",
+                "name": "required",
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "string",
+                  "ofType": null
+                }
+              }
+            }
+          ],
+          "inputFields": [],
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "TestType",
+          "possibleTypes": []
+        },
+        {
+          "description": null,
+          "enumValues": [
+            {
+              "deprecationReason": "This is deprecated.",
+              "description": "This is a half enum?",
+              "isDeprecated": true,
+              "name": "ENUM-HALF"
+            },
+            {
+              "deprecationReason": null,
+              "description": "This is the first enum.",
+              "isDeprecated": false,
+              "name": "ENUM1"
+            },
+            {
+              "deprecationReason": null,
+              "description": "This is the second enum.",
+              "isDeprecated": false,
+              "name": "ENUM2"
+            }
+          ],
+          "fields": [],
+          "inputFields": [],
+          "interfaces": [],
+          "kind": "ENUM",
+          "name": "enumWithDescription",
+          "possibleTypes": []
+        },
+        {
+          "description": null,
+          "enumValues": [],
+          "fields": [],
+          "inputFields": [],
+          "interfaces": [],
+          "kind": "SCALAR",
+          "name": "string",
+          "possibleTypes": []
+        },
+        {
+          "description": null,
+          "enumValues": [],
+          "fields": [
+            {
+              "args": [
+                {
+                  "defaultValue": null,
+                  "description": null,
+                  "name": "input",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": "required",
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "string",
+                      "ofType": null
+                    }
+                  }
+                }
+              ],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "sample",
+              "type": {
+                "kind": "NON_NULL",
+                "name": "required",
+                "ofType": {
+                  "kind": "LIST",
+                  "name": "list",
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": "required",
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "TestType",
+                      "ofType": null
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "inputFields": [],
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "__query",
+          "possibleTypes": []
+        },
+        {
+          "description": null,
+          "enumValues": [],
+          "fields": [],
+          "inputFields": [],
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "__mutation",
+          "possibleTypes": []
+        }
+      ]
     }
   }
 }`

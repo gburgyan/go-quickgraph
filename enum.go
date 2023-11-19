@@ -29,7 +29,7 @@ type StringEnumValues interface {
 
 type EnumValue struct {
 	Name              string
-	Description       *string
+	Description       string
 	IsDeprecated      bool
 	DeprecationReason string
 }

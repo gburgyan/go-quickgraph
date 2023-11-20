@@ -412,7 +412,17 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
             }
           ],
           "inputFields": [],
-          "interfaces": [],
+          "interfaces": [
+            {
+              "kind": "NON_NULL",
+              "name": "required",
+              "ofType": {
+                "kind": "OBJECT",
+                "name": "Character",
+                "ofType": null
+              }
+            }
+          ],
           "kind": "OBJECT",
           "name": "Droid",
           "possibleTypes": []
@@ -616,7 +626,17 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
             }
           ],
           "inputFields": [],
-          "interfaces": [],
+          "interfaces": [
+            {
+              "kind": "NON_NULL",
+              "name": "required",
+              "ofType": {
+                "kind": "OBJECT",
+                "name": "Character",
+                "ofType": null
+              }
+            }
+          ],
           "kind": "OBJECT",
           "name": "Human",
           "possibleTypes": []
@@ -1071,6 +1091,508 @@ func TestGraphy_Introspection_Deprecation(t *testing.T) {
                       "ofType": null
                     }
                   }
+                }
+              }
+            }
+          ],
+          "inputFields": [],
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "__query",
+          "possibleTypes": []
+        },
+        {
+          "description": null,
+          "enumValues": [],
+          "fields": [],
+          "inputFields": [],
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "__mutation",
+          "possibleTypes": []
+        }
+      ]
+    }
+  }
+}`
+
+	buff := bytes.Buffer{}
+	err = json.Indent(&buff, []byte(result), "", "  ")
+	assert.NoError(t, err)
+
+	formatted := buff.String()
+
+	assert.Equal(t, expected, formatted)
+}
+
+func TestGraphy_Introspection_Interface(t *testing.T) {
+	g := Graphy{}
+	ctx := context.Background()
+
+	g.RegisterFunction(ctx, FunctionDefinition{
+		Name: "sample",
+		Function: func(input string) any {
+			return Droid{
+				Character: Character{
+					Name: input,
+				},
+				PrimaryFunction: "droiding",
+			}
+		},
+		Mode:              ModeQuery,
+		ParameterNames:    []string{"input"},
+		ReturnAnyOverride: []any{Character{}},
+	})
+	g.RegisterTypes(ctx, Droid{}, Character{})
+	g.EnableIntrospection(ctx)
+
+	// This query is from the RapidAPI app.
+	result, err := g.ProcessRequest(ctx, fullIntrospectionQuery, "")
+	assert.NoError(t, err)
+
+	expected := `{
+  "data": {
+    "__schema": {
+      "directives": [],
+      "mutationType": {
+        "name": "__mutation"
+      },
+      "queryType": {
+        "name": "__query"
+      },
+      "subscriptionType": null,
+      "types": [
+        {
+          "description": null,
+          "enumValues": [],
+          "fields": [
+            {
+              "args": [
+                {
+                  "defaultValue": null,
+                  "description": null,
+                  "name": "arg1",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": "required",
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "int",
+                      "ofType": null
+                    }
+                  }
+                }
+              ],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "FriendsConnection",
+              "type": {
+                "kind": "OBJECT",
+                "name": "FriendsConnection",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "appearsIn",
+              "type": {
+                "kind": "NON_NULL",
+                "name": "required",
+                "ofType": {
+                  "kind": "LIST",
+                  "name": "list",
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": "required",
+                    "ofType": {
+                      "kind": "ENUM",
+                      "name": "episode",
+                      "ofType": null
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "friends",
+              "type": {
+                "kind": "NON_NULL",
+                "name": "required",
+                "ofType": {
+                  "kind": "LIST",
+                  "name": "list",
+                  "ofType": {
+                    "kind": "INTERFACE",
+                    "name": "Character",
+                    "ofType": null
+                  }
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "id",
+              "type": {
+                "kind": "NON_NULL",
+                "name": "required",
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "string",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "name",
+              "type": {
+                "kind": "NON_NULL",
+                "name": "required",
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "string",
+                  "ofType": null
+                }
+              }
+            }
+          ],
+          "inputFields": [],
+          "interfaces": [],
+          "kind": "INTERFACE",
+          "name": "Character",
+          "possibleTypes": [
+            {
+              "kind": "OBJECT",
+              "name": "Droid",
+              "ofType": null
+            }
+          ]
+        },
+        {
+          "description": null,
+          "enumValues": [],
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "node",
+              "type": {
+                "kind": "INTERFACE",
+                "name": "Character",
+                "ofType": null
+              }
+            }
+          ],
+          "inputFields": [],
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "ConnectionEdge",
+          "possibleTypes": []
+        },
+        {
+          "description": null,
+          "enumValues": [],
+          "fields": [
+            {
+              "args": [
+                {
+                  "defaultValue": null,
+                  "description": null,
+                  "name": "arg1",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": "required",
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "int",
+                      "ofType": null
+                    }
+                  }
+                }
+              ],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "FriendsConnection",
+              "type": {
+                "kind": "OBJECT",
+                "name": "FriendsConnection",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "appearsIn",
+              "type": {
+                "kind": "NON_NULL",
+                "name": "required",
+                "ofType": {
+                  "kind": "LIST",
+                  "name": "list",
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": "required",
+                    "ofType": {
+                      "kind": "ENUM",
+                      "name": "episode",
+                      "ofType": null
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "friends",
+              "type": {
+                "kind": "NON_NULL",
+                "name": "required",
+                "ofType": {
+                  "kind": "LIST",
+                  "name": "list",
+                  "ofType": {
+                    "kind": "INTERFACE",
+                    "name": "Character",
+                    "ofType": null
+                  }
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "id",
+              "type": {
+                "kind": "NON_NULL",
+                "name": "required",
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "string",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "name",
+              "type": {
+                "kind": "NON_NULL",
+                "name": "required",
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "string",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "primaryFunction",
+              "type": {
+                "kind": "NON_NULL",
+                "name": "required",
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "string",
+                  "ofType": null
+                }
+              }
+            }
+          ],
+          "inputFields": [],
+          "interfaces": [
+            {
+              "kind": "NON_NULL",
+              "name": "required",
+              "ofType": {
+                "kind": "INTERFACE",
+                "name": "Character",
+                "ofType": null
+              }
+            }
+          ],
+          "kind": "OBJECT",
+          "name": "Droid",
+          "possibleTypes": []
+        },
+        {
+          "description": null,
+          "enumValues": [],
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "edges",
+              "type": {
+                "kind": "NON_NULL",
+                "name": "required",
+                "ofType": {
+                  "kind": "LIST",
+                  "name": "list",
+                  "ofType": {
+                    "kind": "OBJECT",
+                    "name": "ConnectionEdge",
+                    "ofType": null
+                  }
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "totalCount",
+              "type": {
+                "kind": "NON_NULL",
+                "name": "required",
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "int",
+                  "ofType": null
+                }
+              }
+            }
+          ],
+          "inputFields": [],
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "FriendsConnection",
+          "possibleTypes": []
+        },
+        {
+          "description": null,
+          "enumValues": [
+            {
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "EMPIRE"
+            },
+            {
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "JEDI"
+            },
+            {
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "NEWHOPE"
+            }
+          ],
+          "fields": [],
+          "inputFields": [],
+          "interfaces": [],
+          "kind": "ENUM",
+          "name": "episode",
+          "possibleTypes": []
+        },
+        {
+          "description": null,
+          "enumValues": [],
+          "fields": [],
+          "inputFields": [],
+          "interfaces": [],
+          "kind": "SCALAR",
+          "name": "int",
+          "possibleTypes": []
+        },
+        {
+          "description": null,
+          "enumValues": [],
+          "fields": [],
+          "inputFields": [],
+          "interfaces": [],
+          "kind": "UNION",
+          "name": "sampleResultUnion",
+          "possibleTypes": [
+            {
+              "kind": "NON_NULL",
+              "name": "required",
+              "ofType": {
+                "kind": "INTERFACE",
+                "name": "Character",
+                "ofType": null
+              }
+            }
+          ]
+        },
+        {
+          "description": null,
+          "enumValues": [],
+          "fields": [],
+          "inputFields": [],
+          "interfaces": [],
+          "kind": "SCALAR",
+          "name": "string",
+          "possibleTypes": []
+        },
+        {
+          "description": null,
+          "enumValues": [],
+          "fields": [
+            {
+              "args": [
+                {
+                  "defaultValue": null,
+                  "description": null,
+                  "name": "input",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": "required",
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "string",
+                      "ofType": null
+                    }
+                  }
+                }
+              ],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "sample",
+              "type": {
+                "kind": "NON_NULL",
+                "name": "required",
+                "ofType": {
+                  "kind": "UNION",
+                  "name": "sampleResultUnion",
+                  "ofType": null
                 }
               }
             }

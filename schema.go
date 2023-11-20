@@ -244,6 +244,9 @@ func (g *Graphy) recursiveAddTypeLookup(tl *typeLookup, typeMap map[*typeLookup]
 	for _, tl := range tl.implements {
 		typeMap = g.recursiveAddTypeLookup(tl, typeMap)
 	}
+	for _, tl := range tl.implementedBy {
+		typeMap = g.recursiveAddTypeLookup(tl, typeMap)
+	}
 	for _, tl := range tl.union {
 		typeMap = g.recursiveAddTypeLookup(tl, typeMap)
 	}

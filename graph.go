@@ -135,6 +135,24 @@ func (g *Graphy) RegisterAnyType(ctx context.Context, types ...any) {
 	}
 }
 
+// RegisterTypes is a method on the Graphy struct that registers types that implement interfaces.
+// This is useful for discovering types that implement certain interfaces.
+// The method takes in a context and a variadic parameter of types (of any kind).
+// It iterates over the provided types and performs a type lookup for each type.
+//
+// Parameters:
+// - ctx: The context within which the method operates.
+// - types: A variadic parameter that represents instances ot types to be registered.
+//
+// Usage:
+// g := &Graphy{}
+// g.RegisterTypes(context.Background(), Type1{}, Type2{}, Type3{})
+func (g *Graphy) RegisterTypes(ctx context.Context, types ...any) {
+	for _, t := range types {
+		g.typeLookup(reflect.TypeOf(t))
+	}
+}
+
 func (g *Graphy) ensureInitialized() {
 	if g.processors == nil {
 		g.processors = map[string]graphFunction{}

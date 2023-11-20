@@ -200,8 +200,17 @@ func (g *Graphy) getIntrospectionBaseType(is *__Schema, tl *typeLookup, io TypeK
 			ul := tl.union[name]
 			result.PossibleTypes = append(result.PossibleTypes, g.getIntrospectionModifiedType(is, ul, io))
 		}
-	case tl.rootType.Kind() == reflect.Interface:
+	case len(tl.implementedBy) > 0:
 		result.Kind = IntrospectionKindInterface
+		g.addIntrospectionSchemaFields(is, tl, io, result)
+		impls := tl.implementedBy
+		sort.Slice(impls, func(i, j int) bool {
+			return impls[i].name < impls[j].name
+		})
+		for _, impl := range impls {
+			implType := g.getIntrospectionBaseType(is, impl, io)
+			result.PossibleTypes = append(result.PossibleTypes, implType)
+		}
 	case tl.rootType.ConvertibleTo(stringEnumValuesType):
 		result.Kind = IntrospectionKindEnum
 		enumValue := reflect.New(tl.rootType)
@@ -227,34 +236,41 @@ func (g *Graphy) getIntrospectionBaseType(is *__Schema, tl *typeLookup, io TypeK
 		result.Kind = IntrospectionKindInputObject
 	default:
 		result.Kind = IntrospectionKindObject
-		for _, fieldName := range sortedKeys(tl.fields) {
-			ft := tl.fields[fieldName]
-			if ft.fieldType == FieldTypeField {
-				if io == TypeOutput {
-					field := __Field{
-						Name:         fieldName,
-						Type:         g.getIntrospectionModifiedType(is, g.typeLookup(ft.resultType), io),
-						IsDeprecated: ft.isDeprecated,
-					}
-					if ft.isDeprecated {
-						field.DeprecationReason = &ft.deprecatedReason
-					}
-					result.fieldsRaw = append(result.fieldsRaw, field)
-				} else {
-					input := __InputValue{
-						Name: fieldName,
-						Type: g.getIntrospectionModifiedType(is, g.typeLookup(ft.resultType), io),
-					}
-					result.InputFields = append(result.InputFields, input)
-				}
-			} else if ft.fieldType == FieldTypeGraphFunction {
-				call, args := g.introspectionCall(is, ft.graphFunction)
-				result.fieldsRaw = append(result.fieldsRaw, __Field{Name: fieldName, Type: call, Args: args})
-			}
+		g.addIntrospectionSchemaFields(is, tl, io, result)
+		for _, impls := range sortedKeys(tl.implements) {
+			result.Interfaces = append(result.Interfaces, g.getIntrospectionModifiedType(is, tl.implements[impls], io))
 		}
 	}
 
 	return result
+}
+
+func (g *Graphy) addIntrospectionSchemaFields(is *__Schema, tl *typeLookup, io TypeKind, result *__Type) {
+	for _, fieldName := range sortedKeys(tl.fields) {
+		ft := tl.fields[fieldName]
+		if ft.fieldType == FieldTypeField {
+			if io == TypeOutput {
+				field := __Field{
+					Name:         fieldName,
+					Type:         g.getIntrospectionModifiedType(is, g.typeLookup(ft.resultType), io),
+					IsDeprecated: ft.isDeprecated,
+				}
+				if ft.isDeprecated {
+					field.DeprecationReason = &ft.deprecatedReason
+				}
+				result.fieldsRaw = append(result.fieldsRaw, field)
+			} else {
+				input := __InputValue{
+					Name: fieldName,
+					Type: g.getIntrospectionModifiedType(is, g.typeLookup(ft.resultType), io),
+				}
+				result.InputFields = append(result.InputFields, input)
+			}
+		} else if ft.fieldType == FieldTypeGraphFunction {
+			call, args := g.introspectionCall(is, ft.graphFunction)
+			result.fieldsRaw = append(result.fieldsRaw, __Field{Name: fieldName, Type: call, Args: args})
+		}
+	}
 }
 
 func (g *Graphy) introspectionCall(is *__Schema, f *graphFunction) (*__Type, []__InputValue) {

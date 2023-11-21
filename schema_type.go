@@ -91,80 +91,97 @@ func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup, mapping typeNameMap
 		return g.schemaForUnion(name, t, mapping)
 	}
 
-	sb := strings.Builder{}
-	if kind == TypeInput {
-		sb.WriteString("input ")
-	} else {
-		sb.WriteString("type ")
-	}
+	sb := &strings.Builder{}
+	sb.WriteString(g.getSchemaTypePrefix(kind))
 	sb.WriteString(name)
-
-	if len(t.implements) > 0 {
-		sb.WriteString(" implements")
-		interfaceCount := 0
-		for _, implementedType := range t.implements {
-			sb.WriteString(" ")
-			if interfaceCount > 0 {
-				sb.WriteString("& ")
-			}
-			interfaceCount++
-			sb.WriteString(mapping[implementedType])
-		}
-	}
-
+	sb.WriteString(g.getSchemaImplementedInterfaces(t, mapping))
 	sb.WriteString(" {\n")
-
-	// Get the field names in alphabetical order.
-	fieldNames := sortedKeys(t.fieldsLowercase)
-
-	for _, name := range fieldNames {
-		field := t.fieldsLowercase[name]
-		if field.fieldType == FieldTypeField {
-			if len(field.fieldIndexes) > 1 {
-				// These are going to be either union or implemented interfaces. These need
-				// to be handled differently.
-				continue
-			}
-			typeString := g.schemaRefForType(g.typeLookup(field.resultType), mapping)
-			sb.WriteString("\t")
-			sb.WriteString(field.name)
-			sb.WriteString(": ")
-			sb.WriteString(typeString)
-			if field.isDeprecated {
-				sb.WriteString(" @deprecated(reason: \"")
-				sb.WriteString(field.deprecatedReason)
-				sb.WriteString("\")")
-			}
-			sb.WriteString("\n")
-		} else if field.fieldType == FieldTypeGraphFunction {
-			if kind == TypeOutput {
-				if len(field.fieldIndexes) > 1 {
-					// These are going to be either union or implemented interfaces. These need
-					// to be handled differently.
-					continue
-				}
-				sb.WriteString("\t")
-				sb.WriteString(field.name)
-				if len(field.graphFunction.nameMapping) > 0 {
-					sb.WriteString("(")
-					funcParams := g.schemaForFunctionParameters(field.graphFunction, mapping)
-					sb.WriteString(funcParams)
-					sb.WriteString(")")
-				}
-				sb.WriteString(": ")
-				schemaRef := g.schemaRefForType(field.graphFunction.baseReturnType, mapping)
-				sb.WriteString(schemaRef)
-				sb.WriteString("\n")
-			}
-		} else {
-			panic("unknown field type")
-		}
-	}
-
+	sb.WriteString(g.getSchemaFields(t, kind, mapping))
 	sb.WriteString("}\n")
+
 	return sb.String()
 }
 
+func (g *Graphy) getSchemaTypePrefix(kind TypeKind) string {
+	if kind == TypeInput {
+		return "input "
+	}
+	return "type "
+}
+
+func (g *Graphy) getSchemaImplementedInterfaces(t *typeLookup, mapping typeNameMapping) string {
+	if len(t.implements) == 0 {
+		return ""
+	}
+
+	sb := &strings.Builder{}
+	sb.WriteString(" implements")
+	interfaceCount := 0
+	for _, implementedType := range t.implements {
+		if interfaceCount > 0 {
+			sb.WriteString("& ")
+		}
+		interfaceCount++
+		sb.WriteString(" ")
+		sb.WriteString(mapping[implementedType])
+	}
+
+	return sb.String()
+}
+
+func (g *Graphy) getSchemaFields(t *typeLookup, kind TypeKind, mapping typeNameMapping) string {
+	sb := &strings.Builder{}
+	for _, name := range sortedKeys(t.fieldsLowercase) {
+		field := t.fieldsLowercase[name]
+		if len(field.fieldIndexes) > 1 {
+			continue
+		}
+
+		fieldTypeString := g.getSchemaFieldType(&field, kind, mapping)
+		if fieldTypeString == "" {
+			continue
+		}
+
+		sb.WriteString("\t")
+		sb.WriteString(field.name)
+		sb.WriteString(fieldTypeString)
+
+		if field.isDeprecated {
+			sb.WriteString(" @deprecated(reason: \"")
+			sb.WriteString(field.deprecatedReason)
+			sb.WriteString("\")")
+		}
+
+		sb.WriteString("\n")
+	}
+
+	return sb.String()
+}
+
+func (g *Graphy) getSchemaFieldType(field *fieldLookup, kind TypeKind, mapping typeNameMapping) string {
+	switch field.fieldType {
+	case FieldTypeField:
+		return ": " + g.schemaRefForType(g.typeLookup(field.resultType), mapping)
+	case FieldTypeGraphFunction:
+		if kind == TypeOutput {
+			return g.getSchemaGraphFunctionType(field, mapping)
+		}
+	}
+	return ""
+}
+
+func (g *Graphy) getSchemaGraphFunctionType(field *fieldLookup, mapping typeNameMapping) string {
+	sb := &strings.Builder{}
+	if len(field.graphFunction.nameMapping) > 0 {
+		sb.WriteString("(")
+		sb.WriteString(g.schemaForFunctionParameters(field.graphFunction, mapping))
+		sb.WriteString(")")
+	}
+	sb.WriteString(": ")
+	sb.WriteString(g.schemaRefForType(field.graphFunction.baseReturnType, mapping))
+
+	return sb.String()
+}
 func (g *Graphy) schemaForUnion(name string, t *typeLookup, mapping typeNameMapping) string {
 	sb := strings.Builder{}
 	sb.WriteString("union ")

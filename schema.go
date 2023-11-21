@@ -11,6 +11,8 @@ type usageMap map[*typeLookup]bool
 type typeNameLookup map[string]*typeLookup
 type typeNameMapping map[*typeLookup]string
 
+// schemaTypes provides a cache for the schema-related data structures.
+// It is regenerated whenever the types or functions are modified.
 type schemaTypes struct {
 	inputTypes  []*typeLookup
 	outputTypes []*typeLookup

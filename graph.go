@@ -121,6 +121,8 @@ func (g *Graphy) RegisterFunction(ctx context.Context, def FunctionDefinition) {
 	g.ensureInitialized()
 	gf := g.newGraphFunction(def, false)
 	g.processors[def.Name] = gf
+
+	g.schemaBuffer = nil
 }
 
 // RegisterAnyType registers a type that is potentially used as a return type for a function
@@ -129,10 +131,15 @@ func (g *Graphy) RegisterFunction(ctx context.Context, def FunctionDefinition) {
 // found -- this it needed to infer the types of parameters in cases those are fulfilled with
 // variables.
 func (g *Graphy) RegisterAnyType(ctx context.Context, types ...any) {
+	g.structureLock.Lock()
+	defer g.structureLock.Unlock()
+
 	for _, t := range types {
 		tl := g.typeLookup(reflect.TypeOf(t))
 		g.anyTypes = append(g.anyTypes, tl)
 	}
+
+	g.schemaBuffer = nil
 }
 
 // RegisterTypes is a method on the Graphy struct that registers types that implement interfaces.
@@ -148,9 +155,14 @@ func (g *Graphy) RegisterAnyType(ctx context.Context, types ...any) {
 // g := &Graphy{}
 // g.RegisterTypes(context.Background(), Type1{}, Type2{}, Type3{})
 func (g *Graphy) RegisterTypes(ctx context.Context, types ...any) {
+	g.structureLock.Lock()
+	defer g.structureLock.Unlock()
+
 	for _, t := range types {
 		g.typeLookup(reflect.TypeOf(t))
 	}
+
+	g.schemaBuffer = nil
 }
 
 func (g *Graphy) ensureInitialized() {

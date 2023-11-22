@@ -56,9 +56,9 @@ type FunctionDefinition struct {
 	// schema.
 	Description *string
 
-	// Deprecated is used to mark a function as deprecated. This will cause the function to
+	// DeprecatedReason is used to mark a function as deprecated. This will cause the function to
 	// be marked as deprecated in the schema.
-	Deprecated *string
+	DeprecatedReason *string
 }
 
 type graphFunction struct {
@@ -69,17 +69,17 @@ type graphFunction struct {
 	method   bool
 
 	// Input handling
-	paramType    GraphFunctionParamType
-	mode         GraphFunctionMode
-	nameMapping  map[string]functionNameMapping
-	indexMapping []functionNameMapping
+	paramType     GraphFunctionParamType
+	mode          GraphFunctionMode
+	paramsByName  map[string]functionParamNameMapping
+	paramsByIndex []functionParamNameMapping
 
 	// Output handling
 	baseReturnType *typeLookup
 	rawReturnType  reflect.Type
 }
 
-type functionNameMapping struct {
+type functionParamNameMapping struct {
 	name              string
 	paramIndex        int // Todo: make this into a slice of param indexes for anonymous params
 	paramType         reflect.Type
@@ -182,7 +182,7 @@ func (g *Graphy) newGraphFunction(def FunctionDefinition, method bool) graphFunc
 	}
 	// Gather the parameter types, ignoring the context.Context if it is
 	// present.
-	var inputTypes []functionNameMapping
+	var inputTypes []functionParamNameMapping
 
 	for i := startParam; i < funcTyp.NumIn(); i++ {
 		in := funcTyp.In(i)
@@ -190,7 +190,7 @@ func (g *Graphy) newGraphFunction(def FunctionDefinition, method bool) graphFunc
 			// Skip this parameter if it is a context.Context.
 			continue
 		}
-		fnm := functionNameMapping{
+		fnm := functionParamNameMapping{
 			paramIndex: i,
 			paramType:  in,
 		}
@@ -219,18 +219,18 @@ func (g *Graphy) newGraphFunction(def FunctionDefinition, method bool) graphFunc
 	}
 }
 
-func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc reflect.Value, inputs []functionNameMapping, method bool) graphFunction {
+func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc reflect.Value, inputs []functionParamNameMapping, method bool) graphFunction {
 	// We are in the case where there are multiple parameters. We will use the
 	// types of the parameters to create anonymous arguments. We won't have any named
 	// parameters as we don't have any names to use.
 
 	gf := graphFunction{
-		g:           g,
-		name:        def.Name,
-		mode:        def.Mode,
-		function:    graphFunc,
-		method:      method,
-		nameMapping: map[string]functionNameMapping{},
+		g:            g,
+		name:         def.Name,
+		mode:         def.Mode,
+		function:     graphFunc,
+		method:       method,
+		paramsByName: map[string]functionParamNameMapping{},
 	}
 
 	if len(def.ParameterNames) > 0 {
@@ -254,7 +254,7 @@ func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc ref
 	}
 
 	hasNames := false
-	gf.indexMapping = make([]functionNameMapping, len(inputs))
+	gf.paramsByIndex = make([]functionParamNameMapping, len(inputs))
 	if len(def.ParameterNames) > 0 {
 		if len(def.ParameterNames) != len(inputs) {
 			panic("parameter names count must match parameter count")
@@ -276,13 +276,13 @@ func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc ref
 		if hasNames {
 			mapping.name = def.ParameterNames[i]
 			mapping.anonymousArgument = false
-			gf.nameMapping[def.ParameterNames[i]] = mapping
-			gf.indexMapping[i] = mapping
+			gf.paramsByName[def.ParameterNames[i]] = mapping
+			gf.paramsByIndex[i] = mapping
 		} else {
 			mapping.name = fmt.Sprintf("arg%d", mapping.paramIndex)
 			mapping.anonymousArgument = true
-			gf.nameMapping[mapping.name] = mapping
-			gf.indexMapping[i] = mapping
+			gf.paramsByName[mapping.name] = mapping
+			gf.paramsByIndex[i] = mapping
 		}
 	}
 
@@ -322,7 +322,7 @@ func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflec
 	}
 
 	// Iterate over the fields of the struct and create the name mapping.
-	nameMapping := map[string]functionNameMapping{}
+	nameMapping := map[string]functionParamNameMapping{}
 
 	for i := 0; i < paramType.NumField(); i++ {
 		field := paramType.Field(i)
@@ -336,7 +336,7 @@ func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflec
 			name = jsonTag
 		}
 
-		mapping := functionNameMapping{
+		mapping := functionParamNameMapping{
 			name:              name,
 			paramIndex:        i,
 			paramType:         field.Type,
@@ -353,7 +353,7 @@ func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflec
 		nameMapping[name] = mapping
 	}
 
-	gf.nameMapping = nameMapping
+	gf.paramsByName = nameMapping
 
 	return gf
 }

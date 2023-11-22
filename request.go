@@ -154,12 +154,12 @@ func (g *Graphy) gatherRequestVariables(parsedCall wrapper, fragments map[string
 			for _, parameter := range command.Parameters.Values {
 				if parameter.Value.Variable != nil {
 					varName := *parameter.Value.Variable
-					var paramTarget functionNameMapping
+					var paramTarget functionParamNameMapping
 					if anonArgs {
-						paramTarget = graphFunc.indexMapping[argIndex]
+						paramTarget = graphFunc.paramsByIndex[argIndex]
 						argIndex++
 					} else {
-						paramTarget = graphFunc.nameMapping[parameter.Name]
+						paramTarget = graphFunc.paramsByName[parameter.Name]
 					}
 					targetType := paramTarget.paramType
 					if targetType == nil {
@@ -366,13 +366,13 @@ func (g *Graphy) validateAnonymousFunctionParams(commandField *resultField, gf *
 
 func (g *Graphy) validateNamedFunctionParams(commandField *resultField, gf *graphFunction, variableTypeMap map[string]*requestVariable) error {
 	neededField := map[string]bool{}
-	for _, param := range gf.nameMapping {
+	for _, param := range gf.paramsByName {
 		neededField[param.name] = true
 	}
 
 	if commandField.Params != nil {
 		for _, cfp := range commandField.Params.Values {
-			targetType := gf.nameMapping[cfp.Name].paramType
+			targetType := gf.paramsByName[cfp.Name].paramType
 
 			// We have the parameter, so remove it from the needed list.
 			delete(neededField, cfp.Name)

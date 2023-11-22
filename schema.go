@@ -72,7 +72,7 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) string {
 		for _, function := range functions {
 			sb.WriteString("\t")
 			sb.WriteString(function.name)
-			if len(function.nameMapping) > 0 {
+			if len(function.paramsByName) > 0 {
 				sb.WriteString("(")
 				funcParams := g.schemaForFunctionParameters(function, st.inputTypeNameLookup)
 				sb.WriteString(funcParams)
@@ -262,8 +262,8 @@ func (g *Graphy) recursiveAddTypeLookup(tl *typeLookup, typeMap map[*typeLookup]
 func (g *Graphy) schemaForFunctionParameters(f *graphFunction, mapping typeNameMapping) string {
 	sb := strings.Builder{}
 
-	mappings := []functionNameMapping{}
-	for _, param := range f.nameMapping {
+	mappings := []functionParamNameMapping{}
+	for _, param := range f.paramsByName {
 		mappings = append(mappings, param)
 	}
 	// Sort by index
@@ -287,7 +287,7 @@ func (g *Graphy) schemaForFunctionParameters(f *graphFunction, mapping typeNameM
 
 func (g *Graphy) functionIO(f *graphFunction, inputTypes, outputTypes usageMap) {
 
-	for _, param := range f.nameMapping {
+	for _, param := range f.paramsByName {
 		g.typeIO(g.typeLookup(param.paramType), TypeInput, inputTypes, outputTypes)
 	}
 

@@ -172,7 +172,7 @@ func (g *Graphy) getSchemaFieldType(field *fieldLookup, kind TypeKind, mapping t
 
 func (g *Graphy) getSchemaGraphFunctionType(field *fieldLookup, mapping typeNameMapping) string {
 	sb := &strings.Builder{}
-	if len(field.graphFunction.nameMapping) > 0 {
+	if len(field.graphFunction.paramsByName) > 0 {
 		sb.WriteString("(")
 		sb.WriteString(g.schemaForFunctionParameters(field.graphFunction, mapping))
 		sb.WriteString(")")

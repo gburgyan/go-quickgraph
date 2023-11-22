@@ -48,7 +48,7 @@ func (f *graphFunction) getCallParamsNamedInline(ctx context.Context, req *reque
 
 	// Make a map of the parameters that are required
 	requiredParams := map[string]bool{}
-	for _, nameMapping := range f.nameMapping {
+	for _, nameMapping := range f.paramsByName {
 		if nameMapping.required {
 			requiredParams[nameMapping.name] = true
 		}
@@ -57,7 +57,7 @@ func (f *graphFunction) getCallParamsNamedInline(ctx context.Context, req *reque
 	parsedParams := params
 	if parsedParams != nil {
 		for _, param := range parsedParams.Values {
-			if nameMapping, ok := f.nameMapping[param.Name]; ok {
+			if nameMapping, ok := f.paramsByName[param.Name]; ok {
 				val := reflect.New(nameMapping.paramType).Elem()
 				err := parseInputIntoValue(req, param.Value, val)
 				if err != nil {
@@ -165,7 +165,7 @@ func (f *graphFunction) getCallParamsNamedStruct(ctx context.Context, req *reque
 
 	// Make a map of the parameters that are required
 	requiredParams := map[string]bool{}
-	for _, nameMapping := range f.nameMapping {
+	for _, nameMapping := range f.paramsByName {
 		if nameMapping.required {
 			requiredParams[nameMapping.name] = true
 		}
@@ -174,7 +174,7 @@ func (f *graphFunction) getCallParamsNamedStruct(ctx context.Context, req *reque
 	parsedParams := params
 	if parsedParams != nil {
 		for _, param := range parsedParams.Values {
-			if nameMapping, ok := f.nameMapping[param.Name]; ok {
+			if nameMapping, ok := f.paramsByName[param.Name]; ok {
 				err := parseInputIntoValue(req, param.Value, valueParam.Field(nameMapping.paramIndex))
 				if err != nil {
 					return nil, err

@@ -277,7 +277,7 @@ func (g *Graphy) introspectionCall(is *__Schema, f *graphFunction) (*__Type, []_
 	result := g.getIntrospectionModifiedType(is, f.baseReturnType, TypeOutput)
 
 	var args []__InputValue
-	for _, param := range f.indexMapping {
+	for _, param := range f.paramsByIndex {
 		args = append(args, __InputValue{
 			Name: param.name,
 			Type: g.getIntrospectionModifiedType(is, g.typeLookup(param.paramType), TypeInput),

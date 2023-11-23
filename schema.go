@@ -107,66 +107,21 @@ func (g *Graphy) getSchemaTypes() *schemaTypes {
 		return g.schemaBuffer
 	}
 
-	// Only one goroutine should be able to get here at a time.
 	g.schemaLock.Lock()
 	defer g.schemaLock.Unlock()
 
-	// Check again in case it was set while waiting for the lock
+	// Check it again in case to cover a race condition.
 	if g.schemaBuffer != nil {
 		return g.schemaBuffer
 	}
 
-	var outputTypes []*typeLookup
-	var inputTypes []*typeLookup
-	var enumTypes []*typeLookup
-
-	for _, proc := range g.processors {
-		if strings.HasPrefix(proc.name, "__") {
-			// These are internal functions, so we can skip them.
-			continue
-		}
-		function := &proc
-		inputMap := make(usageMap)
-		outputMap := make(usageMap)
-
-		g.functionIO(function, inputMap, outputMap)
-
-		fInput := keys(inputMap)
-		fOutput := keys(outputMap)
-
-		// Add these to the global lists.
-		outputTypes = append(outputTypes, fOutput...)
-		inputTypes = append(inputTypes, fInput...)
-
-		for _, outTypeLookup := range fOutput {
-			if outTypeLookup.rootType != nil {
-				if outTypeLookup.rootType.AssignableTo(stringEnumValuesType) {
-					enumTypes = append(enumTypes, outTypeLookup)
-				}
-			} else {
-				outputTypes = append(outputTypes, outTypeLookup)
-			}
-		}
-
-		for _, inTypeLookup := range fInput {
-			if inTypeLookup.rootType != nil {
-				if inTypeLookup.rootType.AssignableTo(stringEnumValuesType) {
-					enumTypes = append(enumTypes, inTypeLookup)
-				}
-			} else {
-				inputTypes = append(inputTypes, inTypeLookup)
-			}
-		}
-	}
+	outputTypes, inputTypes, enumTypes := g.processFunctionsForSchema()
 
 	inputTypes = g.expandTypeLookups(inputTypes)
 	outputTypes = g.expandTypeLookups(outputTypes)
 
 	inputMapping, outputMapping := solveInputOutputNameMapping(inputTypes, outputTypes)
-	enumMapping := typeNameMapping{}
-	for _, enumType := range enumTypes {
-		enumMapping[enumType] = enumType.name
-	}
+	enumMapping := createEnumMapping(enumTypes)
 
 	g.schemaBuffer = &schemaTypes{
 		inputTypes:  inputTypes,
@@ -185,6 +140,50 @@ func (g *Graphy) getSchemaTypes() *schemaTypes {
 	g.populateIntrospection(g.schemaBuffer)
 
 	return g.schemaBuffer
+}
+
+func (g *Graphy) processFunctionsForSchema() ([]*typeLookup, []*typeLookup, []*typeLookup) {
+	var outputTypes []*typeLookup
+	var inputTypes []*typeLookup
+	var enumTypes []*typeLookup
+
+	for _, proc := range g.processors {
+		if strings.HasPrefix(proc.name, "__") {
+			continue
+		}
+		function := &proc
+		inputMap := make(usageMap)
+		outputMap := make(usageMap)
+
+		g.gatherFunctionInputsOutputs(function, inputMap, outputMap)
+
+		fInput := keys(inputMap)
+		fOutput := keys(outputMap)
+
+		outputTypes, enumTypes = appendTypesForSchema(outputTypes, enumTypes, fOutput)
+		inputTypes, enumTypes = appendTypesForSchema(inputTypes, enumTypes, fInput)
+	}
+
+	return outputTypes, inputTypes, enumTypes
+}
+
+func appendTypesForSchema(types []*typeLookup, enumTypes []*typeLookup, newTypes []*typeLookup) ([]*typeLookup, []*typeLookup) {
+	for _, typeLookup := range newTypes {
+		if typeLookup.rootType != nil && typeLookup.rootType.AssignableTo(stringEnumValuesType) {
+			enumTypes = append(enumTypes, typeLookup)
+		} else {
+			types = append(types, typeLookup)
+		}
+	}
+	return types, enumTypes
+}
+
+func createEnumMapping(enumTypes []*typeLookup) typeNameMapping {
+	enumMapping := typeNameMapping{}
+	for _, enumType := range enumTypes {
+		enumMapping[enumType] = enumType.name
+	}
+	return enumMapping
 }
 
 func makeTypeNameLookup(t typeNameMapping) typeNameLookup {
@@ -285,16 +284,16 @@ func (g *Graphy) schemaForFunctionParameters(f *graphFunction, mapping typeNameM
 	return sb.String()
 }
 
-func (g *Graphy) functionIO(f *graphFunction, inputTypes, outputTypes usageMap) {
+func (g *Graphy) gatherFunctionInputsOutputs(f *graphFunction, inputTypes, outputTypes usageMap) {
 
 	for _, param := range f.paramsByName {
-		g.typeIO(g.typeLookup(param.paramType), TypeInput, inputTypes, outputTypes)
+		g.gatherTypeInputsOutputs(g.typeLookup(param.paramType), TypeInput, inputTypes, outputTypes)
 	}
 
-	g.typeIO(f.baseReturnType, TypeOutput, inputTypes, outputTypes)
+	g.gatherTypeInputsOutputs(f.baseReturnType, TypeOutput, inputTypes, outputTypes)
 }
 
-func (g *Graphy) typeIO(tl *typeLookup, io TypeKind, inputTypes, outputTypes usageMap) {
+func (g *Graphy) gatherTypeInputsOutputs(tl *typeLookup, io TypeKind, inputTypes, outputTypes usageMap) {
 	if io == TypeInput {
 		if inputTypes[tl] {
 			return
@@ -310,21 +309,18 @@ func (g *Graphy) typeIO(tl *typeLookup, io TypeKind, inputTypes, outputTypes usa
 	for _, fl := range tl.fields {
 		switch fl.fieldType {
 		case FieldTypeField:
-			g.typeIO(g.typeLookup(fl.resultType), io, inputTypes, outputTypes)
+			g.gatherTypeInputsOutputs(g.typeLookup(fl.resultType), io, inputTypes, outputTypes)
 
 		case FieldTypeGraphFunction:
-			g.functionIO(fl.graphFunction, inputTypes, outputTypes)
-
-		default:
-			panic("unknown field type")
+			g.gatherFunctionInputsOutputs(fl.graphFunction, inputTypes, outputTypes)
 		}
 	}
 
 	for _, tl := range tl.implements {
-		g.typeIO(tl, io, inputTypes, outputTypes)
+		g.gatherTypeInputsOutputs(tl, io, inputTypes, outputTypes)
 	}
 
 	for _, tl := range tl.union {
-		g.typeIO(tl, io, inputTypes, outputTypes)
+		g.gatherTypeInputsOutputs(tl, io, inputTypes, outputTypes)
 	}
 }

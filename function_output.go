@@ -69,13 +69,6 @@ func (f *graphFunction) processCallOutput(ctx context.Context, req *request, fil
 // processOutputStruct takes a result filter and a struct, processes the struct according to the filter,
 // and returns a map and an error if there is any. The map contains the processed fields of the struct.
 func (f *graphFunction) processOutputStruct(ctx context.Context, req *request, filter *resultFilter, anyStruct any) (any, error) {
-	// If the anyStruct is a pointer, dereference it.
-	if reflect.TypeOf(anyStruct).Kind() == reflect.Ptr {
-		if reflect.ValueOf(anyStruct).IsNil() {
-			return nil, nil
-		}
-		anyStruct = reflect.ValueOf(anyStruct).Elem().Interface()
-	}
 
 	kind := reflect.TypeOf(anyStruct).Kind()
 	if kind == reflect.Map && reflect.ValueOf(anyStruct).IsNil() {
@@ -90,10 +83,6 @@ func (f *graphFunction) processOutputStruct(ctx context.Context, req *request, f
 	t := reflect.TypeOf(anyStruct)
 	typeName := t.Name()
 	fieldMap := f.g.typeLookup(t)
-
-	if fieldMap.fundamental {
-		return anyStruct, nil
-	}
 
 	if filter == nil {
 		return nil, NewGraphError(fmt.Sprintf("output filter is not present"), lexer.Position{})

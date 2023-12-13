@@ -308,12 +308,8 @@ func (g *Graphy) getIntrospectionModifiedType(is *__Schema, tl *typeLookup, io T
 	ret := g.getIntrospectionBaseType(is, tl, io)
 
 	// If the base type is a slice, wrap the introspection type as a list
-	if tl.isSlice {
-		// If the base type is not a pointer slice, also wrap the introspection type as a non-null type
-		if !tl.isPointerSlice {
-			ret = g.wrapType(ret, "required", IntrospectionKindNonNull)
-		}
-		ret = g.wrapType(ret, "list", IntrospectionKindList)
+	if tl.array != nil {
+		ret = g.wrapArrayTypes(ret, tl.array)
 	}
 
 	// If the base type is not a pointer, wrap the introspection type as a non-null type
@@ -322,6 +318,17 @@ func (g *Graphy) getIntrospectionModifiedType(is *__Schema, tl *typeLookup, io T
 	}
 
 	// Return the modified introspection type
+	return ret
+}
+
+func (g *Graphy) wrapArrayTypes(ret *__Type, array *typeArrayModifier) *__Type {
+	if array.array != nil {
+		ret = g.wrapArrayTypes(ret, array.array)
+	}
+	if !array.isPointer {
+		ret = g.wrapType(ret, "required", IntrospectionKindNonNull)
+	}
+	ret = g.wrapType(ret, "list", IntrospectionKindList)
 	return ret
 }
 

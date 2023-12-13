@@ -28,9 +28,8 @@ type fieldLookup struct {
 type typeLookup struct {
 	typ                 reflect.Type
 	rootType            reflect.Type
-	isSlice             bool
 	isPointer           bool
-	isPointerSlice      bool
+	array               *typeArrayModifier
 	name                string
 	fundamental         bool
 	fields              map[string]fieldLookup
@@ -44,6 +43,11 @@ type typeLookup struct {
 	description      *string
 	isDeprecated     bool
 	deprecatedReason string
+}
+
+type typeArrayModifier struct {
+	isPointer bool
+	array     *typeArrayModifier
 }
 
 func (tl *typeLookup) GetField(name string) (fieldLookup, bool) {

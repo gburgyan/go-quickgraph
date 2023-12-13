@@ -218,11 +218,7 @@ func (g *Graphy) typeLookup(typ reflect.Type) *typeLookup {
 	}
 	if rootTyp.Kind() == reflect.Slice {
 		rootTyp = rootTyp.Elem()
-		result.isSlice = true
-		if rootTyp.Kind() == reflect.Ptr {
-			rootTyp = rootTyp.Elem()
-			result.isPointerSlice = true
-		}
+		rootTyp, result.array = g.dereferenceSlice(rootTyp)
 	}
 
 	result.rootType = rootTyp
@@ -273,6 +269,19 @@ func (g *Graphy) typeLookup(typ reflect.Type) *typeLookup {
 	g.typeLookups[typ] = result
 	g.typeMutex.Unlock()
 	return result
+}
+
+func (g *Graphy) dereferenceSlice(typ reflect.Type) (reflect.Type, *typeArrayModifier) {
+	result := &typeArrayModifier{}
+	if typ.Kind() == reflect.Ptr {
+		typ = typ.Elem()
+		result.isPointer = true
+	}
+	for typ.Kind() == reflect.Slice {
+		typ = typ.Elem()
+		typ, result.array = g.dereferenceSlice(typ)
+	}
+	return typ, result
 }
 
 func (g *Graphy) getRequestStub(ctx context.Context, request string) (*RequestStub, error) {

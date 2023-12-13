@@ -1096,3 +1096,57 @@ enum episode {
 
 	assert.Equal(t, expected, schema)
 }
+
+func TestGraphFunction_NestedArrays(t *testing.T) {
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterQuery(ctx, "nested", func() [][]string {
+		return [][]string{{"foo", "bar"}, {"baz"}}
+	})
+
+	gql := `
+query {
+  nested
+}`
+	response, err := g.ProcessRequest(ctx, gql, "")
+	assert.NoError(t, err)
+	assert.Equal(t, `{"data":{"nested":[["foo","bar"],["baz"]]}}`, response)
+
+	schema := g.SchemaDefinition(ctx)
+	expected := `type Query {
+	nested: [[String!]!]!
+}
+
+`
+	assert.Equal(t, expected, schema)
+}
+
+func TestGraphFunction_NestedArraysInput(t *testing.T) {
+	ctx := context.Background()
+	g := Graphy{}
+	g.RegisterQuery(ctx, "nested", func(in [][]string) [][]string {
+		return in
+	})
+
+	gql := `
+query nestTest($in: [[String!]!]!) {
+  nested(in: $in)
+}`
+
+	json := `
+{
+  "in": [["foo", "bar"], ["baz"]]
+}`
+
+	response, err := g.ProcessRequest(ctx, gql, json)
+	assert.NoError(t, err)
+	assert.Equal(t, `{"data":{"nested":[["foo","bar"],["baz"]]}}`, response)
+
+	schema := g.SchemaDefinition(ctx)
+	expected := `type Query {
+	nested(arg0: [[String!]!]!): [[String!]!]!
+}
+
+`
+	assert.Equal(t, expected, schema)
+}

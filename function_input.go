@@ -70,11 +70,7 @@ func (f *graphFunction) getCallParamsNamedInline(ctx context.Context, req *reque
 	}
 
 	if len(requiredParams) > 0 {
-		missingParams := []string{}
-		for paramName := range requiredParams {
-			missingParams = append(missingParams, paramName)
-		}
-		return nil, fmt.Errorf("missing required parameters: %v", strings.Join(missingParams, ", "))
+		return nil, fmt.Errorf("missing required parameters: %v", strings.Join(keys(requiredParams), ", "))
 	}
 	return paramValues, nil
 }

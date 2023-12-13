@@ -42,8 +42,8 @@ func (f *graphFunction) processCallOutput(ctx context.Context, req *request, fil
 			retVal := []any{}
 			count := callResult.Len()
 			for i := 0; i < count; i++ {
-				a := callResult.Index(i).Interface()
-				sr, err := f.processOutputStruct(ctx, req, filter, a)
+				a := callResult.Index(i)
+				sr, err := f.processCallOutput(ctx, req, filter, a)
 				if err != nil {
 					return nil, AugmentGraphError(err, fmt.Sprintf("error processing slice element %v", i), pos, strconv.Itoa(i))
 				}

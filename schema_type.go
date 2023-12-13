@@ -209,8 +209,6 @@ func (g *Graphy) schemaForUnion(name string, t *typeLookup, mapping typeNameMapp
 
 func (g *Graphy) schemaRefForType(t *typeLookup, mapping typeNameMapping) string {
 	optional := t.isPointer
-	array := t.isSlice
-	optionalInner := t.isPointerSlice
 
 	var baseType string
 	if t.rootType == nil {
@@ -245,15 +243,24 @@ func (g *Graphy) schemaRefForType(t *typeLookup, mapping typeNameMapping) string
 	}
 
 	work := baseType
-	if array {
-		if !optionalInner {
-			work = work + "!"
-		}
-		work = "[" + work + "]"
+
+	if t.array != nil {
+		work = g.wrapSchemaArray(work, t.array)
 	}
+
 	if !optional {
 		work = work + "!"
 	}
 
 	return work
+}
+
+func (g *Graphy) wrapSchemaArray(work string, array *typeArrayModifier) string {
+	if array.array != nil {
+		work = g.wrapSchemaArray(work, array.array)
+	}
+	if !array.isPointer {
+		work = work + "!"
+	}
+	return "[" + work + "]"
 }

@@ -22,26 +22,24 @@ type operationDef struct {
 }
 
 type variableDef struct {
-	Name       string        `parser:"@Variable ':'"`
-	Type       variableType  `parser:"@@"`
-	IsRequired string        `parser:"'!'?"`
-	Value      *genericValue `parser:"('=' @@)?"`
-	Pos        lexer.Position
+	Name  string        `parser:"@Variable ':'"`
+	Type  variableType  `parser:"@@"`
+	Value *genericValue `parser:"('=' @@)?"`
+	Pos   lexer.Position
 }
 
 type variableType struct {
-	Array        *variableArrayType    `parser:"'[' @@ ']'"`
-	ConcreteType *variableConcreteType `parser:"| @@"`
+	Array        *variableArrayType    `parser:"( '[' @@ ']'"`
+	ConcreteType *variableConcreteType `parser:"| @@ )"`
+	IsRequired   string                `parser:"'!'?"`
 }
 
 type variableArrayType struct {
-	InnerType  *variableType `parser:"@@"`
-	IsRequired string        `parser:"'!'?"`
+	InnerType *variableType `parser:"@@"`
 }
 
 type variableConcreteType struct {
-	Name       string `parser:"@Ident"`
-	IsRequired string `parser:"'!'?"`
+	Name string `parser:"@Ident"`
 }
 
 // command is a GraphQL command. This will be 'query' or 'mutation.'

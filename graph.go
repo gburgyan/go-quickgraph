@@ -2,6 +2,7 @@ package quickgraph
 
 import (
 	"context"
+	"github.com/gburgyan/go-timing"
 	"reflect"
 	"strings"
 	"sync"
@@ -175,17 +176,20 @@ func (g *Graphy) ProcessRequest(ctx context.Context, request string, variableJso
 	g.structureLock.RLock()
 	defer g.structureLock.RUnlock()
 
-	rs, err := g.getRequestStub(ctx, request)
+	tCtx, complete := timing.Start(ctx, "ProcessGraphRequest")
+	defer complete()
+
+	rs, err := g.getRequestStub(tCtx, request)
 	if err != nil {
 		return formatError(err), err
 	}
 
-	newRequest, err := rs.newRequest(variableJson)
+	newRequest, err := rs.newRequest(tCtx, variableJson)
 	if err != nil {
 		return formatError(err), err
 	}
 
-	return newRequest.execute(ctx)
+	return newRequest.execute(tCtx)
 }
 
 func (g *Graphy) typeLookup(typ reflect.Type) *typeLookup {
@@ -285,15 +289,23 @@ func (g *Graphy) dereferenceSlice(typ reflect.Type) (reflect.Type, *typeArrayMod
 }
 
 func (g *Graphy) getRequestStub(ctx context.Context, request string) (*RequestStub, error) {
+	tCtx, reqComplete := timing.Start(ctx, "ParseRequest")
+	defer reqComplete()
+
 	if g.RequestCache == nil {
+		tCtx.Details["cache"] = "none"
 		return g.newRequestStub(request)
 	}
 
-	stub, err := g.RequestCache.GetRequestStub(ctx, request)
+	stub, err := g.RequestCache.GetRequestStub(tCtx, request)
 	if stub != nil || err != nil {
+		tCtx.Details["cache"] = "hit"
 		return stub, err
 	}
+
+	tCtx.Details["cache"] = "miss"
+
 	stub, err = g.newRequestStub(request)
-	g.RequestCache.SetRequestStub(ctx, request, stub, err)
+	g.RequestCache.SetRequestStub(tCtx, request, stub, err)
 	return stub, err
 }

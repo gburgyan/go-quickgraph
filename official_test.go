@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/gburgyan/go-timing"
 	"github.com/stretchr/testify/assert"
 	"math"
 	"testing"
@@ -122,6 +123,10 @@ func TestSimpleFields1(t *testing.T) {
   }
 }`
 
+	stub, err := g.getRequestStub(ctx, input)
+	assert.NoError(t, err)
+	assert.Equal(t, "hero", stub.Name)
+
 	resultAny, err := g.ProcessRequest(ctx, input, "")
 	assert.NoError(t, err)
 
@@ -204,6 +209,10 @@ func TestArguments(t *testing.T) {
     height
   }
 }`
+
+	stub, err := g.getRequestStub(ctx, input)
+	assert.NoError(t, err)
+	assert.Equal(t, "Human", stub.Name)
 
 	resultAny, err := g.ProcessRequest(ctx, input, "")
 	assert.NoError(t, err)
@@ -301,6 +310,10 @@ fragment comparisonFields on Character {
   }
 }`
 
+	stub, err := g.getRequestStub(ctx, input)
+	assert.NoError(t, err)
+	assert.Equal(t, "leftComparison_rightComparison", stub.Name)
+
 	resultAny, err := g.ProcessRequest(ctx, input, "")
 	assert.NoError(t, err)
 	assert.Equal(t, `{"data":{"leftComparison":{"appearsIn":["NEWHOPE","EMPIRE","JEDI"],"friends":[{"name":"Han Solo"},{"name":"Leia Organa"},{"name":"C-3PO"},{"name":"R2-D2"}],"name":"Luke Skywalker"},"rightComparison":{"appearsIn":["NEWHOPE","EMPIRE","JEDI"],"friends":[{"name":"Luke Skywalker"},{"name":"Han Solo"},{"name":"Leia Organa"}],"name":"R2-D2"}}}`, resultAny)
@@ -394,9 +407,18 @@ fragment comparisonFields on Character {
   }
 }`
 
-	resultAny, err := g.ProcessRequest(ctx, input, "")
+	stub, err := g.getRequestStub(ctx, input)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "HeroComparison", stub.Name)
+
+	tCtx, complete := timing.StartRoot(ctx, "GraphRequest")
+	resultAny, err := g.ProcessRequest(tCtx, input, "")
+	complete()
 	assert.NoError(t, err)
 	assert.Equal(t, `{"data":{"leftComparison":{"friendsConnection":{"edges":[{"node":{"name":"Han Solo"}},{"node":{"name":"Leia Organa"}},{"node":{"name":"C-3PO"}}],"totalCount":4},"name":"Luke Skywalker"},"rightComparison":{"friendsConnection":{"edges":[{"node":{"name":"Luke Skywalker"}},{"node":{"name":"Han Solo"}},{"node":{"name":"Leia Organa"}}],"totalCount":3},"name":"R2-D2"}}}`, resultAny)
+
+	fmt.Printf("timing:\n%s\n", tCtx.String())
 }
 
 func TestVariableDefaultValue(t *testing.T) {

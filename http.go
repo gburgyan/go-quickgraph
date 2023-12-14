@@ -2,6 +2,7 @@ package quickgraph
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 )
 
@@ -25,17 +26,27 @@ func (g GraphHttpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		if g.graphy.schemaEnabled {
 			schema := g.graphy.SchemaDefinition(request.Context())
 			writer.WriteHeader(200)
-			_, _ = writer.Write([]byte(schema))
-			// TODO: log an error if there is one, but there's not much we can do about it.
+			_, err := writer.Write([]byte(schema))
+			if err != nil {
+				log.Printf("Error writing response: %v", err)
+			}
 		} else {
 			writer.WriteHeader(404)
-			_, _ = writer.Write([]byte("Not Found"))
+			_, err := writer.Write([]byte("Not Found"))
+			if err != nil {
+				log.Printf("Error writing response: %v", err)
+			}
 		}
 		return
 	}
 
 	var req graphqlRequest
 	err := json.NewDecoder(request.Body).Decode(&req)
+	if err != nil {
+		log.Printf("Error decoding request: %v", err)
+		writer.WriteHeader(400)
+		return
+	}
 
 	query := req.Query
 	variables := string(req.Variables)
@@ -43,12 +54,14 @@ func (g GraphHttpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	// Process the request.
 	res, err := g.graphy.ProcessRequest(request.Context(), query, variables)
 	if err != nil {
-		// TODO: Log the error here, but the response still has a GraphQL response that can be returned.
+		log.Printf("Error processing request: %v (will still return response)", err)
 	}
 
 	// Return the response string.
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(200) // Errors are in the response body, and there may be mixed errors and results.
-	_, _ = writer.Write([]byte(res))
-	// TODO: log an error if there is one, but there's not much we can do about it.
+	_, err = writer.Write([]byte(res))
+	if err != nil {
+		log.Printf("Error writing response: %v", err)
+	}
 }

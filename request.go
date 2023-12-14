@@ -444,7 +444,7 @@ func (g *Graphy) validateFunctionVarParam(variableTypeMap map[string]*requestVar
 
 // newRequest creates a new request from a request stub and a JSON string representing the variables used in the request.
 // It unmarshals the variables and assigns them to the corresponding variables in the request.
-func (rs *RequestStub) newRequest(ctx *timing.Context, variableJson string) (*request, error) {
+func (rs *RequestStub) newRequest(ctx context.Context, variableJson string) (*request, error) {
 	_, complete := timing.Start(ctx, "AssembleRequest")
 	defer complete()
 
@@ -495,8 +495,24 @@ type commandResult struct {
 // execute executes a GraphQL request. It looks up the appropriate processor for each command and invokes it.
 // It returns the result of the request as a JSON string.
 func (r *request) execute(ctx context.Context) (string, error) {
-	tCtx, complete := timing.Start(ctx, "ExecuteRequest")
-	defer complete()
+	var parallel bool
+	if r.stub.mode == RequestMutation {
+		parallel = false
+	} else {
+		parallel = true
+	}
+
+	var tCtx context.Context
+	if r.graphy.EnableTiming {
+		var complete timing.Complete
+		var timingContext *timing.Context
+		timingContext, complete = timing.Start(ctx, "ExecuteRequest")
+		defer complete()
+		tCtx = timingContext
+		timingContext.Async = parallel
+	} else {
+		tCtx = ctx
+	}
 
 	result := map[string]any{}
 	data := map[string]any{}
@@ -505,15 +521,8 @@ func (r *request) execute(ctx context.Context) (string, error) {
 	var retErr error
 
 	var cmdResults []commandResult
-	var parallel bool
-	if r.stub.mode == RequestMutation {
-		parallel = false
-	} else {
-		parallel = true
-	}
 
 	if parallel {
-		tCtx.Async = true
 		resultChan := make(chan commandResult)
 		// execute the commands in parallel.
 		for _, cmd := range r.stub.commands {
@@ -579,8 +588,14 @@ func (r *request) executeCommand(ctx context.Context, command command) commandRe
 		name = command.Name
 	}
 
-	tCtx, complete := timing.Start(ctx, "Execute-"+name)
-	defer complete()
+	var tCtx context.Context
+	if r.graphy.EnableTiming {
+		var complete timing.Complete
+		tCtx, complete = timing.Start(ctx, "Execute-"+name)
+		defer complete()
+	} else {
+		tCtx = ctx
+	}
 
 	processor, ok := r.graphy.processors[command.Name]
 	if !ok {

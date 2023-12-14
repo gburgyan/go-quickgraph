@@ -412,6 +412,8 @@ fragment comparisonFields on Character {
 	assert.NoError(t, err)
 	assert.Equal(t, "HeroComparison", stub.Name)
 
+	g.EnableTiming = true
+
 	tCtx, complete := timing.StartRoot(ctx, "GraphRequest")
 	resultAny, err := g.ProcessRequest(tCtx, input, "")
 	complete()

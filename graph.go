@@ -22,6 +22,8 @@ import (
 type Graphy struct {
 	RequestCache GraphRequestCache
 
+	EnableTiming bool
+
 	processors  map[string]graphFunction
 	typeLookups map[reflect.Type]*typeLookup
 	anyTypes    []*typeLookup
@@ -176,8 +178,14 @@ func (g *Graphy) ProcessRequest(ctx context.Context, request string, variableJso
 	g.structureLock.RLock()
 	defer g.structureLock.RUnlock()
 
-	tCtx, complete := timing.Start(ctx, "ProcessGraphRequest")
-	defer complete()
+	var tCtx context.Context
+	if g.EnableTiming {
+		var complete timing.Complete
+		tCtx, complete = timing.Start(ctx, "ProcessGraphRequest")
+		defer complete()
+	} else {
+		tCtx = ctx
+	}
 
 	rs, err := g.getRequestStub(tCtx, request)
 	if err != nil {
@@ -289,21 +297,35 @@ func (g *Graphy) dereferenceSlice(typ reflect.Type) (reflect.Type, *typeArrayMod
 }
 
 func (g *Graphy) getRequestStub(ctx context.Context, request string) (*RequestStub, error) {
-	tCtx, reqComplete := timing.Start(ctx, "ParseRequest")
-	defer reqComplete()
+	var timingContext *timing.Context
+	var tCtx context.Context
+	if g.EnableTiming {
+		var complete timing.Complete
+		timingContext, complete = timing.Start(ctx, "ParseRequest")
+		defer complete()
+		tCtx = timingContext
+	} else {
+		tCtx = ctx
+	}
 
 	if g.RequestCache == nil {
-		tCtx.Details["cache"] = "none"
+		if timingContext != nil {
+			timingContext.Details["cache"] = "none"
+		}
 		return g.newRequestStub(request)
 	}
 
 	stub, err := g.RequestCache.GetRequestStub(tCtx, request)
 	if stub != nil || err != nil {
-		tCtx.Details["cache"] = "hit"
+		if timingContext != nil {
+			timingContext.Details["cache"] = "hit"
+		}
 		return stub, err
 	}
 
-	tCtx.Details["cache"] = "miss"
+	if timingContext != nil {
+		timingContext.Details["cache"] = "miss"
+	}
 
 	stub, err = g.newRequestStub(request)
 	g.RequestCache.SetRequestStub(tCtx, request, stub, err)

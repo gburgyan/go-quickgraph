@@ -428,6 +428,7 @@ query {
   }
 }
 `
+	g.EnableTiming = true
 	tCtx, complete := timing.StartRoot(ctx, "Test")
 	response, err := g.ProcessRequest(tCtx, gql, "")
 	complete()

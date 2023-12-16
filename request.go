@@ -21,12 +21,13 @@ const (
 // RequestStub represents a stub of a GraphQL-like request. It contains the Graphy instance,
 // the mode of the request (Query or Mutation), the commands to execute, and the variables used in the request.
 type RequestStub struct {
-	Name      string
-	graphy    *Graphy
-	mode      RequestType
-	commands  []command
-	variables map[string]*requestVariable
-	fragments map[string]fragment
+	graphy     *Graphy
+	mode       RequestType
+	commands   []command
+	variables  map[string]*requestVariable
+	fragments  map[string]fragment
+	name       string
+	parsedCall *wrapper
 }
 
 // requestVariable represents a variable in a GraphQL-like request. It contains the variable name and its type.
@@ -120,36 +121,41 @@ func (g *Graphy) newRequestStub(request string) (*RequestStub, error) {
 		return nil, err
 	}
 
-	name := g.makeRequestStubName(parsedCall)
-
 	rs := RequestStub{
-		Name:      name,
-		graphy:    g,
-		commands:  parsedCall.Commands,
-		variables: variableTypeMap,
-		fragments: fragments,
-		mode:      mode,
+		parsedCall: &parsedCall,
+		graphy:     g,
+		commands:   parsedCall.Commands,
+		variables:  variableTypeMap,
+		fragments:  fragments,
+		mode:       mode,
 	}
 
 	return &rs, nil
 }
 
-func (g *Graphy) makeRequestStubName(parsedCall wrapper) string {
+func (r *RequestStub) Name() string {
+	if r.name != "" {
+		return r.name
+	}
 	var name string
-	if parsedCall.OperationDef != nil {
-		name = parsedCall.OperationDef.Name
+	if r.parsedCall.OperationDef != nil {
+		name = r.parsedCall.OperationDef.Name
 	} else {
+		builder := strings.Builder{}
 		// Make the name from commands. If there are aliases, use those, otherwise use the command names.
-		var commandNames []string
-		for _, command := range parsedCall.Commands {
+		for i, command := range r.parsedCall.Commands {
+			if i > 0 {
+				builder.WriteString(",")
+			}
 			if command.Alias != nil {
-				commandNames = append(commandNames, *command.Alias)
+				builder.WriteString(*command.Alias)
 			} else {
-				commandNames = append(commandNames, command.Name)
+				builder.WriteString(command.Name)
 			}
 		}
-		name = strings.Join(commandNames, "_")
+		name = builder.String()
 	}
+	r.name = name
 	return name
 }
 

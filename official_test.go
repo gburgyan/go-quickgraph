@@ -125,7 +125,7 @@ func TestSimpleFields1(t *testing.T) {
 
 	stub, err := g.getRequestStub(ctx, input)
 	assert.NoError(t, err)
-	assert.Equal(t, "hero", stub.Name)
+	assert.Equal(t, "hero", stub.Name())
 
 	resultAny, err := g.ProcessRequest(ctx, input, "")
 	assert.NoError(t, err)
@@ -212,7 +212,7 @@ func TestArguments(t *testing.T) {
 
 	stub, err := g.getRequestStub(ctx, input)
 	assert.NoError(t, err)
-	assert.Equal(t, "Human", stub.Name)
+	assert.Equal(t, "Human", stub.Name())
 
 	resultAny, err := g.ProcessRequest(ctx, input, "")
 	assert.NoError(t, err)
@@ -312,7 +312,7 @@ fragment comparisonFields on Character {
 
 	stub, err := g.getRequestStub(ctx, input)
 	assert.NoError(t, err)
-	assert.Equal(t, "leftComparison_rightComparison", stub.Name)
+	assert.Equal(t, "leftComparison,rightComparison", stub.Name())
 
 	resultAny, err := g.ProcessRequest(ctx, input, "")
 	assert.NoError(t, err)
@@ -410,7 +410,7 @@ fragment comparisonFields on Character {
 	stub, err := g.getRequestStub(ctx, input)
 
 	assert.NoError(t, err)
-	assert.Equal(t, "HeroComparison", stub.Name)
+	assert.Equal(t, "HeroComparison", stub.Name())
 
 	g.EnableTiming = true
 

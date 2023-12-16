@@ -179,9 +179,11 @@ func (g *Graphy) ProcessRequest(ctx context.Context, request string, variableJso
 	defer g.structureLock.RUnlock()
 
 	var tCtx context.Context
+	var timingContext *timing.Context
 	if g.EnableTiming {
 		var complete timing.Complete
-		tCtx, complete = timing.Start(ctx, "ProcessGraphRequest")
+		timingContext, complete = timing.Start(ctx, "ProcessGraphRequest")
+		tCtx = timingContext
 		defer complete()
 	} else {
 		tCtx = ctx
@@ -190,6 +192,10 @@ func (g *Graphy) ProcessRequest(ctx context.Context, request string, variableJso
 	rs, err := g.getRequestStub(tCtx, request)
 	if err != nil {
 		return formatError(err), err
+	}
+
+	if timingContext != nil {
+		timingContext.Details["request"] = rs.Name()
 	}
 
 	newRequest, err := rs.newRequest(tCtx, variableJson)

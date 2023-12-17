@@ -122,7 +122,7 @@ func (g *Graphy) newRequestStub(request string) (*RequestStub, error) {
 	}
 
 	rs := RequestStub{
-		parsedCall: &parsedCall,
+		parsedCall: parsedCall,
 		graphy:     g,
 		commands:   parsedCall.Commands,
 		variables:  variableTypeMap,
@@ -161,7 +161,7 @@ func (r *RequestStub) Name() string {
 
 // gatherRequestVariables gathers and validates the variables used in a GraphQL request.
 // It ensures that the variables used across different commands are of the same type.
-func (g *Graphy) gatherRequestVariables(parsedCall wrapper, fragments map[string]fragment) (map[string]*requestVariable, error) {
+func (g *Graphy) gatherRequestVariables(parsedCall *wrapper, fragments map[string]fragment) (map[string]*requestVariable, error) {
 	// TODO: Look at the parsed arguments, find their types, then later verify that
 	//  they are correct.
 
@@ -451,8 +451,10 @@ func (g *Graphy) validateFunctionVarParam(variableTypeMap map[string]*requestVar
 // newRequest creates a new request from a request stub and a JSON string representing the variables used in the request.
 // It unmarshals the variables and assigns them to the corresponding variables in the request.
 func (rs *RequestStub) newRequest(ctx context.Context, variableJson string) (*request, error) {
-	_, complete := timing.Start(ctx, "AssembleRequest")
-	defer complete()
+	if rs.graphy.EnableTiming {
+		_, complete := timing.Start(ctx, "AssembleRequest")
+		defer complete()
+	}
 
 	rawVariables := map[string]json.RawMessage{}
 	if variableJson != "" {

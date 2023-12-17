@@ -136,7 +136,7 @@ var (
 	)
 )
 
-func parseRequest(input string) (wrapper, error) {
+func parseRequest(input string) (*wrapper, error) {
 	r, err := parser.ParseString("", input)
 	if err != nil {
 		var pErr participle.Error
@@ -144,7 +144,7 @@ func parseRequest(input string) (wrapper, error) {
 		if errors.As(err, &pErr) {
 			position = pErr.Position()
 		}
-		return wrapper{}, AugmentGraphError(err, "error parsing request", position)
+		return nil, AugmentGraphError(err, "error parsing request", position)
 	}
-	return *r, nil
+	return r, nil
 }

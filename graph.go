@@ -195,7 +195,7 @@ func (g *Graphy) ProcessRequest(ctx context.Context, request string, variableJso
 	}
 
 	if timingContext != nil {
-		timingContext.Details["request"] = rs.Name()
+		timingContext.AddDetails("request", rs.Name())
 	}
 
 	newRequest, err := rs.newRequest(tCtx, variableJson)
@@ -316,7 +316,7 @@ func (g *Graphy) getRequestStub(ctx context.Context, request string) (*RequestSt
 
 	if g.RequestCache == nil {
 		if timingContext != nil {
-			timingContext.Details["cache"] = "none"
+			timingContext.AddDetails("cache", "none")
 		}
 		return g.newRequestStub(request)
 	}
@@ -324,13 +324,13 @@ func (g *Graphy) getRequestStub(ctx context.Context, request string) (*RequestSt
 	stub, err := g.RequestCache.GetRequestStub(tCtx, request)
 	if stub != nil || err != nil {
 		if timingContext != nil {
-			timingContext.Details["cache"] = "hit"
+			timingContext.AddDetails("cache", "hit")
 		}
 		return stub, err
 	}
 
 	if timingContext != nil {
-		timingContext.Details["cache"] = "miss"
+		timingContext.AddDetails("cache", "miss")
 	}
 
 	stub, err = g.newRequestStub(request)

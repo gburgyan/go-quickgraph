@@ -2,6 +2,7 @@ package quickgraph
 
 import (
 	"encoding/json"
+	"github.com/gburgyan/go-timing"
 	"log"
 	"net/http"
 )
@@ -22,9 +23,18 @@ type graphqlRequest struct {
 }
 
 func (g GraphHttpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	ctx := request.Context()
+	var timingContext *timing.Context
+	var complete timing.Complete
+
+	if g.graphy.EnableTiming {
+		timingContext, complete = timing.Start(ctx, "HttpHandler")
+		ctx = timingContext
+	}
+
 	if request.Method == "GET" {
 		if g.graphy.schemaEnabled {
-			schema := g.graphy.SchemaDefinition(request.Context())
+			schema := g.graphy.SchemaDefinition(ctx)
 			writer.WriteHeader(200)
 			_, err := writer.Write([]byte(schema))
 			if err != nil {
@@ -52,7 +62,7 @@ func (g GraphHttpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	variables := string(req.Variables)
 
 	// Process the request.
-	res, err := g.graphy.ProcessRequest(request.Context(), query, variables)
+	res, err := g.graphy.ProcessRequest(ctx, query, variables)
 	if err != nil {
 		log.Printf("Error processing request: %v (will still return response)", err)
 	}
@@ -63,5 +73,10 @@ func (g GraphHttpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	_, err = writer.Write([]byte(res))
 	if err != nil {
 		log.Printf("Error writing response: %v", err)
+	}
+
+	if g.graphy.EnableTiming {
+		complete()
+		log.Printf("Timing: %v", timingContext.String())
 	}
 }

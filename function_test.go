@@ -3,6 +3,7 @@ package quickgraph
 import (
 	"context"
 	"fmt"
+	"github.com/gburgyan/go-timing"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
@@ -427,7 +428,11 @@ query {
   }
 }
 `
-	response, err := g.ProcessRequest(ctx, gql, "")
+	g.EnableTiming = true
+	tCtx, complete := timing.StartRoot(ctx, "Test")
+	response, err := g.ProcessRequest(tCtx, gql, "")
+	complete()
+
 	endTime := time.Now()
 
 	assert.NoError(t, err)
@@ -436,6 +441,8 @@ query {
 	// The total time should be less than 200ms, since the queries are run in parallel.
 	duration := endTime.Sub(startTime)
 	assert.True(t, duration < 200*time.Millisecond)
+
+	fmt.Println(tCtx.String())
 }
 
 func TestGraphFunction_ParallelQuery_Timeout(t *testing.T) {

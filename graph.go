@@ -2,6 +2,7 @@ package quickgraph
 
 import (
 	"context"
+	"github.com/gburgyan/go-timing"
 	"reflect"
 	"strings"
 	"sync"
@@ -20,6 +21,8 @@ import (
 // GraphRequestCache for more information.
 type Graphy struct {
 	RequestCache GraphRequestCache
+
+	EnableTiming bool
 
 	processors  map[string]graphFunction
 	typeLookups map[reflect.Type]*typeLookup
@@ -175,17 +178,32 @@ func (g *Graphy) ProcessRequest(ctx context.Context, request string, variableJso
 	g.structureLock.RLock()
 	defer g.structureLock.RUnlock()
 
-	rs, err := g.getRequestStub(ctx, request)
+	var tCtx context.Context
+	var timingContext *timing.Context
+	if g.EnableTiming {
+		var complete timing.Complete
+		timingContext, complete = timing.Start(ctx, "ProcessGraphRequest")
+		tCtx = timingContext
+		defer complete()
+	} else {
+		tCtx = ctx
+	}
+
+	rs, err := g.getRequestStub(tCtx, request)
 	if err != nil {
 		return formatError(err), err
 	}
 
-	newRequest, err := rs.newRequest(variableJson)
+	if timingContext != nil {
+		timingContext.AddDetails("request", rs.Name())
+	}
+
+	newRequest, err := rs.newRequest(tCtx, variableJson)
 	if err != nil {
 		return formatError(err), err
 	}
 
-	return newRequest.execute(ctx)
+	return newRequest.execute(tCtx)
 }
 
 func (g *Graphy) typeLookup(typ reflect.Type) *typeLookup {
@@ -285,15 +303,37 @@ func (g *Graphy) dereferenceSlice(typ reflect.Type) (reflect.Type, *typeArrayMod
 }
 
 func (g *Graphy) getRequestStub(ctx context.Context, request string) (*RequestStub, error) {
+	var timingContext *timing.Context
+	var tCtx context.Context
+	if g.EnableTiming {
+		var complete timing.Complete
+		timingContext, complete = timing.Start(ctx, "ParseRequest")
+		defer complete()
+		tCtx = timingContext
+	} else {
+		tCtx = ctx
+	}
+
 	if g.RequestCache == nil {
+		if timingContext != nil {
+			timingContext.AddDetails("cache", "none")
+		}
 		return g.newRequestStub(request)
 	}
 
-	stub, err := g.RequestCache.GetRequestStub(ctx, request)
+	stub, err := g.RequestCache.GetRequestStub(tCtx, request)
 	if stub != nil || err != nil {
+		if timingContext != nil {
+			timingContext.AddDetails("cache", "hit")
+		}
 		return stub, err
 	}
+
+	if timingContext != nil {
+		timingContext.AddDetails("cache", "miss")
+	}
+
 	stub, err = g.newRequestStub(request)
-	g.RequestCache.SetRequestStub(ctx, request, stub, err)
+	g.RequestCache.SetRequestStub(tCtx, request, stub, err)
 	return stub, err
 }

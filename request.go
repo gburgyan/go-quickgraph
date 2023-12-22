@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/alecthomas/participle/v2/lexer"
+	"github.com/gburgyan/go-timing"
 	"reflect"
 	"strings"
 )
@@ -20,11 +21,13 @@ const (
 // RequestStub represents a stub of a GraphQL-like request. It contains the Graphy instance,
 // the mode of the request (Query or Mutation), the commands to execute, and the variables used in the request.
 type RequestStub struct {
-	graphy    *Graphy
-	mode      RequestType
-	commands  []command
-	variables map[string]*requestVariable
-	fragments map[string]fragment
+	graphy     *Graphy
+	mode       RequestType
+	commands   []command
+	variables  map[string]*requestVariable
+	fragments  map[string]fragment
+	name       string
+	parsedCall *wrapper
 }
 
 // requestVariable represents a variable in a GraphQL-like request. It contains the variable name and its type.
@@ -119,19 +122,46 @@ func (g *Graphy) newRequestStub(request string) (*RequestStub, error) {
 	}
 
 	rs := RequestStub{
-		graphy:    g,
-		commands:  parsedCall.Commands,
-		variables: variableTypeMap,
-		fragments: fragments,
-		mode:      mode,
+		parsedCall: parsedCall,
+		graphy:     g,
+		commands:   parsedCall.Commands,
+		variables:  variableTypeMap,
+		fragments:  fragments,
+		mode:       mode,
 	}
 
 	return &rs, nil
 }
 
+func (r *RequestStub) Name() string {
+	if r.name != "" {
+		return r.name
+	}
+	var name string
+	if r.parsedCall.OperationDef != nil {
+		name = r.parsedCall.OperationDef.Name
+	} else {
+		builder := strings.Builder{}
+		// Make the name from commands. If there are aliases, use those, otherwise use the command names.
+		for i, command := range r.parsedCall.Commands {
+			if i > 0 {
+				builder.WriteString(",")
+			}
+			if command.Alias != nil {
+				builder.WriteString(*command.Alias)
+			} else {
+				builder.WriteString(command.Name)
+			}
+		}
+		name = builder.String()
+	}
+	r.name = name
+	return name
+}
+
 // gatherRequestVariables gathers and validates the variables used in a GraphQL request.
 // It ensures that the variables used across different commands are of the same type.
-func (g *Graphy) gatherRequestVariables(parsedCall wrapper, fragments map[string]fragment) (map[string]*requestVariable, error) {
+func (g *Graphy) gatherRequestVariables(parsedCall *wrapper, fragments map[string]fragment) (map[string]*requestVariable, error) {
 	// TODO: Look at the parsed arguments, find their types, then later verify that
 	//  they are correct.
 
@@ -420,7 +450,12 @@ func (g *Graphy) validateFunctionVarParam(variableTypeMap map[string]*requestVar
 
 // newRequest creates a new request from a request stub and a JSON string representing the variables used in the request.
 // It unmarshals the variables and assigns them to the corresponding variables in the request.
-func (rs *RequestStub) newRequest(variableJson string) (*request, error) {
+func (rs *RequestStub) newRequest(ctx context.Context, variableJson string) (*request, error) {
+	if rs.graphy.EnableTiming {
+		_, complete := timing.Start(ctx, "AssembleRequest")
+		defer complete()
+	}
+
 	rawVariables := map[string]json.RawMessage{}
 	if variableJson != "" {
 		err := json.Unmarshal([]byte(variableJson), &rawVariables)
@@ -468,13 +503,6 @@ type commandResult struct {
 // execute executes a GraphQL request. It looks up the appropriate processor for each command and invokes it.
 // It returns the result of the request as a JSON string.
 func (r *request) execute(ctx context.Context) (string, error) {
-	result := map[string]any{}
-	data := map[string]any{}
-	var errColl []error
-	result["data"] = data
-	var retErr error
-
-	var cmdResults []commandResult
 	var parallel bool
 	if r.stub.mode == RequestMutation {
 		parallel = false
@@ -482,21 +510,41 @@ func (r *request) execute(ctx context.Context) (string, error) {
 		parallel = true
 	}
 
+	var tCtx context.Context
+	if r.graphy.EnableTiming {
+		var complete timing.Complete
+		var timingContext *timing.Context
+		timingContext, complete = timing.Start(ctx, "ExecuteRequest")
+		defer complete()
+		tCtx = timingContext
+		timingContext.Async = parallel
+	} else {
+		tCtx = ctx
+	}
+
+	result := map[string]any{}
+	data := map[string]any{}
+	var errColl []error
+	result["data"] = data
+	var retErr error
+
+	var cmdResults []commandResult
+
 	if parallel {
 		resultChan := make(chan commandResult)
 		// execute the commands in parallel.
 		for _, cmd := range r.stub.commands {
 			go func(cmd command) {
-				resultChan <- r.executeCommand(ctx, cmd)
+				resultChan <- r.executeCommand(tCtx, cmd)
 			}(cmd)
 		}
 		// Gather the results from the channel and put them in the cmdResults
 		// slice.
 		for len(cmdResults) < len(r.stub.commands) {
 			select {
-			case <-ctx.Done():
+			case <-tCtx.Done():
 				cmdResults = append(cmdResults, commandResult{
-					err: AugmentGraphError(ctx.Err(), "context timed out", lexer.Position{}),
+					err: AugmentGraphError(tCtx.Err(), "context timed out", lexer.Position{}),
 				})
 				break
 			case cmdResult := <-resultChan:
@@ -505,14 +553,14 @@ func (r *request) execute(ctx context.Context) (string, error) {
 		}
 	} else {
 		for _, command := range r.stub.commands {
-			ctxErr := ctx.Err()
+			ctxErr := tCtx.Err()
 			if ctxErr != nil {
 				cmdResults = append(cmdResults, commandResult{
-					err: AugmentGraphError(ctx.Err(), "context timed out", lexer.Position{}),
+					err: AugmentGraphError(tCtx.Err(), "context timed out", lexer.Position{}),
 				})
 				break
 			}
-			cmdResults = append(cmdResults, r.executeCommand(ctx, command))
+			cmdResults = append(cmdResults, r.executeCommand(tCtx, command))
 		}
 	}
 
@@ -541,6 +589,22 @@ func (r *request) execute(ctx context.Context) (string, error) {
 }
 
 func (r *request) executeCommand(ctx context.Context, command command) commandResult {
+	var name string
+	if command.Alias != nil {
+		name = *command.Alias
+	} else {
+		name = command.Name
+	}
+
+	var tCtx context.Context
+	if r.graphy.EnableTiming {
+		var complete timing.Complete
+		tCtx, complete = timing.Start(ctx, "Execute-"+name)
+		defer complete()
+	} else {
+		tCtx = ctx
+	}
+
 	processor, ok := r.graphy.processors[command.Name]
 	if !ok {
 		// This shouldn't happen since we validate the commands when we create the request stub.
@@ -549,14 +613,14 @@ func (r *request) executeCommand(ctx context.Context, command command) commandRe
 		}
 	}
 
-	obj, err := processor.Call(ctx, r, command.Parameters, reflect.Value{})
+	obj, err := processor.Call(tCtx, r, command.Parameters, reflect.Value{})
 	if err != nil {
 		return commandResult{
 			err: AugmentGraphError(err, fmt.Sprintf("error calling %s", command.Name), command.Pos, command.Name),
 		}
 	}
 
-	res, err := processor.GenerateResult(ctx, r, obj, command.ResultFilter)
+	res, err := processor.GenerateResult(tCtx, r, obj, command.ResultFilter)
 	if err != nil {
 		var pos lexer.Position
 		if command.ResultFilter != nil {
@@ -567,11 +631,6 @@ func (r *request) executeCommand(ctx context.Context, command command) commandRe
 		return commandResult{
 			err: AugmentGraphError(err, fmt.Sprintf("error generating result for %s", command.Name), pos, command.Name),
 		}
-	}
-
-	name := command.Name
-	if command.Alias != nil {
-		name = *command.Alias
 	}
 
 	return commandResult{

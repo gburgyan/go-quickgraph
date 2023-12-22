@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/alecthomas/participle/v2 v2.1.1
-	github.com/gburgyan/go-timing v0.7.4
+	github.com/gburgyan/go-timing v0.7.6
 	github.com/stretchr/testify v1.8.4
 )
 

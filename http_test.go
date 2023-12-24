@@ -29,7 +29,7 @@ func (e *errorWriter) WriteHeader(status int) {
 }
 
 func TestGraphHttpHandler_ServeHTTP_GetSchema(t *testing.T) {
-	g := Graphy{}
+	g := Graphy{EnableTiming: true}
 	ctx := context.Background()
 	g.RegisterQuery(ctx, "greeting", func(ctx context.Context, name string) (string, error) {
 		return "Hello, " + name, nil
@@ -71,7 +71,7 @@ func TestGraphHttpHandler_ServeHTTP_GetSchema(t *testing.T) {
 }
 
 func TestGraphHttpHandler_ServeHTTP_GetSchema_Error(t *testing.T) {
-	g := Graphy{}
+	g := Graphy{EnableTiming: true}
 	ctx := context.Background()
 	g.RegisterQuery(ctx, "greeting", func(ctx context.Context, name string) (string, error) {
 		return "Hello, " + name, nil
@@ -99,7 +99,7 @@ func TestGraphHttpHandler_ServeHTTP_GetSchema_Error(t *testing.T) {
 }
 
 func TestGraphHttpHandler_ServeHTTP_PostQuery(t *testing.T) {
-	g := Graphy{}
+	g := Graphy{EnableTiming: true}
 	g.RegisterQuery(nil, "greeting", func(ctx context.Context, name string) (string, error) {
 		return "Hello, " + name, nil
 	}, "name")
@@ -147,7 +147,7 @@ func TestGraphHttpHandler_ServeHTTP_PostQuery(t *testing.T) {
 }
 
 func TestGraphHttpHandler_ServeHTTP_PostQuery_BadJSON(t *testing.T) {
-	g := Graphy{}
+	g := Graphy{EnableTiming: true}
 	g.RegisterQuery(nil, "greeting", func(ctx context.Context, name string) (string, error) {
 		return "Hello, " + name, nil
 	}, "name")
@@ -185,7 +185,7 @@ func TestGraphHttpHandler_ServeHTTP_PostQuery_BadJSON(t *testing.T) {
 }
 
 func TestGraphHttpHandler_ServeHTTP_PostQuery_Error(t *testing.T) {
-	g := Graphy{}
+	g := Graphy{EnableTiming: true}
 	g.RegisterQuery(nil, "greeting", func(ctx context.Context, name string) (string, error) {
 		return "", errors.New("expected error")
 	}, "name")

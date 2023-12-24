@@ -204,7 +204,11 @@ func parseInputIntoValue(req *request, inValue genericValue, targetValue reflect
 	typ := targetValue.Type()
 	isPtr := typ.Kind() == reflect.Ptr
 	if isPtr {
+		// Make a new instance of the object, set the target to that new instance, then dereference.
 		typ = typ.Elem()
+		instance := reflect.New(typ)
+		targetValue.Set(instance)
+		targetValue = targetValue.Elem()
 	}
 	isSlice := typ.Kind() == reflect.Slice
 	isStruct := typ.Kind() == reflect.Struct
@@ -251,50 +255,26 @@ func parseVariableIntoValue(req *request, variableName string, targetValue refle
 	if !ok {
 		return fmt.Errorf("variable %v not found", variableName)
 	}
+	if value.Kind() == reflect.Ptr {
+		value = value.Elem()
+	}
 	targetValue.Set(value)
 	return nil
 }
 
 // parseStringIntoValue interprets the provided string and assigns it to targetValue.
 func parseStringIntoValue(s string, targetValue reflect.Value) {
-	if targetValue.Kind() == reflect.Ptr {
-		// Create a pointer to the target type and set the value.
-		ttp := targetValue.Type()
-		tt := ttp.Elem()
-		val := reflect.New(tt)
-		val.Elem().SetString(s)
-		targetValue.Set(val)
-	} else {
-		targetValue.SetString(s)
-	}
+	targetValue.SetString(s)
 }
 
 // parseIntIntoValue converts an int64 to the appropriate type and assigns it to targetValue.
 func parseIntIntoValue(i int64, targetValue reflect.Value) {
-	if targetValue.Kind() == reflect.Ptr {
-		// Create a pointer to the target type and set the value.
-		ttp := targetValue.Type()
-		tt := ttp.Elem()
-		val := reflect.New(tt)
-		val.Elem().SetInt(i)
-		targetValue.Set(val)
-	} else {
-		targetValue.SetInt(i)
-	}
+	targetValue.SetInt(i)
 }
 
 // parseFloatIntoValue converts a float64 to the appropriate type and assigns it to targetValue.
 func parseFloatIntoValue(f float64, targetValue reflect.Value) {
-	if targetValue.Kind() == reflect.Ptr {
-		// Create a pointer to the target type and set the value.
-		ttp := targetValue.Type()
-		tt := ttp.Elem()
-		val := reflect.New(tt)
-		val.Elem().SetFloat(f)
-		targetValue.Set(val)
-	} else {
-		targetValue.SetFloat(f)
-	}
+	targetValue.SetFloat(f)
 }
 
 // parseIdentifierIntoValue attempts to interpret an identifier and assign its corresponding value to targetValue. It supports
@@ -339,18 +319,12 @@ func parseIdentifierIntoValue(identifier string, value reflect.Value) error {
 		value.SetString(identifier)
 		return nil
 	} else {
-		if ptr {
-			strValue := reflect.New(value.Type().Elem())
-			strValue.Elem().SetString(identifier)
-			value.Set(strValue)
-		} else {
-			// This assumes the value is a string or something that
-			// simply wraps a string. No extra checks are done as
-			// that is also handled at the reflection layer. If this
-			// is not a string, it will panic, that will get caught,
-			// and the error will be returned.
-			value.SetString(identifier)
-		}
+		// This assumes the value is a string or something that
+		// simply wraps a string. No extra checks are done as
+		// that is also handled at the reflection layer. If this
+		// is not a string, it will panic, that will get caught,
+		// and the error will be returned.
+		value.SetString(identifier)
 		return nil
 	}
 }
@@ -400,6 +374,7 @@ func unmarshalWithEnumUnmarshaler(identifier string, value reflect.Value) (bool,
 // to the corresponding index in the slice represented by targetValue. If an item cannot be parsed, it returns an error.
 func parseListIntoValue(req *request, inVal genericValue, targetValue reflect.Value) error {
 	targetType := targetValue.Type()
+	fmt.Println(targetType)
 	targetValue.Set(reflect.MakeSlice(targetType, len(inVal.List), len(inVal.List)))
 	for i, listItem := range inVal.List {
 		err := parseInputIntoValue(req, listItem, targetValue.Index(i))

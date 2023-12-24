@@ -359,7 +359,6 @@ func unmarshalWithEnumUnmarshaler(identifier string, value reflect.Value) (bool,
 	// Make a pointer to the value type in case the receiver is a pointer.
 	interfaceVal := value
 	valueType := interfaceVal.Type()
-	fmt.Printf("1: %v\n", valueType)
 	if interfaceVal.Kind() == reflect.Ptr && interfaceVal.IsNil() {
 		// Create something for the pointer to point to.
 		instance := reflect.New(valueType.Elem())
@@ -372,7 +371,6 @@ func unmarshalWithEnumUnmarshaler(identifier string, value reflect.Value) (bool,
 		valueType = interfaceVal.Type().Elem()
 		interfaceVal = interfaceVal.Elem()
 	}
-	fmt.Printf("2: %v\n", valueType)
 	destinationVal := reflect.New(valueType)
 	if ok := value.CanConvert(enumUnmarshalerType); ok {
 		// If it supports the EnumUnmarshaler interface, use that.

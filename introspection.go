@@ -178,7 +178,15 @@ func (g *Graphy) populateIntrospection(st *schemaTypes) {
 func (g *Graphy) getIntrospectionBaseType(is *__Schema, tl *typeLookup, io TypeKind) *__Type {
 	var name string
 
-	if io == TypeOutput || tl.fundamental {
+	if tl.rootType != nil && tl.rootType.ConvertibleTo(stringEnumValuesType) {
+		name = g.schemaBuffer.enumTypeNameLookup[tl]
+	} else if tl.fundamental {
+		if otlName, ok := g.schemaBuffer.outputTypeNameLookup[tl]; ok {
+			name = otlName
+		} else {
+			name = introspectionScalarName(tl)
+		}
+	} else if io == TypeOutput || tl.fundamental {
 		name = g.schemaBuffer.outputTypeNameLookup[tl]
 	} else if io == TypeInput {
 		name = g.schemaBuffer.inputTypeNameLookup[tl]
@@ -230,10 +238,15 @@ func (g *Graphy) getIntrospectionBaseType(is *__Schema, tl *typeLookup, io TypeK
 			}
 			result.enumValuesRaw = append(result.enumValuesRaw, value)
 		}
+
 	case tl.fundamental:
 		result.Kind = IntrospectionKindScalar
+		result.Name = name
+
 	case io == TypeInput:
 		result.Kind = IntrospectionKindInputObject
+		g.addIntrospectionSchemaFields(is, tl, io, result)
+
 	default:
 		result.Kind = IntrospectionKindObject
 		g.addIntrospectionSchemaFields(is, tl, io, result)
@@ -243,6 +256,22 @@ func (g *Graphy) getIntrospectionBaseType(is *__Schema, tl *typeLookup, io TypeK
 	}
 
 	return result
+}
+
+func introspectionScalarName(tl *typeLookup) string {
+	kind := tl.rootType.Kind()
+	switch kind {
+	case reflect.Bool:
+		return "Boolean"
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return "Int"
+	case reflect.Float32, reflect.Float64:
+		return "Float"
+	case reflect.String:
+		return "String"
+	default:
+		panic("unknown scalar type")
+	}
 }
 
 func (g *Graphy) addIntrospectionSchemaFields(is *__Schema, tl *typeLookup, io TypeKind, result *__Type) {

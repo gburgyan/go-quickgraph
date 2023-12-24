@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/stretchr/testify/assert"
+	"reflect"
 	"testing"
 )
 
@@ -140,16 +141,6 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
       },
       "subscriptionType": null,
       "types": [
-        {
-          "description": null,
-          "enumValues": [],
-          "fields": [],
-          "inputFields": [],
-          "interfaces": [],
-          "kind": "SCALAR",
-          "name": "",
-          "possibleTypes": []
-        },
         {
           "description": null,
           "enumValues": [],
@@ -513,7 +504,7 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
                   "name": "arg1",
                   "type": {
                     "kind": "SCALAR",
-                    "name": "",
+                    "name": "String",
                     "ofType": null
                   }
                 }
@@ -708,6 +699,16 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
           "interfaces": [],
           "kind": "OBJECT",
           "name": "Starship",
+          "possibleTypes": []
+        },
+        {
+          "description": null,
+          "enumValues": [],
+          "fields": [],
+          "inputFields": [],
+          "interfaces": [],
+          "kind": "SCALAR",
+          "name": "String",
           "possibleTypes": []
         },
         {
@@ -1625,4 +1626,35 @@ func TestGraphy_Introspection_Interface(t *testing.T) {
 	formatted := buff.String()
 
 	assert.Equal(t, expected, formatted)
+}
+
+func TestIntrospectionScalarName_WithBoolType(t *testing.T) {
+	tl := &typeLookup{rootType: reflect.TypeOf(true)}
+	result := introspectionScalarName(tl)
+	assert.Equal(t, "Boolean", result)
+}
+
+func TestIntrospectionScalarName_WithIntType(t *testing.T) {
+	tl := &typeLookup{rootType: reflect.TypeOf(int(1))}
+	result := introspectionScalarName(tl)
+	assert.Equal(t, "Int", result)
+}
+
+func TestIntrospectionScalarName_WithFloatType(t *testing.T) {
+	tl := &typeLookup{rootType: reflect.TypeOf(float64(1.0))}
+	result := introspectionScalarName(tl)
+	assert.Equal(t, "Float", result)
+}
+
+func TestIntrospectionScalarName_WithStringType(t *testing.T) {
+	tl := &typeLookup{rootType: reflect.TypeOf("test")}
+	result := introspectionScalarName(tl)
+	assert.Equal(t, "String", result)
+}
+
+func TestIntrospectionScalarName_WithUnknownType(t *testing.T) {
+	tl := &typeLookup{rootType: reflect.TypeOf(map[string]string{})}
+	assert.PanicsWithValue(t, "unknown scalar type", func() {
+		introspectionScalarName(tl)
+	})
 }

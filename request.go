@@ -198,7 +198,7 @@ func (g *Graphy) gatherRequestVariables(parsedCall *wrapper, fragments map[strin
 
 					err := g.addTypedInputVariable(varName, variableTypeMap, targetType)
 					if err != nil {
-						return nil, AugmentGraphError(err, fmt.Sprintf("error adding variable %s", varName), parameter.Pos)
+						return nil, AugmentGraphError(err, fmt.Sprintf("error adding variable %s", varName), parameter.Pos, varName)
 					}
 				}
 			}
@@ -414,7 +414,7 @@ func (g *Graphy) validateNamedFunctionParams(commandField *resultField, gf *grap
 
 				err := g.validateFunctionVarParam(variableTypeMap, varName, targetType)
 				if err != nil {
-					return AugmentGraphError(err, fmt.Sprintf("error validating variable %s", varName), cfp.Pos)
+					return AugmentGraphError(err, fmt.Sprintf("error validating variable %s", varName), cfp.Pos, varName)
 				}
 			}
 			// Todo: Consider parsing, validating, and caching the value for value types. The
@@ -473,13 +473,13 @@ func (rs *RequestStub) newRequest(ctx context.Context, variableJson string) (*re
 		if variableJson, found := rawVariables[varName]; found {
 			err := json.Unmarshal(variableJson, variableValue.Interface())
 			if err != nil {
-				return nil, AugmentGraphError(err, fmt.Sprintf("error parsing variable %s into type %s", varName, variable.Type.Name()), lexer.Position{})
+				return nil, AugmentGraphError(err, fmt.Sprintf("error parsing variable %s into type %s", varName, variable.Type.Name()), lexer.Position{}, varName)
 			}
 			variables[varName] = variableValue.Elem()
 		} else if variable.Default != nil {
 			err := parseInputIntoValue(nil, *variable.Default, variableValue.Elem())
 			if err != nil {
-				return nil, AugmentGraphError(err, fmt.Sprintf("error parsing default variable %s into type %s", varName, variable.Type.Name()), lexer.Position{})
+				return nil, AugmentGraphError(err, fmt.Sprintf("error parsing default variable %s into type %s", varName, variable.Type.Name()), lexer.Position{}, varName)
 			}
 			variables[varName] = variableValue.Elem()
 		} else {

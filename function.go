@@ -333,7 +333,11 @@ func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflec
 
 		name := field.Name
 		if jsonTag := field.Tag.Get("json"); jsonTag != "" {
-			name = jsonTag
+			if jsonTag == "-" {
+				continue
+			}
+			// Ignore anything after the first comma.
+			name = strings.Split(jsonTag, ",")[0]
 		}
 
 		mapping := functionParamNameMapping{

@@ -574,7 +574,7 @@ query f($time: int!) {
 	response, err := g.ProcessRequest(ctx, gql, `{"time": "foo"}`)
 
 	assert.Error(t, err)
-	assert.Equal(t, `{"errors":[{"message":"error parsing variable time into type int64: json: cannot unmarshal string into Go value of type int64"}]}`, response)
+	assert.Equal(t, `{"errors":[{"message":"error parsing variable time into type int64: json: cannot unmarshal string into Go value of type int64","path":["time"]}]}`, response)
 }
 
 func TestGraphFunction_BadDefaultVariableType(t *testing.T) {
@@ -594,7 +594,7 @@ query f($time: int! = "foo") {
 	response, err := g.ProcessRequest(ctx, gql, ``)
 
 	assert.Error(t, err)
-	assert.Equal(t, `{"errors":[{"message":"error parsing default variable time into type int64: panic: reflect: call of reflect.Value.SetString on int64 Value","locations":[{"line":2,"column":23}]}]}`, response)
+	assert.Equal(t, `{"errors":[{"message":"error parsing default variable time into type int64: panic: reflect: call of reflect.Value.SetString on int64 Value","locations":[{"line":2,"column":23}],"path":["time"]}]}`, response)
 }
 
 func TestGraphFunction_MissingVariable(t *testing.T) {
@@ -753,12 +753,13 @@ query mixed($in: string!) {
 }
 `
 	response, err := g.ProcessRequest(ctx, gql, ``)
-	assert.EqualError(t, err, "error adding variable $in [4:5]: variable in is used with different types: existing type: string, new type: int")
-	assert.Equal(t, `{"errors":[{"message":"error adding variable $in: variable in is used with different types: existing type: string, new type: int","locations":[{"line":4,"column":5}]}]}`, response)
+	assert.EqualError(t, err, "error adding variable $in (path: $in) [4:5]: variable in is used with different types: existing type: string, new type: int")
+	assert.Equal(t, `{"errors":[{"message":"error adding variable $in: variable in is used with different types: existing type: string, new type: int","locations":[{"line":4,"column":5}],"path":["$in"]}]}`, response)
 }
 
 type TestA struct {
-	B *TestB
+	B      *TestB
+	Ignore *string `json:"-"`
 }
 
 type TestB struct {

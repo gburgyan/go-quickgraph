@@ -359,11 +359,20 @@ func unmarshalWithEnumUnmarshaler(identifier string, value reflect.Value) (bool,
 	// Make a pointer to the value type in case the receiver is a pointer.
 	interfaceVal := value
 	valueType := interfaceVal.Type()
-	if interfaceVal.Kind() == reflect.Ptr {
-		// If the value is a pointer, dereference it.
+	fmt.Printf("1: %v\n", valueType)
+	if interfaceVal.Kind() == reflect.Ptr && interfaceVal.IsNil() {
+		// Create something for the pointer to point to.
+		instance := reflect.New(valueType.Elem())
+		interfaceVal.Set(instance)
+
+		// Now dereference the pointer.
+		valueType = interfaceVal.Type().Elem()
+		interfaceVal = interfaceVal.Elem()
+	} else if interfaceVal.Kind() == reflect.Ptr {
 		valueType = interfaceVal.Type().Elem()
 		interfaceVal = interfaceVal.Elem()
 	}
+	fmt.Printf("2: %v\n", valueType)
 	destinationVal := reflect.New(valueType)
 	if ok := value.CanConvert(enumUnmarshalerType); ok {
 		// If it supports the EnumUnmarshaler interface, use that.
@@ -427,6 +436,11 @@ func parseMapIntoValue(req *request, inValue genericValue, targetValue reflect.V
 	for i := 0; i < targetType.NumField(); i++ {
 		field := targetType.Field(i)
 		if tag, ok := field.Tag.Lookup("json"); ok {
+			// Only use the name from the tag if it's not "-" and ignore anything after a comma.
+			if tag == "-" {
+				continue
+			}
+			tag = strings.Split(tag, ",")[0]
 			fieldMap[tag] = field
 		}
 		if field.Type.Kind() != reflect.Ptr {
@@ -455,7 +469,7 @@ func parseMapIntoValue(req *request, inValue genericValue, targetValue reflect.V
 			// We have found the field, so parse the value into it.
 			err := parseInputIntoValue(req, namedValue.Value, fieldValue)
 			if err != nil {
-				return err
+				return AugmentGraphError(err, fmt.Sprintf("error setting field %s", fieldName), inValue.Pos, fieldName)
 			}
 			delete(requiredFields, fieldName)
 		} else {

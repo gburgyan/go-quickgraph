@@ -53,7 +53,7 @@ type command struct {
 
 // parameterList is a list of parameters for a call to a function.
 type parameterList struct {
-	Values []namedValue `parser:"(@@ (',' @@)*)?"`
+	Values []namedValue `parser:"(@@ (',' @	@)*)?"`
 	Pos    lexer.Position
 }
 
@@ -71,8 +71,8 @@ type genericValue struct {
 	String     *string        `parser:"| @String"`
 	Int        *int64         `parser:"| @Int"`
 	Float      *float64       `parser:"| @Float"`
-	Map        []namedValue   `parser:"| '{' ( @@ (',' @@)* )? '}'"`
-	List       []genericValue `parser:"| '[' ( @@ (',' @@)* )? ']'"`
+	Map        []namedValue   `parser:"| '{' ( @@ (','? @@)* )? '}'"`
+	List       []genericValue `parser:"| '[' ( @@ (','? @@)* )? ']'"`
 	Pos        lexer.Position
 }
 

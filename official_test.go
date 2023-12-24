@@ -60,6 +60,7 @@ func (c *Character) FriendsConnection(first int) *FriendsConnection {
 type Review struct {
 	Stars      int     `json:"stars"`
 	Commentary *string `json:"commentary"`
+	Ignore     *string `json:"-"`
 }
 
 type episode string

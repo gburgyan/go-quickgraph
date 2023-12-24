@@ -17,7 +17,8 @@ type Course struct {
 }
 
 type PriceConvertInput struct {
-	Currency string `json:"currency"`
+	Currency string  `json:"currency"`
+	Ignore   *string `json:"-"`
 }
 
 func (c *Course) PriceConvert(in PriceConvertInput) (string, error) {

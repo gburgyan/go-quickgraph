@@ -374,7 +374,6 @@ func unmarshalWithEnumUnmarshaler(identifier string, value reflect.Value) (bool,
 // to the corresponding index in the slice represented by targetValue. If an item cannot be parsed, it returns an error.
 func parseListIntoValue(req *request, inVal genericValue, targetValue reflect.Value) error {
 	targetType := targetValue.Type()
-	fmt.Println(targetType)
 	targetValue.Set(reflect.MakeSlice(targetType, len(inVal.List), len(inVal.List)))
 	for i, listItem := range inVal.List {
 		err := parseInputIntoValue(req, listItem, targetValue.Index(i))

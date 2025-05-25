@@ -261,18 +261,16 @@ func (g *Graphy) typeLookup(typ reflect.Type) *typeLookup {
 	}
 
 	if rootTyp.Kind() == reflect.Struct {
-		// IMPORTANT: We intentionally release the mutex before calling populateTypeLookup
-		// to prevent deadlocks. populateTypeLookup recursively calls g.typeLookup() for
-		// field types, which would deadlock if we held the mutex. This is safe because:
-		// 1. The 'result' object is newly created and not yet shared
-		// 2. Multiple threads might compute the same type concurrently, but that's OK
-		// 3. Only one thread will store the result (whoever gets the lock first)
-		// 4. The computation is deterministic, so all threads produce the same result
-		g.typeMutex.Unlock()
-		g.populateTypeLookup(rootTyp, nil, result)
-		g.typeMutex.Lock()
+		// IMPORTANT: Store the type lookup BEFORE populating to handle circular references.
+		// This prevents infinite recursion when types reference each other (A->B->A).
+		// The type lookup will be incomplete at first, but that's OK - it will be
+		// populated as we process the fields.
 		g.typeLookups[typ] = result
 		g.typeMutex.Unlock()
+
+		// Now populate the type lookup. If this type is referenced circularly,
+		// the recursive call will find it in the cache and return the partial result.
+		g.populateTypeLookup(rootTyp, nil, result)
 		return result
 	}
 	if typ == anyType {

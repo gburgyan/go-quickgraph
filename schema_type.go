@@ -237,8 +237,17 @@ func (g *Graphy) schemaRefForType(t *typeLookup, mapping typeNameMapping) string
 				baseType = mapping[t]
 			}
 
+		case reflect.Interface:
+			// Interfaces are represented as the GraphQL any type
+			// If the interface has specific implementations registered,
+			// they would be handled through the union mechanism
+			baseType = t.name
+			if baseType == "" {
+				baseType = "Any"
+			}
+
 		default:
-			panic("unsupported type")
+			panic(fmt.Sprintf("unsupported type: %v", t.rootType.Kind()))
 		}
 	}
 

@@ -326,6 +326,10 @@ func parseIntIntoValue(i int64, targetValue reflect.Value) error {
 		}
 		targetValue.SetUint(uint64(i))
 		return nil
+	case reflect.Float32, reflect.Float64:
+		// Convert int to float
+		targetValue.SetFloat(float64(i))
+		return nil
 	}
 	targetValue.SetInt(i)
 	return nil

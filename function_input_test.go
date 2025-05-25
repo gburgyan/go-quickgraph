@@ -337,3 +337,54 @@ func Test_parseIntIntoValue_Overflow(t *testing.T) {
 		})
 	}
 }
+
+func Test_parseIntIntoValue_Float(t *testing.T) {
+	tests := []struct {
+		name   string
+		value  int64
+		target interface{}
+	}{
+		{
+			name:   "int to float32",
+			value:  42,
+			target: new(float32),
+		},
+		{
+			name:   "int to float64",
+			value:  100,
+			target: new(float64),
+		},
+		{
+			name:   "negative int to float32",
+			value:  -42,
+			target: new(float32),
+		},
+		{
+			name:   "negative int to float64",
+			value:  -100,
+			target: new(float64),
+		},
+		{
+			name:   "large int to float64",
+			value:  1000000,
+			target: new(float64),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := reflect.ValueOf(tt.target).Elem()
+			err := parseIntIntoValue(tt.value, v)
+
+			assert.NoError(t, err)
+
+			// Check the value was set correctly
+			switch tt.target.(type) {
+			case *float32:
+				assert.Equal(t, float32(tt.value), v.Interface().(float32))
+			case *float64:
+				assert.Equal(t, float64(tt.value), v.Interface().(float64))
+			}
+		})
+	}
+}

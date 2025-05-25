@@ -312,6 +312,13 @@ func (g *Graphy) addGraphMethodsForType(typ reflect.Type, index []int, tl *typeL
 
 // fetch fetches a value from a given reflect.Value using the field indexes.
 // It walks the field indexes in order to find the nested field if necessary.
+//
+// This is the entry point for field resolution. It handles two types of fields:
+// 1. Regular struct fields (FieldTypeField) - simply navigates to and returns the field value
+// 2. Methods/functions (FieldTypeGraphFunction) - calls fetchGraphFunction to execute the method
+//
+// The distinction is important because methods on embedded types require special handling
+// to ensure the correct receiver type is used when calling the method.
 func (t *fieldLookup) fetch(ctx context.Context, req *request, v reflect.Value, params *parameterList) (any, error) {
 	switch t.fieldType {
 	case FieldTypeField:
@@ -331,6 +338,8 @@ func (t *fieldLookup) fetchField(v reflect.Value) (any, error) {
 }
 
 func (t *fieldLookup) fetchGraphFunction(ctx context.Context, req *request, v reflect.Value, params *parameterList) (any, error) {
+	// params can be nil for field methods (methods called as fields in GraphQL without parentheses)
+	// We need to handle this gracefully throughout this function
 	var pos lexer.Position
 	if params != nil {
 		pos = params.Pos
@@ -340,13 +349,28 @@ func (t *fieldLookup) fetchGraphFunction(ctx context.Context, req *request, v re
 		return nil, NewGraphError("field is not a function", pos)
 	}
 
-	// Navigate to the correct field if we have field indexes (for embedded types)
-	// This is needed when a method is defined on an embedded type
+	// EMBEDDED TYPE METHOD HANDLING:
+	// When a method is defined on an embedded type, we need to navigate through the struct
+	// hierarchy to reach the correct receiver. The fieldIndexes slice contains the path
+	// through nested fields to reach the embedded type.
+	//
+	// Example scenario:
+	//   type Employee struct { Name string }
+	//   func (e *Employee) GetDetails() string { ... }
+	//   type Developer struct {
+	//       Employee  // embedded at field index 0
+	//       Language string
+	//   }
+	//
+	// To call GetDetails on a Developer, we need to:
+	// 1. Navigate to field index 0 (the embedded Employee)
+	// 2. Ensure the value is suitable for the method's receiver type
 	for i, idx := range t.fieldIndexes {
 		if !v.IsValid() {
 			return nil, NewGraphError(fmt.Sprintf("invalid value at field index %d", i), pos)
 		}
 		// Handle both struct and pointer to struct
+		// We may encounter pointers when dealing with pointer fields or interface{} values
 		if v.Kind() == reflect.Ptr {
 			if v.IsNil() {
 				return nil, NewGraphError(fmt.Sprintf("nil pointer at field index %d", i), pos)
@@ -359,6 +383,7 @@ func (t *fieldLookup) fetchGraphFunction(ctx context.Context, req *request, v re
 		if idx >= v.NumField() {
 			return nil, NewGraphError(fmt.Sprintf("field index %d out of range (num fields: %d)", idx, v.NumField()), pos)
 		}
+		// Navigate to the embedded field. This maintains addressability if the parent was addressable.
 		v = v.Field(idx)
 	}
 
@@ -370,6 +395,9 @@ func (t *fieldLookup) fetchGraphFunction(ctx context.Context, req *request, v re
 	// fmt.Printf("DEBUG fetchGraphFunction: v.Type=%v, v.Kind=%v, v.CanAddr=%v, method=%v\n",
 	//     v.Type(), v.Kind(), v.CanAddr(), t.name)
 
+	// Call the method with the navigated value as the receiver
+	// The Call function will handle ensuring the receiver type matches what the method expects
+	// (e.g., converting Employee to *Employee if needed)
 	obj, err := t.graphFunction.Call(ctx, req, params, v)
 	if err != nil {
 		var pos lexer.Position

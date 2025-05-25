@@ -65,7 +65,7 @@ func (f *graphFunction) processCallOutput(ctx context.Context, req *request, fil
 		// TODO: Handle maps?
 		return nil, NewGraphError(fmt.Sprintf("maps not supported"), pos)
 	} else if kind == reflect.Struct {
-		sr, err := f.processOutputStructValue(nil, req, filter, callResult.Interface(), callResult)
+		sr, err := f.processOutputStruct(ctx, req, filter, callResult)
 		if err != nil {
 			return nil, AugmentGraphError(err, fmt.Sprintf("error processing struct"), pos)
 		}
@@ -75,26 +75,49 @@ func (f *graphFunction) processCallOutput(ctx context.Context, req *request, fil
 	}
 }
 
-// processOutputStruct takes a result filter and a struct, processes the struct according to the filter,
+// processOutputStruct takes a result filter and a reflect.Value of a struct, processes the struct according to the filter,
 // and returns a map and an error if there is any. The map contains the processed fields of the struct.
-func (f *graphFunction) processOutputStruct(ctx context.Context, req *request, filter *resultFilter, anyStruct any) (any, error) {
-	return f.processOutputStructValue(ctx, req, filter, anyStruct, reflect.Value{})
-}
-
-// processOutputStructValue is the internal implementation that can accept a reflect.Value to preserve addressability
-func (f *graphFunction) processOutputStructValue(ctx context.Context, req *request, filter *resultFilter, anyStruct any, structValue reflect.Value) (any, error) {
-
-	kind := reflect.TypeOf(anyStruct).Kind()
-	if kind == reflect.Map && reflect.ValueOf(anyStruct).IsNil() {
+//
+// IMPORTANT: This function takes a reflect.Value instead of interface{} to preserve addressability.
+// This is crucial for calling methods with pointer receivers on embedded types. When Go's reflection
+// creates a new reflect.Value from an interface{} (via reflect.ValueOf), the resulting value is not
+// addressable, which prevents taking its address for pointer receiver methods.
+//
+// Example scenario this fixes:
+//
+//	type Employee struct { Name string }
+//	func (e *Employee) GetDetails() string { return e.Name }  // pointer receiver
+//	type Developer struct { Employee }  // embedded by value
+//
+// When processing a Developer and trying to call GetDetails on the embedded Employee,
+// we need the Employee field to be addressable so we can get *Employee for the method call.
+func (f *graphFunction) processOutputStruct(ctx context.Context, req *request, filter *resultFilter, structValue reflect.Value) (any, error) {
+	if !structValue.IsValid() {
 		return nil, nil
 	}
 
-	anyStruct, err := deferenceUnionType(anyStruct)
-	if err != nil {
-		return nil, AugmentGraphError(err, fmt.Sprintf("error dereferencing union type"), filter.Pos)
+	// Handle nil maps
+	if structValue.Kind() == reflect.Map && structValue.IsNil() {
+		return nil, nil
 	}
 
-	t := reflect.TypeOf(anyStruct)
+	// Dereference interfaces and pointers to get to the actual struct
+	for structValue.Kind() == reflect.Interface || structValue.Kind() == reflect.Ptr {
+		if structValue.IsNil() {
+			return nil, nil
+		}
+		structValue = structValue.Elem()
+	}
+
+	// Handle union types
+	var err error
+	structValue, err = deferenceUnionTypeValue(structValue)
+	if err != nil {
+		return nil, AugmentGraphError(err, "error dereferencing union type", filter.Pos)
+	}
+
+	// Get the type for lookup
+	t := structValue.Type()
 	typeName := t.Name()
 	fieldMap := f.g.typeLookup(t)
 
@@ -135,14 +158,7 @@ func (f *graphFunction) processOutputStructValue(ctx context.Context, req *reque
 			}
 			// Todo: Check for directives. Either here or in fetch.
 
-			// Use structValue if valid (preserves addressability), otherwise create new value
-			var valueToUse reflect.Value
-			if structValue.IsValid() {
-				valueToUse = structValue
-			} else {
-				valueToUse = reflect.ValueOf(anyStruct)
-			}
-			fieldAny, err := fieldInfo.fetch(ctx, req, valueToUse, field.Params)
+			fieldAny, err := fieldInfo.fetch(ctx, req, structValue, field.Params)
 			if err != nil {
 				return nil, AugmentGraphError(err, fmt.Sprintf("error fetching field %v", field.Name), field.Pos, field.Name)
 			}
@@ -160,6 +176,76 @@ func (f *graphFunction) processOutputStructValue(ctx context.Context, req *reque
 	}
 
 	return r, nil
+}
+
+// deferenceUnionTypeValue works with reflect.Value to preserve addressability while handling union types.
+//
+// Union types in GraphQL are represented as Go structs with multiple pointer fields, where exactly
+// one field should be non-nil at runtime. This function finds and returns that non-nil field's value.
+//
+// Unlike the original deferenceUnionType function which works with interface{} values,
+// this version maintains the reflect.Value chain, preserving addressability. This is critical
+// when the union contains types with methods that have pointer receivers.
+//
+// Example union type:
+//
+//	type SearchResultUnion struct {
+//	    User    *User
+//	    Product *Product
+//	    Order   *Order
+//	}
+//
+// Only one of User, Product, or Order should be non-nil.
+func deferenceUnionTypeValue(v reflect.Value) (reflect.Value, error) {
+	if !v.IsValid() {
+		return v, nil
+	}
+
+	// If the value is a union type, as indicated by its name ending in "Union"
+	if !strings.HasSuffix(v.Type().Name(), "Union") {
+		return v, nil
+	}
+
+	// Find the field that is not nil
+	t := v.Type()
+	found := false
+	var result reflect.Value
+
+	for i := 0; i < t.NumField(); i++ {
+		field := v.Field(i)
+		switch field.Kind() {
+		case reflect.Map, reflect.Pointer, reflect.Interface, reflect.Slice:
+			// These are allowed
+		default:
+			return reflect.Value{}, fmt.Errorf("fields in union type must be pointers, maps, slices, or interfaces")
+		}
+
+		if field.IsNil() {
+			continue
+		}
+
+		if found {
+			return reflect.Value{}, fmt.Errorf("more than one field in union type is not nil")
+		}
+
+		found = true
+		// For pointer types, dereference
+		if field.Kind() == reflect.Ptr {
+			result = field.Elem()
+			if !result.IsValid() {
+				return reflect.Value{}, fmt.Errorf("union field %s points to invalid value", t.Field(i).Name)
+			}
+		} else {
+			// For maps, slices, and interfaces, use them directly
+			result = field
+		}
+	}
+
+	if !found {
+		return reflect.Value{}, fmt.Errorf("all fields in union type are nil")
+	}
+
+	return result, nil
 }
 
 // deferenceUnionType takes a struct and checks if the struct is a union type.

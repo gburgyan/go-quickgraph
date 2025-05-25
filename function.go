@@ -516,6 +516,10 @@ func (f *graphFunction) Call(ctx context.Context, req *request, params *paramete
 		}
 	}()
 
+	// Get the parameters for the function call.
+	// NOTE: params can be nil for field methods (methods accessed as fields without parentheses in GraphQL).
+	// Example: "personalDetails" instead of "personalDetails()"
+	// getCallParameters must handle this case correctly.
 	paramValues, err := f.getCallParameters(ctx, req, params, methodTarget)
 	if err != nil {
 		var pos lexer.Position
@@ -525,11 +529,32 @@ func (f *graphFunction) Call(ctx context.Context, req *request, params *paramete
 		return reflect.Value{}, AugmentGraphError(err, fmt.Sprintf("error getting call parameters for function %s", f.name), pos)
 	}
 
+	// PARAMETER VALIDATION:
+	// Before calling the function, ensure all parameters are valid reflect.Values.
+	// An invalid reflect.Value (created with reflect.Value{}) will cause a panic
+	// when passed to Call(). This can happen if parameter initialization fails.
+	//
+	// This validation prevents the cryptic panic "reflect: Call using zero Value argument"
+	// and provides a clearer error message indicating which parameter is invalid.
+	for i, pv := range paramValues {
+		if !pv.IsValid() {
+			var pos lexer.Position
+			if params != nil {
+				pos = params.Pos
+			}
+			return reflect.Value{}, NewGraphError(fmt.Sprintf("invalid parameter at index %d for function %s", i, f.name), pos)
+		}
+	}
+
 	gfv := f.function
 	callResults := gfv.Call(paramValues)
 	if len(callResults) == 0 {
 		// We should never get here because all functions must return at least one value and an optional error.
-		return reflect.Value{}, NewGraphError("function returned no values", params.Pos, f.name)
+		var pos lexer.Position
+		if params != nil {
+			pos = params.Pos
+		}
+		return reflect.Value{}, NewGraphError("function returned no values", pos, f.name)
 	}
 
 	var resultValues []reflect.Value
@@ -537,7 +562,11 @@ func (f *graphFunction) Call(ctx context.Context, req *request, params *paramete
 		if callResult.CanConvert(errorType) {
 			if !callResult.IsNil() {
 				err := callResult.Convert(errorType).Interface().(error)
-				return reflect.Value{}, AugmentGraphError(err, fmt.Sprintf("function %s returned error", f.name), params.Pos)
+				var pos lexer.Position
+				if params != nil {
+					pos = params.Pos
+				}
+				return reflect.Value{}, AugmentGraphError(err, fmt.Sprintf("function %s returned error", f.name), pos)
 			}
 		} else {
 			resultValues = append(resultValues, callResult)
@@ -555,13 +584,21 @@ func (f *graphFunction) Call(ctx context.Context, req *request, params *paramete
 	for _, resultValue := range resultValues {
 		if !resultValue.IsNil() {
 			if nonNilResult.IsValid() {
-				return reflect.Value{}, NewGraphError(fmt.Sprintf("function %s returned multiple non-nil values", f.name), params.Pos)
+				var pos lexer.Position
+				if params != nil {
+					pos = params.Pos
+				}
+				return reflect.Value{}, NewGraphError(fmt.Sprintf("function %s returned multiple non-nil values", f.name), pos)
 			}
 			nonNilResult = resultValue
 		}
 	}
 	if !nonNilResult.IsValid() {
-		return reflect.Value{}, NewGraphError(fmt.Sprintf("function %s returned no non-nil values", f.name), params.Pos)
+		var pos lexer.Position
+		if params != nil {
+			pos = params.Pos
+		}
+		return reflect.Value{}, NewGraphError(fmt.Sprintf("function %s returned no non-nil values", f.name), pos)
 	}
 	return nonNilResult, nil
 }
@@ -571,10 +608,28 @@ func (f *graphFunction) GenerateResult(ctx context.Context, req *request, obj re
 	return f.processCallOutput(ctx, req, filter, obj)
 }
 
+// receiverValueForFunction converts the target value to the appropriate type for the method receiver.
+// This handles the complexity of Go's method sets where a method might be defined on a pointer
+// receiver but we have a value, or vice versa.
+//
+// EMBEDDED TYPE HANDLING:
+// This function is particularly important for embedded types. When we navigate to an embedded
+// field to call its method, we need to ensure the receiver type matches what the method expects.
+// For example:
+//   - Method defined on *Employee (pointer receiver)
+//   - We have an Employee value from an embedded field
+//   - We need to convert Employee to *Employee
+//
+// The function prioritizes using addressable values (via CanAddr) over creating new pointers,
+// which preserves the connection to the original data structure.
 func (f *graphFunction) receiverValueForFunction(target reflect.Value) reflect.Value {
 	if !f.method {
 		// There should be no way of getting here.
 		panic("receiverValueForFunction called on non-method")
+	}
+
+	if !target.IsValid() {
+		panic("receiverValueForFunction called with invalid target")
 	}
 
 	receiverType := f.function.Type().In(0)
@@ -586,11 +641,15 @@ func (f *graphFunction) receiverValueForFunction(target reflect.Value) reflect.V
 	// are needed. Those cases have not been found. See the TestGraphFunction_MethodCall
 	// test case for the full matrix of cases that are tested.
 	if receiverType.Kind() == reflect.Ptr && target.Kind() != reflect.Ptr {
-		// If the target is addressable, take its address
+		// Method expects pointer receiver but we have a value.
+		// First try to take the address if the value is addressable.
+		// This is preferable because it maintains the connection to the original struct.
 		if target.CanAddr() {
 			return target.Addr()
 		}
-		// Otherwise, make a new pointer to the target
+		// If not addressable (e.g., value came from interface{} or map),
+		// create a new pointer with a copy of the value.
+		// Note: Changes made by the method won't affect the original in this case.
 		ptrElem := reflect.New(target.Type())
 		ptrElem.Elem().Set(target)
 		return ptrElem
@@ -599,7 +658,8 @@ func (f *graphFunction) receiverValueForFunction(target reflect.Value) reflect.V
 	} else if receiverType.Kind() == target.Kind() {
 		return target
 	}
-	panic("receiverValueForFunction called with incompatible receiver type")
+	panic(fmt.Sprintf("receiverValueForFunction called with incompatible receiver type: want %v, got %v (target type: %v)",
+		receiverType, target.Kind(), target.Type()))
 }
 
 func unionNameGenerator(def FunctionDefinition) string {

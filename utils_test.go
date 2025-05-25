@@ -67,3 +67,90 @@ func Test_sortedKeys_WhenMapHasOneElement_ReturnsSliceWithOneElement(t *testing.
 
 	assert.Equal(t, expected, result)
 }
+
+func Test_parseVariableName(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		wantName  string
+		wantError bool
+		errorMsg  string
+	}{
+		{
+			name:     "valid simple variable",
+			input:    "$foo",
+			wantName: "foo",
+		},
+		{
+			name:     "valid with underscore",
+			input:    "$_foo",
+			wantName: "_foo",
+		},
+		{
+			name:     "valid with numbers",
+			input:    "$foo123",
+			wantName: "foo123",
+		},
+		{
+			name:     "valid complex",
+			input:    "$_foo_Bar_123",
+			wantName: "_foo_Bar_123",
+		},
+		{
+			name:      "empty string",
+			input:     "",
+			wantError: true,
+			errorMsg:  `invalid variable reference: "" (too short)`,
+		},
+		{
+			name:      "just dollar sign",
+			input:     "$",
+			wantError: true,
+			errorMsg:  `invalid variable reference: "$" (too short)`,
+		},
+		{
+			name:      "no dollar sign",
+			input:     "foo",
+			wantError: true,
+			errorMsg:  `invalid variable reference: "foo" (must start with '$')`,
+		},
+		{
+			name:      "starts with number",
+			input:     "$123foo",
+			wantError: true,
+			errorMsg:  `invalid variable name: "123foo" (must match /[_A-Za-z][_0-9A-Za-z]*/)`,
+		},
+		{
+			name:      "contains hyphen",
+			input:     "$foo-bar",
+			wantError: true,
+			errorMsg:  `invalid variable name: "foo-bar" (must match /[_A-Za-z][_0-9A-Za-z]*/)`,
+		},
+		{
+			name:      "contains space",
+			input:     "$foo bar",
+			wantError: true,
+			errorMsg:  `invalid variable name: "foo bar" (must match /[_A-Za-z][_0-9A-Za-z]*/)`,
+		},
+		{
+			name:      "special characters",
+			input:     "$foo!@#",
+			wantError: true,
+			errorMsg:  `invalid variable name: "foo!@#" (must match /[_A-Za-z][_0-9A-Za-z]*/)`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotName, err := parseVariableName(tt.input)
+
+			if tt.wantError {
+				assert.Error(t, err)
+				assert.Equal(t, tt.errorMsg, err.Error())
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.wantName, gotName)
+			}
+		})
+	}
+}

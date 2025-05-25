@@ -258,3 +258,82 @@ func Test_parseIdentifierIntoValue_PtrType(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, myType("hello"), *outVal)
 }
+
+func Test_parseIntIntoValue_Overflow(t *testing.T) {
+	tests := []struct {
+		name      string
+		value     int64
+		target    interface{}
+		wantError bool
+		errorMsg  string
+	}{
+		{
+			name:      "int8 overflow positive",
+			value:     200,
+			target:    new(int8),
+			wantError: true,
+			errorMsg:  "value 200 overflows int8",
+		},
+		{
+			name:      "int8 overflow negative",
+			value:     -200,
+			target:    new(int8),
+			wantError: true,
+			errorMsg:  "value -200 overflows int8",
+		},
+		{
+			name:      "int8 valid",
+			value:     100,
+			target:    new(int8),
+			wantError: false,
+		},
+		{
+			name:      "int16 overflow",
+			value:     40000,
+			target:    new(int16),
+			wantError: true,
+			errorMsg:  "value 40000 overflows int16",
+		},
+		{
+			name:      "int32 overflow",
+			value:     3000000000,
+			target:    new(int32),
+			wantError: true,
+			errorMsg:  "value 3000000000 overflows int32",
+		},
+		{
+			name:      "uint8 negative",
+			value:     -1,
+			target:    new(uint8),
+			wantError: true,
+			errorMsg:  "value -1 overflows uint8",
+		},
+		{
+			name:      "uint8 overflow",
+			value:     300,
+			target:    new(uint8),
+			wantError: true,
+			errorMsg:  "value 300 overflows uint8",
+		},
+		{
+			name:      "uint8 valid",
+			value:     200,
+			target:    new(uint8),
+			wantError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := reflect.ValueOf(tt.target).Elem()
+			err := parseIntIntoValue(tt.value, v)
+
+			if tt.wantError {
+				assert.Error(t, err)
+				assert.Equal(t, tt.errorMsg, err.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

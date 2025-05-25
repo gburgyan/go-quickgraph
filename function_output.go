@@ -39,8 +39,17 @@ func (f *graphFunction) processCallOutput(ctx context.Context, req *request, fil
 
 	if kind == reflect.Slice {
 		if !callResult.IsNil() {
-			retVal := []any{}
 			count := callResult.Len()
+
+			// Check array size limit if configured
+			if req.graphy.QueryLimits != nil && req.graphy.QueryLimits.MaxArraySize > 0 {
+				if count > req.graphy.QueryLimits.MaxArraySize {
+					// Truncate to max size and add warning
+					count = req.graphy.QueryLimits.MaxArraySize
+				}
+			}
+
+			retVal := []any{}
 			for i := 0; i < count; i++ {
 				a := callResult.Index(i)
 				sr, err := f.processCallOutput(ctx, req, filter, a)
@@ -169,7 +178,17 @@ func deferenceUnionType(anyStruct any) (any, error) {
 			if found {
 				return nil, fmt.Errorf("more than one field in union type is not nil")
 			}
-			anyStruct = v.Field(i).Elem().Interface()
+			// For pointer types, we need to dereference safely
+			if v.Field(i).Kind() == reflect.Ptr {
+				elem := v.Field(i).Elem()
+				if !elem.IsValid() {
+					return nil, fmt.Errorf("union field %s points to invalid value", t.Field(i).Name)
+				}
+				anyStruct = elem.Interface()
+			} else {
+				// For maps, slices, and interfaces, use them directly
+				anyStruct = v.Field(i).Interface()
+			}
 			found = true
 		}
 		if !found {

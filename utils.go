@@ -2,6 +2,7 @@ package quickgraph
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 )
 
@@ -40,4 +41,30 @@ func toStringSlice[T fmt.Stringer](items []T) []string {
 		result[i] = item.String()
 	}
 	return result
+}
+
+// validVariableNameRegex defines the pattern for valid GraphQL variable names
+// According to GraphQL spec, names must match /[_A-Za-z][_0-9A-Za-z]*/
+var validVariableNameRegex = regexp.MustCompile(`^[_A-Za-z][_0-9A-Za-z]*$`)
+
+// parseVariableName extracts and validates a variable name from a GraphQL variable reference.
+// Variable references should start with '$' followed by a valid name.
+// Returns the variable name without the '$' prefix and an error if invalid.
+func parseVariableName(varRef string) (string, error) {
+	if len(varRef) < 2 {
+		return "", fmt.Errorf("invalid variable reference: %q (too short)", varRef)
+	}
+
+	if varRef[0] != '$' {
+		return "", fmt.Errorf("invalid variable reference: %q (must start with '$')", varRef)
+	}
+
+	varName := varRef[1:]
+
+	// Validate the variable name according to GraphQL naming rules
+	if !validVariableNameRegex.MatchString(varName) {
+		return "", fmt.Errorf("invalid variable name: %q (must match /[_A-Za-z][_0-9A-Za-z]*/)", varName)
+	}
+
+	return varName, nil
 }

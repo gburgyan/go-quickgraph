@@ -9,6 +9,23 @@ import (
 	"strings"
 )
 
+// ParameterMode defines how function parameters are handled
+type ParameterMode int
+
+const (
+	// AutoDetect maintains backward compatibility by automatically detecting parameter mode
+	AutoDetect ParameterMode = iota
+
+	// StructParams explicitly uses a struct for parameters
+	StructParams
+
+	// NamedParams explicitly uses named inline parameters
+	NamedParams
+
+	// PositionalParams explicitly uses positional parameters (no names required)
+	PositionalParams
+)
+
 type GraphFunctionParamType int
 
 const (
@@ -36,6 +53,10 @@ type FunctionDefinition struct {
 	// doesn't provide parameter names, this is needed to map the parameters to the function.
 	// This is used when the function can have anonymous parameters otherwise.
 	ParameterNames []string
+
+	// ParameterMode explicitly defines how parameters should be handled.
+	// If not set (AutoDetect), the mode is inferred from the function signature.
+	ParameterMode ParameterMode
 
 	// ReturnAnyOverride is a list of types that may be returned as `any` when returned from
 	// the function. This is a function-specific override to the global `any` types that are
@@ -197,6 +218,42 @@ func (g *Graphy) newGraphFunction(def FunctionDefinition, method bool) graphFunc
 		inputTypes = append(inputTypes, fnm)
 	}
 
+	// Check explicit parameter mode first
+	switch def.ParameterMode {
+	case StructParams:
+		// Validate we have exactly one struct parameter
+		if len(inputTypes) != 1 {
+			panic(fmt.Sprintf("StructParams mode requires exactly one non-context parameter, got %d", len(inputTypes)))
+		}
+		if inputTypes[0].paramType.Kind() != reflect.Struct {
+			panic(fmt.Sprintf("StructParams mode requires a struct parameter, got %s", inputTypes[0].paramType.Kind()))
+		}
+		return g.newStructGraphFunction(def, funcVal, inputTypes[0].paramType, method)
+
+	case NamedParams:
+		// Validate we have parameter names
+		if len(def.ParameterNames) == 0 {
+			panic("NamedParams mode requires ParameterNames to be set")
+		}
+		if len(def.ParameterNames) != len(inputTypes) {
+			panic(fmt.Sprintf("NamedParams mode requires %d parameter names, got %d", len(inputTypes), len(def.ParameterNames)))
+		}
+		return g.newAnonymousGraphFunction(def, funcVal, inputTypes, method)
+
+	case PositionalParams:
+		// Validate no parameter names are set
+		if len(def.ParameterNames) > 0 {
+			panic("PositionalParams mode cannot be used with ParameterNames - parameters are positional only")
+		}
+		return g.newAnonymousGraphFunction(def, funcVal, inputTypes, method)
+
+	case AutoDetect:
+		// Fall through to original auto-detection logic
+	default:
+		panic(fmt.Sprintf("unknown ParameterMode: %d", def.ParameterMode))
+	}
+
+	// Original auto-detection logic for backward compatibility
 	if len(inputTypes) == 0 {
 		// This is fine -- this case is used primarily in result generation. If a field's
 		// output is expensive to get, it can be hidden behind a function to ensure it's

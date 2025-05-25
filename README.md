@@ -336,6 +336,178 @@ In this case both of the following queries will work:
 
 Regardless of how the function is invoked, the parameters for the function come from either the base query itself or variables that are passed in along with the query. `Graphy` supports both scalar types, as well as more complex types including complex, and even nested, structures, as well as slices of those objects.
 
+## Explicit Parameter Modes
+
+By default, `go-quickgraph` automatically detects how to handle function parameters based on the function signature. However, you can explicitly specify the parameter mode for clearer intent and better error messages:
+
+```go
+type ParameterMode int
+
+const (
+    AutoDetect      // Default: automatic detection (backward compatible)
+    StructParams    // Explicitly use a struct for parameters
+    NamedParams     // Explicitly use named inline parameters
+    PositionalParams // Explicitly use positional parameters
+)
+```
+
+### StructParams Mode
+
+Use when you want parameters to be fields of a struct:
+
+```go
+type UserInput struct {
+    ID     string  `json:"id"`
+    Name   *string `json:"name"`    // optional
+    Active *bool   `json:"active"`  // optional
+}
+
+func GetUser(ctx context.Context, input UserInput) *User {
+    // Implementation
+}
+
+g.RegisterFunction(ctx, FunctionDefinition{
+    Name:          "getUser",
+    Function:      GetUser,
+    ParameterMode: StructParams,
+})
+```
+
+GraphQL query:
+```graphql
+{
+    getUser(id: "123", name: "John") {
+        id
+        name
+    }
+}
+```
+
+### NamedParams Mode
+
+Use when you want multiple named parameters:
+
+```go
+func GetUser(ctx context.Context, id string, name *string, active *bool) *User {
+    // Implementation
+}
+
+g.RegisterFunction(ctx, FunctionDefinition{
+    Name:           "getUser",
+    Function:       GetUser,
+    ParameterMode:  NamedParams,
+    ParameterNames: []string{"id", "name", "active"},
+})
+```
+
+GraphQL query uses the provided names:
+```graphql
+{
+    getUser(id: "123", active: true) {
+        id
+        name
+    }
+}
+```
+
+### PositionalParams Mode
+
+Use when parameter order matters more than names:
+
+```go
+func SearchUsers(ctx context.Context, query string, limit int) []*User {
+    // Implementation
+}
+
+g.RegisterFunction(ctx, FunctionDefinition{
+    Name:          "searchUsers",
+    Function:      SearchUsers,
+    ParameterMode: PositionalParams,
+})
+```
+
+GraphQL query uses positional arguments (arg1, arg2, etc.):
+```graphql
+{
+    searchUsers(arg1: "john", arg2: 10) {
+        id
+        name
+    }
+}
+```
+
+### Benefits of Explicit Modes
+
+1. **Clear Intent**: Your code explicitly states how parameters should be handled
+2. **Better Validation**: Get specific error messages when configuration doesn't match the function signature
+3. **No Ambiguity**: Avoid confusion about which mode was auto-selected
+4. **Self-Documenting**: The parameter mode serves as documentation
+
+### Validation Rules
+
+- **StructParams**: Requires exactly one non-context struct parameter
+- **NamedParams**: Requires ParameterNames to be set and match parameter count
+- **PositionalParams**: Cannot be used with ParameterNames (will panic)
+- **AutoDetect**: Falls back to original behavior for backward compatibility
+
+### AutoDetect Behavior (Default)
+
+When `ParameterMode` is not specified or set to `AutoDetect`, the library uses these rules to determine parameter handling:
+
+1. **No parameters** (excluding context.Context):
+   - Function is called without arguments
+   - Used for resolver functions that don't need input
+
+2. **Single struct parameter**:
+   - If the single parameter is a struct AND no ParameterNames are provided
+   - Struct fields become GraphQL arguments (uses `StructParams` mode)
+   - Example: `func GetUser(ctx context.Context, input UserInput) *User`
+
+3. **Single non-struct parameter OR struct with ParameterNames**:
+   - Treated as anonymous inline parameter (uses `AnonymousParamsInline` mode)
+   - If ParameterNames provided, uses those names; otherwise uses `arg1`
+   - Example: `func GetUserByID(ctx context.Context, id string) *User`
+
+4. **Multiple parameters**:
+   - Always treated as anonymous inline parameters (uses `AnonymousParamsInline` mode)
+   - If ParameterNames provided, uses those names; otherwise uses `arg1`, `arg2`, etc.
+   - Example: `func SearchUsers(ctx context.Context, query string, limit int) []*User`
+
+**Important Notes**:
+- `context.Context` parameters are always ignored when counting parameters
+- Pointer types indicate optional parameters (can be nil)
+- Non-pointer types are required parameters
+
+Example of AutoDetect in action:
+```go
+// Case 1: Struct parameter - fields become arguments
+type UserInput struct {
+    ID   string
+    Name *string // optional
+}
+g.RegisterQuery(ctx, "getUser", func(ctx context.Context, input UserInput) *User {
+    // GraphQL: getUser(id: "123", name: "John")
+})
+
+// Case 2: Single non-struct - becomes arg1
+g.RegisterQuery(ctx, "getUserByID", func(ctx context.Context, id string) *User {
+    // GraphQL: getUserByID(arg1: "123")
+})
+
+// Case 3: Multiple parameters - become arg1, arg2, etc.
+g.RegisterQuery(ctx, "searchUsers", func(ctx context.Context, query string, limit int) []*User {
+    // GraphQL: searchUsers(arg1: "john", arg2: 10)
+})
+
+// Case 4: With parameter names - uses provided names
+g.RegisterFunction(ctx, FunctionDefinition{
+    Name:           "searchUsers",
+    Function:       searchUsersFunc,
+    ParameterNames: []string{"query", "limit"},
+    // GraphQL: searchUsers(query: "john", limit: 10)
+})
+```
+
 # Type System
 
 The way `Graphy` works with types is intended to be as transparent to the user as possible. The normal types, scalars, structs, and slices all work as expected. This applies to both input in the form of parameters being sent in to functions and the results of those functions.
@@ -596,6 +768,126 @@ Since each unique request, independent of the variables, can be cached, it's imp
 ## Internal caching
 
 Internally `Graphy` will cache much of the results of reflection operations. These relate to the types that are used for input and output. Since these have a one-to-one relationship to the internal types of the running system, they are cached by `Graphy` for the lifetime of the object; it can't grow out of bounds and cannot be subject to a denial of service attack. 
+
+# Query Limits and DoS Protection
+
+`go-quickgraph` provides optional query limits to protect against denial-of-service attacks and resource exhaustion. These limits are opt-in and can be configured on the `Graphy` instance.
+
+## Configuring Query Limits
+
+```go
+graph := quickgraph.Graphy{
+    QueryLimits: &quickgraph.QueryLimits{
+        MaxDepth:               10,    // Maximum query nesting depth
+        MaxFields:              50,    // Maximum fields per level
+        MaxAliases:             20,    // Maximum number of aliases
+        MaxArraySize:           1000,  // Maximum array elements returned
+        MaxConcurrentResolvers: 100,   // Maximum parallel goroutines
+    },
+}
+```
+
+All limits are optional - zero or unset values mean unlimited.
+
+## Available Limits
+
+### MaxDepth
+Prevents deeply nested queries that could cause excessive processing or stack overflow:
+```graphql
+# This query would be rejected if MaxDepth is set to 3
+{
+  user {
+    posts {
+      comments {
+        author {  # Depth 4 - would exceed limit
+          name
+        }
+      }
+    }
+  }
+}
+```
+
+### MaxFields
+Limits the number of fields that can be requested at any single level:
+```graphql
+# This would be rejected if MaxFields is set to 3
+{
+  user {
+    id        # Field 1
+    name      # Field 2
+    email     # Field 3
+    posts     # Field 4 - would exceed limit
+  }
+}
+```
+
+### MaxAliases
+Prevents alias amplification attacks:
+```graphql
+# This would be rejected if MaxAliases is set to 2
+{
+  a1: expensive { ... }  # Alias 1
+  a2: expensive { ... }  # Alias 2
+  a3: expensive { ... }  # Alias 3 - would exceed limit
+}
+```
+
+### MaxArraySize
+Truncates large arrays to prevent memory exhaustion:
+```go
+// If a resolver returns 10,000 items but MaxArraySize is 100,
+// only the first 100 items will be processed and returned
+```
+
+### MaxConcurrentResolvers
+Limits the number of goroutines spawned for parallel query execution:
+```go
+// With MaxConcurrentResolvers set to 10, at most 10 resolver
+// functions will execute in parallel, even if the query has
+// 100 aliased fields
+```
+
+## Error Handling
+
+When a limit is exceeded, the query is rejected with a descriptive error:
+```json
+{
+  "errors": [{
+    "message": "query depth 5 exceeds maximum allowed depth of 3"
+  }]
+}
+```
+
+## Performance Considerations
+
+- Depth and field limits are checked during query parsing (early validation)
+- Array size limits are applied during execution (late validation)
+- Concurrent resolver limits may cause some queries to execute sequentially instead of in parallel
+
+## Example: Production Configuration
+
+```go
+func main() {
+    ctx := context.Background()
+    
+    graph := quickgraph.Graphy{
+        QueryLimits: &quickgraph.QueryLimits{
+            MaxDepth:               15,    // Reasonable for most schemas
+            MaxFields:              100,   // Prevent overly broad queries
+            MaxAliases:             30,    // Prevent alias abuse
+            MaxArraySize:           5000,  // Limit memory usage
+            MaxConcurrentResolvers: 50,    // Prevent goroutine explosion
+        },
+    }
+    
+    graph.RegisterQuery(ctx, "users", GetUsers)
+    graph.EnableIntrospection(ctx)
+    
+    http.Handle("/graphql", graph.HttpHandler())
+    http.ListenAndServe(":8080", nil)
+}
+```
 
 # Dealing with unknown commands
 

@@ -3,6 +3,7 @@ package quickgraph
 import (
 	"context"
 	"fmt"
+	"math"
 	"reflect"
 	"strings"
 )
@@ -43,6 +44,14 @@ func (f *graphFunction) getCallParamsNamedInline(ctx context.Context, req *reque
 		if gft.In(i).ConvertibleTo(contextType) {
 			paramValues[i] = reflect.ValueOf(ctx)
 			continue
+		}
+	}
+
+	// Initialize all parameters to their zero values first
+	for _, nameMapping := range f.paramsByName {
+		if paramValues[nameMapping.paramIndex].Kind() == reflect.Invalid {
+			// Only initialize if not already set (e.g., context or receiver)
+			paramValues[nameMapping.paramIndex] = reflect.Zero(nameMapping.paramType)
 		}
 	}
 
@@ -106,24 +115,25 @@ func (f *graphFunction) getCallParamsAnonymousInline(ctx context.Context, req *r
 					return nil, fmt.Errorf("missing parameter in function")
 				}
 			} else {
-				if normalParamCount >= len(params.Values) {
-					return nil, fmt.Errorf("too many parameters provided %d", normalParamCount)
-				}
-				err := parseInputIntoValue(req, params.Values[normalParamCount].Value, val)
-				if err != nil {
-					return nil, err
+				if normalParamCount < len(params.Values) {
+					err := parseInputIntoValue(req, params.Values[normalParamCount].Value, val)
+					if err != nil {
+						return nil, err
+					}
+				} else if val.Type().Kind() != reflect.Ptr {
+					// Required parameter not provided
+					return nil, fmt.Errorf("missing required parameter at position %d", normalParamCount)
 				}
 			}
-
+			normalParamCount++
 		}
-		normalParamCount++
 	}
 	inParamCount := 0
 	if params != nil {
 		inParamCount = len(params.Values)
 	}
-	if normalParamCount < inParamCount {
-		return nil, fmt.Errorf("too few parameters provided %d", normalParamCount)
+	if inParamCount > normalParamCount {
+		return nil, fmt.Errorf("too many parameters provided: expected %d, got %d", normalParamCount, inParamCount)
 	}
 
 	return paramValues, nil
@@ -216,8 +226,11 @@ func parseInputIntoValue(req *request, inValue genericValue, targetValue reflect
 		if req == nil {
 			return fmt.Errorf("variable %s provided but no request", *inValue.Variable)
 		}
-		// Strip the $ from the variable name.
-		variableName := (*inValue.Variable)[1:]
+		// Parse and validate the variable name
+		variableName, err := parseVariableName(*inValue.Variable)
+		if err != nil {
+			return err
+		}
 		err = parseVariableIntoValue(req, variableName, targetValue)
 	} else if inValue.String != nil {
 		// The string value has quotes around it, remove them.
@@ -229,7 +242,7 @@ func parseInputIntoValue(req *request, inValue genericValue, targetValue reflect
 		err = parseIdentifierIntoValue(*inValue.Identifier, targetValue)
 	} else if inValue.Int != nil {
 		i := *inValue.Int
-		parseIntIntoValue(i, targetValue)
+		err = parseIntIntoValue(i, targetValue)
 	} else if inValue.Float != nil {
 		f := *inValue.Float
 		parseFloatIntoValue(f, targetValue)
@@ -268,8 +281,54 @@ func parseStringIntoValue(s string, targetValue reflect.Value) {
 }
 
 // parseIntIntoValue converts an int64 to the appropriate type and assigns it to targetValue.
-func parseIntIntoValue(i int64, targetValue reflect.Value) {
+func parseIntIntoValue(i int64, targetValue reflect.Value) error {
+	// Check bounds based on the target type to prevent overflow
+	switch targetValue.Kind() {
+	case reflect.Int8:
+		if i < math.MinInt8 || i > math.MaxInt8 {
+			return fmt.Errorf("value %d overflows int8", i)
+		}
+	case reflect.Int16:
+		if i < math.MinInt16 || i > math.MaxInt16 {
+			return fmt.Errorf("value %d overflows int16", i)
+		}
+	case reflect.Int32:
+		if i < math.MinInt32 || i > math.MaxInt32 {
+			return fmt.Errorf("value %d overflows int32", i)
+		}
+	case reflect.Uint:
+		if i < 0 || (targetValue.Type().Size() == 4 && i > math.MaxUint32) {
+			return fmt.Errorf("value %d overflows uint", i)
+		}
+		targetValue.SetUint(uint64(i))
+		return nil
+	case reflect.Uint8:
+		if i < 0 || i > math.MaxUint8 {
+			return fmt.Errorf("value %d overflows uint8", i)
+		}
+		targetValue.SetUint(uint64(i))
+		return nil
+	case reflect.Uint16:
+		if i < 0 || i > math.MaxUint16 {
+			return fmt.Errorf("value %d overflows uint16", i)
+		}
+		targetValue.SetUint(uint64(i))
+		return nil
+	case reflect.Uint32:
+		if i < 0 || i > math.MaxUint32 {
+			return fmt.Errorf("value %d overflows uint32", i)
+		}
+		targetValue.SetUint(uint64(i))
+		return nil
+	case reflect.Uint64:
+		if i < 0 {
+			return fmt.Errorf("value %d cannot be negative for uint64", i)
+		}
+		targetValue.SetUint(uint64(i))
+		return nil
+	}
 	targetValue.SetInt(i)
+	return nil
 }
 
 // parseFloatIntoValue converts a float64 to the appropriate type and assigns it to targetValue.

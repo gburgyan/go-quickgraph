@@ -5,6 +5,7 @@ import (
 	"github.com/gburgyan/go-timing"
 	"log"
 	"net/http"
+	"runtime/debug"
 )
 
 type GraphHttpHandler struct {
@@ -23,6 +24,20 @@ type graphqlRequest struct {
 }
 
 func (g GraphHttpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	// Recover from any panics to prevent server crashes
+	defer func() {
+		if r := recover(); r != nil {
+			// Log the panic details internally (including stack trace)
+			log.Printf("Panic in GraphQL HTTP handler: %v\nStack trace:\n%s", r, debug.Stack())
+
+			// Return a generic error to the client (no internal details)
+			writer.Header().Set("Content-Type", "application/json")
+			writer.WriteHeader(500)
+			errorResponse := `{"errors":[{"message":"Internal server error"}]}`
+			_, _ = writer.Write([]byte(errorResponse))
+		}
+	}()
+
 	ctx := request.Context()
 	var timingContext *timing.Context
 	var complete timing.Complete

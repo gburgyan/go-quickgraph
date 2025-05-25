@@ -71,6 +71,22 @@ func (g *Graphy) newRequestStub(request string) (*RequestStub, error) {
 		return nil, err
 	}
 
+	// Create query limit context if limits are configured
+	limitCtx := newQueryLimitContext(g.QueryLimits)
+
+	// Check alias count if configured
+	if limitCtx != nil {
+		aliasCount := 0
+		for _, cmd := range parsedCall.Commands {
+			if cmd.Alias != nil {
+				aliasCount++
+			}
+		}
+		if err := limitCtx.checkAliasCount(aliasCount); err != nil {
+			return nil, err
+		}
+	}
+
 	var mode RequestType
 	switch strings.ToLower(parsedCall.Mode) {
 	case "":
@@ -116,7 +132,7 @@ func (g *Graphy) newRequestStub(request string) (*RequestStub, error) {
 	}
 
 	// TODO: Use the fragments in the variable gathering.
-	variableTypeMap, err := g.gatherRequestVariables(parsedCall, fragments)
+	variableTypeMap, err := g.gatherRequestVariables(parsedCall, fragments, limitCtx)
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +177,7 @@ func (r *RequestStub) Name() string {
 
 // gatherRequestVariables gathers and validates the variables used in a GraphQL request.
 // It ensures that the variables used across different commands are of the same type.
-func (g *Graphy) gatherRequestVariables(parsedCall *wrapper, fragments map[string]fragment) (map[string]*requestVariable, error) {
+func (g *Graphy) gatherRequestVariables(parsedCall *wrapper, fragments map[string]fragment, limitCtx *queryLimitContext) (map[string]*requestVariable, error) {
 	// TODO: Look at the parsed arguments, find their types, then later verify that
 	//  they are correct.
 
@@ -207,7 +223,7 @@ func (g *Graphy) gatherRequestVariables(parsedCall *wrapper, fragments map[strin
 		// Depth-first search into the result filter.
 		typeLookup := graphFunc.baseReturnType
 
-		err := g.addAndValidateResultVariables(typeLookup, command.ResultFilter, variableTypeMap, fragments)
+		err := g.addAndValidateResultVariablesWithDepth(typeLookup, command.ResultFilter, variableTypeMap, fragments, 0, limitCtx)
 		if err != nil {
 			return nil, AugmentGraphError(err, fmt.Sprintf("error validating result filter for %s", command.Name), command.ResultFilter.Pos, command.Name)
 		}
@@ -217,8 +233,11 @@ func (g *Graphy) gatherRequestVariables(parsedCall *wrapper, fragments map[strin
 		// Ensure that all the variables used in the operation definition are present.
 		opVars := map[string]variableDef{}
 		for _, variable := range parsedCall.OperationDef.Variables {
-			// Trim off the leading $.
-			name := variable.Name[1:]
+			// Parse and validate the variable name
+			name, err := parseVariableName(variable.Name)
+			if err != nil {
+				return nil, AugmentGraphError(err, "invalid variable definition", variable.Pos)
+			}
 			variable := variable
 			opVars[name] = variable
 		}
@@ -237,9 +256,12 @@ func (g *Graphy) gatherRequestVariables(parsedCall *wrapper, fragments map[strin
 	return variableTypeMap, nil
 }
 
-func (g *Graphy) addTypedInputVariable(varName string, variableTypeMap map[string]*requestVariable, targetType reflect.Type) error {
-	// Strip the leading $ from the variable name.
-	varName = varName[1:]
+func (g *Graphy) addTypedInputVariable(varRef string, variableTypeMap map[string]*requestVariable, targetType reflect.Type) error {
+	// Parse and validate the variable name
+	varName, err := parseVariableName(varRef)
+	if err != nil {
+		return err
+	}
 	if existingVariable, found := variableTypeMap[varName]; found {
 		if existingVariable.Type != targetType {
 			return fmt.Errorf("variable %s is used with different types: existing type: %v, new type: %v", varName, existingVariable.Type, targetType)
@@ -254,9 +276,25 @@ func (g *Graphy) addTypedInputVariable(varName string, variableTypeMap map[strin
 }
 
 func (g *Graphy) addAndValidateResultVariables(typ *typeLookup, filter *resultFilter, variableTypeMap map[string]*requestVariable, fragments map[string]fragment) error {
+	return g.addAndValidateResultVariablesWithDepth(typ, filter, variableTypeMap, fragments, 0, nil)
+}
+
+func (g *Graphy) addAndValidateResultVariablesWithDepth(typ *typeLookup, filter *resultFilter, variableTypeMap map[string]*requestVariable, fragments map[string]fragment, depth int, limitCtx *queryLimitContext) error {
 
 	if filter == nil {
 		return nil
+	}
+
+	// Check depth limit
+	if limitCtx != nil {
+		if err := limitCtx.checkDepth(depth); err != nil {
+			return err
+		}
+
+		// Check field count at this depth
+		if err := limitCtx.checkFieldCount(depth, len(filter.Fields)); err != nil {
+			return err
+		}
 	}
 
 	for _, field := range filter.Fields {
@@ -297,7 +335,7 @@ func (g *Graphy) addAndValidateResultVariables(typ *typeLookup, filter *resultFi
 
 			if childType != nil {
 				// Recurse
-				err := g.addAndValidateResultVariables(childType, field.SubParts, variableTypeMap, fragments)
+				err := g.addAndValidateResultVariablesWithDepth(childType, field.SubParts, variableTypeMap, fragments, depth+1, limitCtx)
 				if err != nil {
 					return AugmentGraphError(err, fmt.Sprintf("error validating field for %s", field.Name), field.SubParts.Pos, field.Name)
 				}
@@ -318,7 +356,7 @@ func (g *Graphy) addAndValidateResultVariables(typ *typeLookup, filter *resultFi
 			return fmt.Errorf("unknown fragment type")
 		}
 		if found, subTyp := typ.ImplementsInterface(fragmentDef.TypeName); found {
-			err := g.addAndValidateResultVariables(subTyp, fragmentDef.Filter, variableTypeMap, fragments)
+			err := g.addAndValidateResultVariablesWithDepth(subTyp, fragmentDef.Filter, variableTypeMap, fragments, depth+1, limitCtx)
 			if err != nil {
 				return AugmentGraphError(err, fmt.Sprintf("error validating fragment %s", fragmentDef.TypeName), fragmentDef.Filter.Pos, fragmentDef.TypeName)
 			}
@@ -377,11 +415,13 @@ func (g *Graphy) validateAnonymousFunctionParams(commandField *resultField, gf *
 
 		// Ensure that the parameter is the correct type.
 		if cfp.Value.Variable != nil {
-			varName := *cfp.Value.Variable
-			// Strip the leading $ from the variable name.
-			varName = varName[1:]
+			// Parse and validate the variable name
+			varName, err := parseVariableName(*cfp.Value.Variable)
+			if err != nil {
+				return AugmentGraphError(err, "invalid variable reference", cfp.Pos)
+			}
 
-			err := g.validateFunctionVarParam(variableTypeMap, varName, targetType)
+			err = g.validateFunctionVarParam(variableTypeMap, varName, targetType)
 			if err != nil {
 				return err
 			}
@@ -408,11 +448,13 @@ func (g *Graphy) validateNamedFunctionParams(commandField *resultField, gf *grap
 			delete(neededField, cfp.Name)
 
 			if cfp.Value.Variable != nil {
-				varName := *cfp.Value.Variable
-				// Strip the leading $ from the variable name.
-				varName = varName[1:]
+				// Parse and validate the variable name
+				varName, err := parseVariableName(*cfp.Value.Variable)
+				if err != nil {
+					return AugmentGraphError(err, "invalid variable reference", cfp.Pos)
+				}
 
-				err := g.validateFunctionVarParam(variableTypeMap, varName, targetType)
+				err = g.validateFunctionVarParam(variableTypeMap, varName, targetType)
 				if err != nil {
 					return AugmentGraphError(err, fmt.Sprintf("error validating variable %s", varName), cfp.Pos, varName)
 				}
@@ -530,23 +572,48 @@ func (r *request) execute(ctx context.Context) (string, error) {
 
 	var cmdResults []commandResult
 
+	// Create resolver guard if limits are configured
+	var resolverGuard *concurrentResolverGuard
+	if r.graphy.QueryLimits != nil && r.graphy.QueryLimits.MaxConcurrentResolvers > 0 {
+		resolverGuard = newConcurrentResolverGuard(r.graphy.QueryLimits.MaxConcurrentResolvers)
+	}
+
 	if parallel {
-		resultChan := make(chan commandResult)
+		resultChan := make(chan commandResult, len(r.stub.commands))
 		// execute the commands in parallel.
 		for _, cmd := range r.stub.commands {
+			// Check concurrent resolver limit
+			if resolverGuard != nil {
+				if err := resolverGuard.acquire(); err != nil {
+					// Can't acquire slot, execute synchronously instead
+					cmdResults = append(cmdResults, r.executeCommand(tCtx, cmd))
+					continue
+				}
+			}
+
 			go func(cmd command) {
+				if resolverGuard != nil {
+					defer resolverGuard.release()
+				}
 				resultChan <- r.executeCommand(tCtx, cmd)
 			}(cmd)
 		}
 		// Gather the results from the channel and put them in the cmdResults
 		// slice.
+	gatherResults:
 		for len(cmdResults) < len(r.stub.commands) {
 			select {
 			case <-tCtx.Done():
-				cmdResults = append(cmdResults, commandResult{
-					err: AugmentGraphError(tCtx.Err(), "context timed out", lexer.Position{}),
-				})
-				break
+				// Context cancelled - stop waiting for more results
+				// Add error for the remaining commands that we're not waiting for
+				remainingCommands := len(r.stub.commands) - len(cmdResults)
+				for i := 0; i < remainingCommands; i++ {
+					cmdResults = append(cmdResults, commandResult{
+						err: AugmentGraphError(tCtx.Err(), "context timed out", lexer.Position{}),
+					})
+				}
+				// Break out of the outer loop using the label
+				break gatherResults
 			case cmdResult := <-resultChan:
 				cmdResults = append(cmdResults, cmdResult)
 			}

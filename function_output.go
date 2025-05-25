@@ -65,7 +65,7 @@ func (f *graphFunction) processCallOutput(ctx context.Context, req *request, fil
 		// TODO: Handle maps?
 		return nil, NewGraphError(fmt.Sprintf("maps not supported"), pos)
 	} else if kind == reflect.Struct {
-		sr, err := f.processOutputStruct(nil, req, filter, callResult.Interface())
+		sr, err := f.processOutputStructValue(nil, req, filter, callResult.Interface(), callResult)
 		if err != nil {
 			return nil, AugmentGraphError(err, fmt.Sprintf("error processing struct"), pos)
 		}
@@ -78,6 +78,11 @@ func (f *graphFunction) processCallOutput(ctx context.Context, req *request, fil
 // processOutputStruct takes a result filter and a struct, processes the struct according to the filter,
 // and returns a map and an error if there is any. The map contains the processed fields of the struct.
 func (f *graphFunction) processOutputStruct(ctx context.Context, req *request, filter *resultFilter, anyStruct any) (any, error) {
+	return f.processOutputStructValue(ctx, req, filter, anyStruct, reflect.Value{})
+}
+
+// processOutputStructValue is the internal implementation that can accept a reflect.Value to preserve addressability
+func (f *graphFunction) processOutputStructValue(ctx context.Context, req *request, filter *resultFilter, anyStruct any, structValue reflect.Value) (any, error) {
 
 	kind := reflect.TypeOf(anyStruct).Kind()
 	if kind == reflect.Map && reflect.ValueOf(anyStruct).IsNil() {
@@ -130,7 +135,14 @@ func (f *graphFunction) processOutputStruct(ctx context.Context, req *request, f
 			}
 			// Todo: Check for directives. Either here or in fetch.
 
-			fieldAny, err := fieldInfo.fetch(ctx, req, reflect.ValueOf(anyStruct), field.Params)
+			// Use structValue if valid (preserves addressability), otherwise create new value
+			var valueToUse reflect.Value
+			if structValue.IsValid() {
+				valueToUse = structValue
+			} else {
+				valueToUse = reflect.ValueOf(anyStruct)
+			}
+			fieldAny, err := fieldInfo.fetch(ctx, req, valueToUse, field.Params)
 			if err != nil {
 				return nil, AugmentGraphError(err, fmt.Sprintf("error fetching field %v", field.Name), field.Pos, field.Name)
 			}

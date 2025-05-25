@@ -586,7 +586,11 @@ func (f *graphFunction) receiverValueForFunction(target reflect.Value) reflect.V
 	// are needed. Those cases have not been found. See the TestGraphFunction_MethodCall
 	// test case for the full matrix of cases that are tested.
 	if receiverType.Kind() == reflect.Ptr && target.Kind() != reflect.Ptr {
-		// Make a new pointer to the target.
+		// If the target is addressable, take its address
+		if target.CanAddr() {
+			return target.Addr()
+		}
+		// Otherwise, make a new pointer to the target
 		ptrElem := reflect.New(target.Type())
 		ptrElem.Elem().Set(target)
 		return ptrElem

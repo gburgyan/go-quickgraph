@@ -3,6 +3,7 @@ package quickgraph
 import (
 	"context"
 	"fmt"
+	"github.com/alecthomas/participle/v2/lexer"
 	"reflect"
 	"strings"
 )
@@ -117,8 +118,11 @@ func (g *Graphy) processBaseTypeFieldLookup(typ reflect.Type, prevIndex []int, t
 		index := append(prevIndex, i)
 		if field.Anonymous {
 			// Queue up the anonymous field for processing later.
+			// Capture loop variables to avoid closure issues
+			capturedField := field
+			capturedIndex := index
 			deferredAnonymous = append(deferredAnonymous, func() {
-				g.populateTypeLookup(field.Type, index, tl)
+				g.populateTypeLookup(capturedField.Type, capturedIndex, tl)
 			})
 			// Get the name of the type of the field.
 			name := field.Type.Name()
@@ -327,9 +331,52 @@ func (t *fieldLookup) fetchField(v reflect.Value) (any, error) {
 }
 
 func (t *fieldLookup) fetchGraphFunction(ctx context.Context, req *request, v reflect.Value, params *parameterList) (any, error) {
+	var pos lexer.Position
+	if params != nil {
+		pos = params.Pos
+	}
+
+	if t.graphFunction == nil {
+		return nil, NewGraphError("field is not a function", pos)
+	}
+
+	// Navigate to the correct field if we have field indexes (for embedded types)
+	// This is needed when a method is defined on an embedded type
+	for i, idx := range t.fieldIndexes {
+		if !v.IsValid() {
+			return nil, NewGraphError(fmt.Sprintf("invalid value at field index %d", i), pos)
+		}
+		// Handle both struct and pointer to struct
+		if v.Kind() == reflect.Ptr {
+			if v.IsNil() {
+				return nil, NewGraphError(fmt.Sprintf("nil pointer at field index %d", i), pos)
+			}
+			v = v.Elem()
+		}
+		if v.Kind() != reflect.Struct {
+			return nil, NewGraphError(fmt.Sprintf("expected struct at field index %d, got %v", i, v.Kind()), pos)
+		}
+		if idx >= v.NumField() {
+			return nil, NewGraphError(fmt.Sprintf("field index %d out of range (num fields: %d)", idx, v.NumField()), pos)
+		}
+		v = v.Field(idx)
+	}
+
+	if !v.IsValid() {
+		return nil, NewGraphError("invalid value after field navigation", pos)
+	}
+
+	// Debug: log the value state before calling
+	// fmt.Printf("DEBUG fetchGraphFunction: v.Type=%v, v.Kind=%v, v.CanAddr=%v, method=%v\n",
+	//     v.Type(), v.Kind(), v.CanAddr(), t.name)
+
 	obj, err := t.graphFunction.Call(ctx, req, params, v)
 	if err != nil {
-		return nil, AugmentGraphError(err, "error calling graph function", params.Pos)
+		var pos lexer.Position
+		if params != nil {
+			pos = params.Pos
+		}
+		return nil, AugmentGraphError(err, "error calling graph function", pos)
 	}
 	return obj.Interface(), nil
 }

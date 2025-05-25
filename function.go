@@ -102,7 +102,8 @@ type graphFunction struct {
 
 type functionParamNameMapping struct {
 	name              string
-	paramIndex        int // Todo: make this into a slice of param indexes for anonymous params
+	paramIndex        int   // For struct params: index of the top-level field
+	fieldPath         []int // For embedded fields: path to navigate to the actual field
 	paramType         reflect.Type
 	required          bool
 	anonymousArgument bool
@@ -381,17 +382,13 @@ func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflec
 	// Iterate over the fields of the struct and create the name mapping.
 	nameMapping := map[string]functionParamNameMapping{}
 
-	for i := 0; i < paramType.NumField(); i++ {
-		field := paramType.Field(i)
-		if field.Anonymous {
-			// Todo: support anonymous fields
-			panic("anonymous fields are not supported")
-		}
-
+	// Helper function to process a field and add it to nameMapping
+	var processField func(field reflect.StructField, fieldIndex int, fieldPath []int)
+	processField = func(field reflect.StructField, fieldIndex int, fieldPath []int) {
 		name := field.Name
 		if jsonTag := field.Tag.Get("json"); jsonTag != "" {
 			if jsonTag == "-" {
-				continue
+				return
 			}
 			// Ignore anything after the first comma.
 			name = strings.Split(jsonTag, ",")[0]
@@ -399,7 +396,8 @@ func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflec
 
 		mapping := functionParamNameMapping{
 			name:              name,
-			paramIndex:        i,
+			paramIndex:        fieldIndex,
+			fieldPath:         fieldPath,
 			paramType:         field.Type,
 			anonymousArgument: false,
 		}
@@ -412,6 +410,56 @@ func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflec
 		}
 
 		nameMapping[name] = mapping
+	}
+
+	// Process all fields
+	for i := 0; i < paramType.NumField(); i++ {
+		field := paramType.Field(i)
+		if field.Anonymous {
+			// ANONYMOUS FIELD SUPPORT:
+			// When we encounter an anonymous (embedded) field, we promote its fields
+			// to the parent level for GraphQL arguments. This is similar to how Go
+			// promotes methods from embedded types.
+			//
+			// Example input struct:
+			//   type CommonInput struct {
+			//       Limit  int
+			//       Offset int
+			//   }
+			//   type SearchInput struct {
+			//       CommonInput  // anonymous embedding
+			//       Query string
+			//   }
+			//
+			// In GraphQL, this allows: search(query: "test", limit: 10, offset: 0)
+			// All fields from CommonInput are available as direct arguments.
+			//
+			// Note: We map promoted fields to the parent struct's field index,
+			// so when populating the struct, we'll need to navigate to the embedded field.
+
+			embeddedType := field.Type
+			if embeddedType.Kind() == reflect.Ptr {
+				embeddedType = embeddedType.Elem()
+			}
+
+			if embeddedType.Kind() == reflect.Struct {
+				// Process fields of the embedded struct
+				for j := 0; j < embeddedType.NumField(); j++ {
+					embeddedField := embeddedType.Field(j)
+					if embeddedField.Anonymous {
+						// Skip nested anonymous fields for now
+						// This could be supported recursively if needed
+						continue
+					}
+					// For embedded fields, fieldPath contains [embeddedFieldIndex, fieldIndex]
+					// This allows navigation: struct.Field(i).Field(j)
+					processField(embeddedField, i, []int{j})
+				}
+			}
+		} else {
+			// Regular field, no navigation needed
+			processField(field, i, nil)
+		}
 	}
 
 	gf.paramsByName = nameMapping

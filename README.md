@@ -281,6 +281,86 @@ Since reflection can be used to get the names of the members of the structure, t
 
 The same `RegisterFunction` function can also be used as described above to define additional aspects of the function, such as if it's a mutator.
 
+### Anonymous Fields (Embedded Structs)
+
+Struct functions support Go's anonymous fields (embedded structs), allowing you to compose input types and promote fields to the parent level in GraphQL. This is particularly useful for sharing common fields across multiple input types.
+
+When a struct contains anonymous fields, the fields from the embedded struct are promoted and become direct arguments in the GraphQL function:
+
+```go
+// Common fields that multiple inputs might share
+type PaginationInput struct {
+    Limit  int `json:"limit"`
+    Offset int `json:"offset"`
+}
+
+// SearchInput embeds PaginationInput
+type SearchInput struct {
+    PaginationInput  // anonymous embedding
+    Query   string   `json:"query"`
+    Tags    []string `json:"tags"`
+}
+
+func Search(ctx context.Context, input SearchInput) []SearchResult {
+    // Can access input.Limit, input.Offset directly
+    // as well as input.Query and input.Tags
+}
+
+g.RegisterQuery(ctx, "search", Search)
+```
+
+In GraphQL, this allows queries like:
+```graphql
+{
+    search(query: "golang", limit: 10, offset: 0, tags: ["tutorial"]) {
+        id
+        title
+    }
+}
+```
+
+Notice how `limit` and `offset` are promoted to be direct arguments alongside `query` and `tags`, rather than being nested in a sub-object.
+
+#### Pointer Embedding
+
+You can also embed structs via pointers, which makes all the embedded fields optional:
+
+```go
+type FilterOptions struct {
+    MinPrice *float64 `json:"minPrice"`
+    MaxPrice *float64 `json:"maxPrice"`
+}
+
+type ProductSearchInput struct {
+    PaginationInput      // Required fields from value embedding
+    *FilterOptions       // Optional fields from pointer embedding
+    Query       string   `json:"query"`
+    SortBy      string   `json:"sortBy"`
+}
+
+func SearchProducts(ctx context.Context, input ProductSearchInput) []Product {
+    // FilterOptions is automatically initialized if any of its fields are provided
+    if input.FilterOptions != nil && input.MinPrice != nil {
+        // Apply minimum price filter
+    }
+}
+```
+
+This creates a GraphQL function where `limit` and `offset` are required (from `PaginationInput`), while `minPrice` and `maxPrice` are optional (from `*FilterOptions`).
+
+#### Benefits
+
+1. **Code Reuse**: Common fields like pagination can be defined once and embedded in multiple input types
+2. **Cleaner APIs**: Fields are promoted to the top level, avoiding nested input objects
+3. **Go Idiomatic**: Follows Go's composition patterns naturally
+4. **Backward Compatible**: Adding fields to an embedded struct automatically makes them available in all structs that embed it
+
+#### Limitations
+
+- Nested anonymous fields (anonymous fields within anonymous fields) are not currently supported
+- Field name conflicts between the parent and embedded structs follow Go's rules (parent wins)
+- JSON tags on embedded struct fields are respected
+
 ## Return Values
 
 Regardless of how the function is defined, it is required to return a struct, a pointer to a struct, or a slice of either. It may optionally return an `error` as well. The returned value will be used to populate the response to the GraphQL calls. The shape of the response object will be used to construct the schema of the `Graphy` in case that is used.

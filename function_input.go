@@ -181,7 +181,27 @@ func (f *graphFunction) getCallParamsNamedStruct(ctx context.Context, req *reque
 	if parsedParams != nil {
 		for _, param := range parsedParams.Values {
 			if nameMapping, ok := f.paramsByName[param.Name]; ok {
-				err := parseInputIntoValue(req, param.Value, valueParam.Field(nameMapping.paramIndex))
+				// Navigate to the target field using the field path
+				targetField := valueParam.Field(nameMapping.paramIndex)
+
+				// If we have a fieldPath, navigate through embedded fields
+				// This handles the case where a field is promoted from an anonymous embedded struct
+				if len(nameMapping.fieldPath) > 0 {
+					// First ensure the embedded struct is initialized if it's a pointer
+					if targetField.Kind() == reflect.Ptr && targetField.IsNil() {
+						targetField.Set(reflect.New(targetField.Type().Elem()))
+					}
+
+					// Navigate to the actual field within the embedded struct
+					if targetField.Kind() == reflect.Ptr {
+						targetField = targetField.Elem()
+					}
+					for _, idx := range nameMapping.fieldPath {
+						targetField = targetField.Field(idx)
+					}
+				}
+
+				err := parseInputIntoValue(req, param.Value, targetField)
 				if err != nil {
 					return nil, err
 				}

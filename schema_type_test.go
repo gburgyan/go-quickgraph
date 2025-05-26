@@ -128,7 +128,7 @@ func TestGraphy_implementsSchema(t *testing.T) {
 	humans: [Human!]!
 }
 
-type Character {
+interface Character {
 	appearsIn: [episode!]!
 	friends: [Character]!
 	FriendsConnection(arg1: Int!): FriendsConnection
@@ -146,9 +146,13 @@ type FriendsConnection {
 }
 
 type Human implements Character {
+	appearsIn: [episode!]!
+	friends: [Character]!
 	FriendsConnection(arg1: Int!): FriendsConnection
 	Height(arg1: String): Float!
 	HeightMeters: Float!
+	id: String!
+	name: String!
 }
 
 enum episode {
@@ -184,7 +188,7 @@ func TestGraphy_enumSchema(t *testing.T) {
 	search(search: String!): [SearchResult!]!
 }
 
-type Character {
+interface Character {
 	appearsIn: [episode!]!
 	friends: [Character]!
 	FriendsConnection(arg1: Int!): FriendsConnection
@@ -197,7 +201,11 @@ type ConnectionEdge {
 }
 
 type Droid implements Character {
+	appearsIn: [episode!]!
+	friends: [Character]!
 	FriendsConnection(arg1: Int!): FriendsConnection
+	id: String!
+	name: String!
 	primaryFunction: String!
 }
 
@@ -207,9 +215,13 @@ type FriendsConnection {
 }
 
 type Human implements Character {
+	appearsIn: [episode!]!
+	friends: [Character]!
 	FriendsConnection(arg1: Int!): FriendsConnection
 	Height(arg1: String): Float!
 	HeightMeters: Float!
+	id: String!
+	name: String!
 }
 
 union SearchResult = Droid | Human | Starship

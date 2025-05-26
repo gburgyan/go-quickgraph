@@ -92,7 +92,7 @@ func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup, mapping typeNameMap
 	}
 
 	sb := &strings.Builder{}
-	sb.WriteString(g.getSchemaTypePrefix(kind))
+	sb.WriteString(g.getSchemaTypePrefix(kind, t))
 	sb.WriteString(name)
 	sb.WriteString(g.getSchemaImplementedInterfaces(t, mapping))
 	sb.WriteString(" {\n")
@@ -102,9 +102,33 @@ func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup, mapping typeNameMap
 	return sb.String()
 }
 
-func (g *Graphy) getSchemaTypePrefix(kind TypeKind) string {
+func (g *Graphy) getSchemaTypePrefix(kind TypeKind, t *typeLookup) string {
 	if kind == TypeInput {
 		return "input "
+	}
+	// If this type is implemented by other types (i.e., it's embedded in other structs),
+	// then it should be rendered as an interface in GraphQL
+
+	// Check if this type has implementedBy relationships
+	hasImplementedBy := len(t.implementedBy) > 0
+
+	// If not, and this is a pointer or slice type, check the underlying type
+	if !hasImplementedBy && t.rootType != nil {
+		// Look up the non-pointer version of the type
+		nonPtrType := t.rootType
+		if nonPtrType.Kind() == reflect.Ptr {
+			nonPtrType = nonPtrType.Elem()
+		}
+
+		// Get the typeLookup for the non-pointer type
+		if baseTl := g.typeLookup(nonPtrType); baseTl != nil && baseTl != t {
+			hasImplementedBy = len(baseTl.implementedBy) > 0
+			// Found implementedBy relationships in the base type
+		}
+	}
+
+	if hasImplementedBy {
+		return "interface "
 	}
 	return "type "
 }
@@ -131,11 +155,15 @@ func (g *Graphy) getSchemaImplementedInterfaces(t *typeLookup, mapping typeNameM
 
 func (g *Graphy) getSchemaFields(t *typeLookup, kind TypeKind, mapping typeNameMapping) string {
 	sb := &strings.Builder{}
+
+	// Use fieldsLowercase with sortedKeys as in the original implementation
+	// The fields already include inherited fields from embedded structs
 	for _, name := range sortedKeys(t.fieldsLowercase) {
 		field := t.fieldsLowercase[name]
-		if len(field.fieldIndexes) > 1 {
-			continue
-		}
+
+		// Note: We don't skip fields with len(fieldIndexes) > 1 because
+		// embedded struct fields have multiple indexes (e.g., [0 0] for the first field
+		// of the first embedded struct) and we want to include those in the schema
 
 		fieldTypeString := g.getSchemaFieldType(&field, kind, mapping)
 		if fieldTypeString == "" {

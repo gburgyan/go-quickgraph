@@ -135,7 +135,15 @@ func (g *Graphy) processBaseTypeFieldLookup(typ reflect.Type, prevIndex []int, t
 
 			tl.implements[name] = anonLookup
 			tl.implementsLowercase[strings.ToLower(name)] = anonLookup
-			anonLookup.implementedBy = append(anonLookup.implementedBy, tl)
+
+			// When establishing the implementedBy relationship, always use the root type
+			// This ensures that MyType, *MyType, and []MyType all share the same relationships
+			rootAnonLookup := anonLookup
+			if anonLookup.rootType != anonLookup.typ {
+				// This is a variant (pointer or slice), get the root type lookup
+				rootAnonLookup = g.typeLookup(anonLookup.rootType)
+			}
+			rootAnonLookup.implementedBy = append(rootAnonLookup.implementedBy, tl)
 		} else {
 
 			tfl := g.baseFieldLookup(field, index)

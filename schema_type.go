@@ -40,7 +40,14 @@ func (g *Graphy) schemaForTypes(kind TypeKind, mapping typeNameMapping, inputMap
 		}
 
 		// Check if this type should generate both interface and concrete type
-		if kind == TypeOutput && len(t.implementedBy) > 0 {
+		// Also check the root type if this is a variant (pointer or slice)
+		hasImplementedBy := len(t.implementedBy) > 0
+		if !hasImplementedBy && t.rootType != nil && t.rootType != t.typ {
+			if rootLookup, ok := g.typeLookups[t.rootType]; ok {
+				hasImplementedBy = len(rootLookup.implementedBy) > 0
+			}
+		}
+		if kind == TypeOutput && hasImplementedBy {
 			if t.interfaceOnly {
 				// Generate only interface with original name (no I prefix)
 				completed[name] = true
@@ -206,7 +213,13 @@ func (g *Graphy) getSchemaImplementedInterfaces(t *typeLookup, mapping typeNameM
 		interfaceCount++
 		// If the implemented type has implementedBy relationships and is not interfaceOnly,
 		// use the I prefix for the interface name
-		if len(implementedType.implementedBy) > 0 && !implementedType.interfaceOnly {
+		hasImplementedBy := len(implementedType.implementedBy) > 0
+		if !hasImplementedBy && implementedType.rootType != nil && implementedType.rootType != implementedType.typ {
+			if rootLookup, ok := g.typeLookups[implementedType.rootType]; ok {
+				hasImplementedBy = len(rootLookup.implementedBy) > 0
+			}
+		}
+		if hasImplementedBy && !implementedType.interfaceOnly {
 			sb.WriteString("I")
 		}
 		sb.WriteString(mapping[implementedType])

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 )
@@ -15,6 +16,7 @@ type ExampleWebSocketAdapter struct {
 	// For testing, we'll use channels to simulate
 	incoming chan []byte
 	outgoing chan []byte
+	mu       sync.RWMutex
 	closed   bool
 }
 
@@ -27,16 +29,30 @@ func (e *ExampleWebSocketAdapter) ReadMessage() ([]byte, error) {
 }
 
 func (e *ExampleWebSocketAdapter) WriteMessage(data []byte) error {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
 	if e.closed {
 		return fmt.Errorf("connection closed")
 	}
-	e.outgoing <- data
-	return nil
+
+	// Use a select with default to avoid blocking if the channel is closed
+	select {
+	case e.outgoing <- data:
+		return nil
+	default:
+		return fmt.Errorf("connection closed")
+	}
 }
 
 func (e *ExampleWebSocketAdapter) Close() error {
-	e.closed = true
-	close(e.outgoing)
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	if !e.closed {
+		e.closed = true
+		close(e.outgoing)
+	}
 	return nil
 }
 

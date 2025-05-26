@@ -41,10 +41,14 @@ func (g *Graphy) schemaForTypes(kind TypeKind, mapping typeNameMapping, inputMap
 
 		// Check if this type should generate both interface and concrete type
 		// Also check the root type if this is a variant (pointer or slice)
+		t.mu.RLock()
 		hasImplementedBy := len(t.implementedBy) > 0
+		t.mu.RUnlock()
 		if !hasImplementedBy && t.rootType != nil && t.rootType != t.typ {
 			if rootLookup, ok := g.typeLookups[t.rootType]; ok {
+				rootLookup.mu.RLock()
 				hasImplementedBy = len(rootLookup.implementedBy) > 0
+				rootLookup.mu.RUnlock()
 			}
 		}
 		if kind == TypeOutput && hasImplementedBy {
@@ -173,7 +177,9 @@ func (g *Graphy) getSchemaTypePrefix(kind TypeKind, t *typeLookup) string {
 	// then it should be rendered as an interface in GraphQL
 
 	// Check if this type has implementedBy relationships
+	t.mu.RLock()
 	hasImplementedBy := len(t.implementedBy) > 0
+	t.mu.RUnlock()
 
 	// If not, and this is a pointer or slice type, check the underlying type
 	if !hasImplementedBy && t.rootType != nil {
@@ -185,7 +191,9 @@ func (g *Graphy) getSchemaTypePrefix(kind TypeKind, t *typeLookup) string {
 
 		// Get the typeLookup for the non-pointer type
 		if baseTl := g.typeLookup(nonPtrType); baseTl != nil && baseTl != t {
+			baseTl.mu.RLock()
 			hasImplementedBy = len(baseTl.implementedBy) > 0
+			baseTl.mu.RUnlock()
 			// Found implementedBy relationships in the base type
 		}
 	}
@@ -204,25 +212,47 @@ func (g *Graphy) getSchemaImplementedInterfaces(t *typeLookup, mapping typeNameM
 	sb := &strings.Builder{}
 	sb.WriteString(" implements")
 	interfaceCount := 0
-	for _, implementedType := range t.implements {
+
+	// Sort interface names for deterministic output
+	var interfaceNames []string
+	interfacesByName := make(map[string]*typeLookup)
+
+	t.mu.RLock()
+	implementsCopy := make(map[string]*typeLookup)
+	for k, v := range t.implements {
+		implementsCopy[k] = v
+	}
+	t.mu.RUnlock()
+
+	for _, implementedType := range implementsCopy {
+		name := mapping[implementedType]
+		// Check if we need to add I prefix
+		implementedType.mu.RLock()
+		hasImplementedBy := len(implementedType.implementedBy) > 0
+		implementedType.mu.RUnlock()
+		if !hasImplementedBy && implementedType.rootType != nil && implementedType.rootType != implementedType.typ {
+			if rootLookup, ok := g.typeLookups[implementedType.rootType]; ok {
+				rootLookup.mu.RLock()
+				hasImplementedBy = len(rootLookup.implementedBy) > 0
+				rootLookup.mu.RUnlock()
+			}
+		}
+		if hasImplementedBy && !implementedType.interfaceOnly {
+			name = "I" + name
+		}
+		interfaceNames = append(interfaceNames, name)
+		interfacesByName[name] = implementedType
+	}
+	sort.Strings(interfaceNames)
+
+	for _, name := range interfaceNames {
 		if interfaceCount > 0 {
 			sb.WriteString(" & ")
 		} else {
 			sb.WriteString(" ")
 		}
 		interfaceCount++
-		// If the implemented type has implementedBy relationships and is not interfaceOnly,
-		// use the I prefix for the interface name
-		hasImplementedBy := len(implementedType.implementedBy) > 0
-		if !hasImplementedBy && implementedType.rootType != nil && implementedType.rootType != implementedType.typ {
-			if rootLookup, ok := g.typeLookups[implementedType.rootType]; ok {
-				hasImplementedBy = len(rootLookup.implementedBy) > 0
-			}
-		}
-		if hasImplementedBy && !implementedType.interfaceOnly {
-			sb.WriteString("I")
-		}
-		sb.WriteString(mapping[implementedType])
+		sb.WriteString(name)
 	}
 
 	return sb.String()
@@ -233,8 +263,15 @@ func (g *Graphy) getSchemaFields(t *typeLookup, kind TypeKind, mapping typeNameM
 
 	// Use fieldsLowercase with sortedKeys as in the original implementation
 	// The fields already include inherited fields from embedded structs
-	for _, name := range sortedKeys(t.fieldsLowercase) {
-		field := t.fieldsLowercase[name]
+	t.mu.RLock()
+	fieldsCopy := make(map[string]fieldLookup)
+	for k, v := range t.fieldsLowercase {
+		fieldsCopy[k] = v
+	}
+	t.mu.RUnlock()
+
+	for _, name := range sortedKeys(fieldsCopy) {
+		field := fieldsCopy[name]
 
 		// Note: We don't skip fields with len(fieldIndexes) > 1 because
 		// embedded struct fields have multiple indexes (e.g., [0 0] for the first field
@@ -312,9 +349,15 @@ func (g *Graphy) schemaForUnion(name string, t *typeLookup, mapping typeNameMapp
 			}
 		}
 
-		if len(checkType.implementedBy) > 0 {
+		checkType.mu.RLock()
+		hasImplementations := len(checkType.implementedBy) > 0
+		implementations := make([]*typeLookup, len(checkType.implementedBy))
+		copy(implementations, checkType.implementedBy)
+		checkType.mu.RUnlock()
+
+		if hasImplementations {
 			// This is an interface, add all its implementations
-			for _, impl := range checkType.implementedBy {
+			for _, impl := range implementations {
 				concreteTypes[impl.name] = impl
 			}
 			// If we're not interface-only, include the concrete type too
@@ -375,6 +418,10 @@ func (g *Graphy) schemaRefForType(t *typeLookup, mapping typeNameMapping) string
 		case reflect.Struct:
 			if t != nil {
 				baseType = mapping[t]
+				// Check if this type has implementations and should be referenced as an interface
+				if len(t.implementedBy) > 0 && !t.interfaceOnly {
+					baseType = "I" + baseType
+				}
 			}
 
 		case reflect.Interface:

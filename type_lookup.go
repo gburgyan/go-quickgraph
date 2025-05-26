@@ -6,6 +6,7 @@ import (
 	"github.com/alecthomas/participle/v2/lexer"
 	"reflect"
 	"strings"
+	"sync"
 )
 
 type fieldType int
@@ -27,6 +28,7 @@ type fieldLookup struct {
 }
 
 type typeLookup struct {
+	mu                  sync.RWMutex // Protects all mutable fields
 	typ                 reflect.Type
 	rootType            reflect.Type
 	isPointer           bool
@@ -56,6 +58,9 @@ type typeArrayModifier struct {
 }
 
 func (tl *typeLookup) GetField(name string) (fieldLookup, bool) {
+	tl.mu.RLock()
+	defer tl.mu.RUnlock()
+
 	result, ok := tl.fields[name]
 	if !ok {
 		result, ok = tl.fieldsLowercase[strings.ToLower(name)]
@@ -104,12 +109,14 @@ func (g *Graphy) processUnionFieldLookup(typ reflect.Type, prevIndex []int, tl *
 
 		// TODO: Add some sanity checking here. Right now it's is bit too loose.
 		fieldTypeLookup := g.typeLookup(field.Type)
+		tl.mu.Lock()
 		tl.union[fieldTypeLookup.name] = fieldTypeLookup
 		// If the lowercase version of the field name is not already in the map,
 		// add it.
 		if _, ok := tl.unionLowercase[strings.ToLower(name)]; !ok {
 			tl.unionLowercase[strings.ToLower(name)] = fieldTypeLookup
 		}
+		tl.mu.Unlock()
 	}
 }
 
@@ -133,8 +140,10 @@ func (g *Graphy) processBaseTypeFieldLookup(typ reflect.Type, prevIndex []int, t
 
 			anonLookup := g.typeLookup(field.Type)
 
+			tl.mu.Lock()
 			tl.implements[name] = anonLookup
 			tl.implementsLowercase[strings.ToLower(name)] = anonLookup
+			tl.mu.Unlock()
 
 			// When establishing the implementedBy relationship, always use the root type
 			// This ensures that MyType, *MyType, and []MyType all share the same relationships
@@ -143,7 +152,9 @@ func (g *Graphy) processBaseTypeFieldLookup(typ reflect.Type, prevIndex []int, t
 				// This is a variant (pointer or slice), get the root type lookup
 				rootAnonLookup = g.typeLookup(anonLookup.rootType)
 			}
+			rootAnonLookup.mu.Lock()
 			rootAnonLookup.implementedBy = append(rootAnonLookup.implementedBy, tl)
+			rootAnonLookup.mu.Unlock()
 		} else {
 
 			tfl := g.baseFieldLookup(field, index)
@@ -153,7 +164,9 @@ func (g *Graphy) processBaseTypeFieldLookup(typ reflect.Type, prevIndex []int, t
 			}
 
 			// If we already have a field with that name, ignore it.
+			tl.mu.Lock()
 			if _, ok := tl.fields[tfl.name]; ok {
+				tl.mu.Unlock()
 				continue
 			}
 
@@ -166,6 +179,7 @@ func (g *Graphy) processBaseTypeFieldLookup(typ reflect.Type, prevIndex []int, t
 			if _, ok := tl.fieldsLowercase[strings.ToLower(tfl.name)]; !ok {
 				tl.fieldsLowercase[strings.ToLower(tfl.name)] = tfl
 			}
+			tl.mu.Unlock()
 		}
 	}
 
@@ -326,12 +340,14 @@ func (g *Graphy) addGraphMethodsForType(typ reflect.Type, index []int, tl *typeL
 				fieldType:     FieldTypeGraphFunction,
 				graphFunction: &gf,
 			}
+			tl.mu.Lock()
 			tl.fields[funcDef.Name] = tfl
 			// If the lowercase version of the field name is not already in the map,
 			// add it.
 			if _, ok := tl.fieldsLowercase[strings.ToLower(funcDef.Name)]; !ok {
 				tl.fieldsLowercase[strings.ToLower(funcDef.Name)] = tfl
 			}
+			tl.mu.Unlock()
 		}
 	}
 }

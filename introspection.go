@@ -287,8 +287,15 @@ func introspectionScalarName(tl *typeLookup) string {
 }
 
 func (g *Graphy) addIntrospectionSchemaFields(is *__Schema, tl *typeLookup, io TypeKind, result *__Type) {
-	for _, fieldName := range sortedKeys(tl.fields) {
-		ft := tl.fields[fieldName]
+	tl.mu.RLock()
+	fieldsCopy := make(map[string]fieldLookup)
+	for k, v := range tl.fields {
+		fieldsCopy[k] = v
+	}
+	tl.mu.RUnlock()
+
+	for _, fieldName := range sortedKeys(fieldsCopy) {
+		ft := fieldsCopy[fieldName]
 		if ft.fieldType == FieldTypeField {
 			if io == TypeOutput {
 				field := __Field{

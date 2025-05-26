@@ -303,15 +303,51 @@ func (g *Graphy) typeLookup(typ reflect.Type) *typeLookup {
 			gtei = gtev.Interface().(GraphTypeExtension)
 		}
 		typeExtension := gtei.GraphTypeExtension()
-		result.name = typeExtension.Name
-		if typeExtension.Deprecated != "" {
-			result.isDeprecated = true
-			result.deprecatedReason = typeExtension.Deprecated
+
+		// Check if this is likely an embedded implementation by comparing the returned name
+		// with the actual type name. If they differ and the returned name matches a field name,
+		// it's likely inherited from an embedded type.
+		if typeExtension.Name != rootTyp.Name() {
+			// Check if this type embeds another type with this name
+			hasEmbeddedWithName := false
+			if rootTyp.Kind() == reflect.Struct {
+				for i := 0; i < rootTyp.NumField(); i++ {
+					field := rootTyp.Field(i)
+					if field.Anonymous && field.Type.Name() == typeExtension.Name {
+						hasEmbeddedWithName = true
+						break
+					}
+				}
+			}
+
+			if hasEmbeddedWithName {
+				// This GraphTypeExtension is inherited from an embedded field
+				// Use the actual type name instead
+				result.name = rootTyp.Name()
+			} else {
+				// This is a legitimate rename via GraphTypeExtension
+				result.name = typeExtension.Name
+				if typeExtension.Deprecated != "" {
+					result.isDeprecated = true
+					result.deprecatedReason = typeExtension.Deprecated
+				}
+				if typeExtension.Description != "" {
+					result.description = &typeExtension.Description
+				}
+				result.interfaceOnly = typeExtension.InterfaceOnly
+			}
+		} else {
+			// Names match, use the extension
+			result.name = typeExtension.Name
+			if typeExtension.Deprecated != "" {
+				result.isDeprecated = true
+				result.deprecatedReason = typeExtension.Deprecated
+			}
+			if typeExtension.Description != "" {
+				result.description = &typeExtension.Description
+			}
+			result.interfaceOnly = typeExtension.InterfaceOnly
 		}
-		if typeExtension.Description != "" {
-			result.description = &typeExtension.Description
-		}
-		result.interfaceOnly = typeExtension.InterfaceOnly
 	} else {
 		result.name = rootTyp.Name()
 	}
@@ -340,12 +376,16 @@ func (g *Graphy) typeLookup(typ reflect.Type) *typeLookup {
 			result.unionLowercase[strings.ToLower(at.name)] = at
 		}
 		// For each of the union types, add the fields to the result.
+		result.mu.Lock()
 		for _, at := range result.union {
+			at.mu.RLock()
 			for name, field := range at.fields {
 				result.fields[name] = field
 				result.fieldsLowercase[strings.ToLower(name)] = field
 			}
+			at.mu.RUnlock()
 		}
+		result.mu.Unlock()
 		g.typeLookups[typ] = result
 		g.typeMutex.Unlock()
 		return result

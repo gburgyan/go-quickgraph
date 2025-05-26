@@ -1003,7 +1003,15 @@ func TestGraphFunction_StructReturnUnionOverride(t *testing.T) {
 	f(Val: String!): MyUnion!
 }
 
-interface Character {
+interface ICharacter {
+	appearsIn: [episode!]!
+	friends: [Character]!
+	FriendsConnection(arg1: Int!): FriendsConnection
+	id: String!
+	name: String!
+}
+
+type Character implements ICharacter {
 	appearsIn: [episode!]!
 	friends: [Character]!
 	FriendsConnection(arg1: Int!): FriendsConnection
@@ -1020,7 +1028,7 @@ type FriendsConnection {
 	totalCount: Int!
 }
 
-type Human implements Character {
+type Human implements ICharacter {
 	appearsIn: [episode!]!
 	friends: [Character]!
 	FriendsConnection(arg1: Int!): FriendsConnection
@@ -1068,7 +1076,15 @@ func TestGraphFunction_StructReturnUnion(t *testing.T) {
 	f(Val: String): fResultUnion!
 }
 
-interface Character {
+interface ICharacter {
+	appearsIn: [episode!]!
+	friends: [Character]!
+	FriendsConnection(arg1: Int!): FriendsConnection
+	id: String!
+	name: String!
+}
+
+type Character implements ICharacter {
 	appearsIn: [episode!]!
 	friends: [Character]!
 	FriendsConnection(arg1: Int!): FriendsConnection
@@ -1085,7 +1101,7 @@ type FriendsConnection {
 	totalCount: Int!
 }
 
-type Human implements Character {
+type Human implements ICharacter {
 	appearsIn: [episode!]!
 	friends: [Character]!
 	FriendsConnection(arg1: Int!): FriendsConnection

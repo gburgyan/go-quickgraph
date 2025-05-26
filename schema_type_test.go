@@ -128,7 +128,15 @@ func TestGraphy_implementsSchema(t *testing.T) {
 	humans: [Human!]!
 }
 
-interface Character {
+interface ICharacter {
+	appearsIn: [episode!]!
+	friends: [Character]!
+	FriendsConnection(arg1: Int!): FriendsConnection
+	id: String!
+	name: String!
+}
+
+type Character implements ICharacter {
 	appearsIn: [episode!]!
 	friends: [Character]!
 	FriendsConnection(arg1: Int!): FriendsConnection
@@ -145,7 +153,7 @@ type FriendsConnection {
 	totalCount: Int!
 }
 
-type Human implements Character {
+type Human implements ICharacter {
 	appearsIn: [episode!]!
 	friends: [Character]!
 	FriendsConnection(arg1: Int!): FriendsConnection
@@ -188,7 +196,15 @@ func TestGraphy_enumSchema(t *testing.T) {
 	search(search: String!): [SearchResult!]!
 }
 
-interface Character {
+interface ICharacter {
+	appearsIn: [episode!]!
+	friends: [Character]!
+	FriendsConnection(arg1: Int!): FriendsConnection
+	id: String!
+	name: String!
+}
+
+type Character implements ICharacter {
 	appearsIn: [episode!]!
 	friends: [Character]!
 	FriendsConnection(arg1: Int!): FriendsConnection
@@ -200,7 +216,7 @@ type ConnectionEdge {
 	node: Character
 }
 
-type Droid implements Character {
+type Droid implements ICharacter {
 	appearsIn: [episode!]!
 	friends: [Character]!
 	FriendsConnection(arg1: Int!): FriendsConnection
@@ -214,7 +230,7 @@ type FriendsConnection {
 	totalCount: Int!
 }
 
-type Human implements Character {
+type Human implements ICharacter {
 	appearsIn: [episode!]!
 	friends: [Character]!
 	FriendsConnection(arg1: Int!): FriendsConnection

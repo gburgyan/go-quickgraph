@@ -61,17 +61,17 @@ func TestEmbeddedTypeBecomesInterface(t *testing.T) {
 	schema := g.SchemaDefinition(ctx)
 
 	// Verify that BaseEntity is rendered as an interface
-	assert.Contains(t, schema, "interface BaseEntity {")
+	assert.Contains(t, schema, "interface IBaseEntity {")
 
 	// Verify that User implements BaseEntity
-	assert.Contains(t, schema, "type User implements BaseEntity {")
+	assert.Contains(t, schema, "type User implements IBaseEntity {")
 
 	// Verify that Product implements BaseEntity
-	assert.Contains(t, schema, "type Product implements BaseEntity {")
+	assert.Contains(t, schema, "type Product implements IBaseEntity {")
 
 	// Verify that implementing types include all interface fields
-	assert.Contains(t, schema, "type User implements BaseEntity {\n\tCreatedAt: String!\n\tEmail: String!\n\tID: String!\n\tUpdatedAt: String!\n\tUsername: String!\n}")
-	assert.Contains(t, schema, "type Product implements BaseEntity {\n\tCreatedAt: String!\n\tID: String!\n\tName: String!\n\tPrice: Float!\n\tUpdatedAt: String!\n}")
+	assert.Contains(t, schema, "type User implements IBaseEntity {\n\tCreatedAt: String!\n\tEmail: String!\n\tID: String!\n\tUpdatedAt: String!\n\tUsername: String!\n}")
+	assert.Contains(t, schema, "type Product implements IBaseEntity {\n\tCreatedAt: String!\n\tID: String!\n\tName: String!\n\tPrice: Float!\n\tUpdatedAt: String!\n}")
 }
 
 // Test with multiple levels of embedding
@@ -113,9 +113,9 @@ func TestMultiLevelEmbeddingInterface(t *testing.T) {
 	schema := g.SchemaDefinition(ctx)
 
 	// Both Identifiable and Timestamped should be interfaces
-	assert.Contains(t, schema, "interface Identifiable {")
-	assert.Contains(t, schema, "interface Timestamped implements Identifiable {")
+	assert.Contains(t, schema, "interface IIdentifiable {")
+	assert.Contains(t, schema, "interface ITimestamped {")
 
-	// Article should implement both Identifiable and Timestamped
-	assert.Contains(t, schema, "type Article implements Timestamped & Identifiable {")
+	// Article should implement both Identifiable and Timestamped (in alphabetical order)
+	assert.Contains(t, schema, "type Article implements IIdentifiable & ITimestamped {")
 }

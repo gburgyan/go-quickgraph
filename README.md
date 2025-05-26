@@ -775,6 +775,203 @@ In which case the name of the union is `MyUnion`.
 
 You can also name a type ending with the string `Union` and that type will be treated as a union. The members of that type must all be pointers. The result of the evaluation of the union must have a single non-nil value, and that is the implied type of the result.
 
+# Subscriptions
+
+`go-quickgraph` supports GraphQL subscriptions, allowing clients to receive real-time updates when data changes. Subscriptions follow the same code-first approach as queries and mutations.
+
+## Basic Subscription Example
+
+```go
+type Message struct {
+    ID        string
+    Text      string
+    User      string
+    Timestamp time.Time
+}
+
+// Register a subscription that returns a channel
+g.RegisterSubscription(ctx, "messageAdded", func(ctx context.Context, roomID string) (<-chan Message, error) {
+    ch := make(chan Message)
+    
+    // Set up your event source (message broker, database, etc.)
+    go func() {
+        defer close(ch)
+        
+        // Example: Subscribe to a message broker
+        subscription := messageBroker.Subscribe(roomID)
+        defer subscription.Close()
+        
+        for {
+            select {
+            case <-ctx.Done():
+                return
+            case msg := <-subscription.Messages():
+                ch <- Message{
+                    ID:        msg.ID,
+                    Text:      msg.Text,
+                    User:      msg.User,
+                    Timestamp: msg.Timestamp,
+                }
+            }
+        }
+    }()
+    
+    return ch, nil
+})
+```
+
+## Subscription Functions
+
+Subscription functions must:
+1. Return a receive-only channel (`<-chan T`) as the first return value
+2. Optionally return an error as the second return value
+3. Close the channel when the subscription ends
+4. Respect context cancellation
+
+The channel element type `T` follows the same rules as query/mutation return types.
+
+Examples:
+```go
+// With error return (useful for setup validation)
+func Subscribe(ctx context.Context, topic string) (<-chan Event, error) {
+    if !isValidTopic(topic) {
+        return nil, fmt.Errorf("invalid topic: %s", topic)
+    }
+    ch := make(chan Event)
+    // ... setup subscription ...
+    return ch, nil
+}
+
+// Without error return (simpler when setup can't fail)
+func Subscribe(ctx context.Context, interval time.Duration) <-chan time.Time {
+    ch := make(chan time.Time)
+    go func() {
+        defer close(ch)
+        ticker := time.NewTicker(interval)
+        defer ticker.Stop()
+        for {
+            select {
+            case <-ctx.Done():
+                return
+            case t := <-ticker.C:
+                ch <- t
+            }
+        }
+    }()
+    return ch
+}
+```
+
+## WebSocket Support
+
+Subscriptions require a WebSocket transport. `go-quickgraph` provides a pluggable WebSocket interface that works with any WebSocket library:
+
+```go
+// Example with gorilla/websocket
+import "github.com/gorilla/websocket"
+
+// Create adapter for your WebSocket library
+type GorillaWebSocketAdapter struct {
+    conn *websocket.Conn
+}
+
+func (a *GorillaWebSocketAdapter) ReadMessage() ([]byte, error) {
+    _, data, err := a.conn.ReadMessage()
+    return data, err
+}
+
+func (a *GorillaWebSocketAdapter) WriteMessage(data []byte) error {
+    return a.conn.WriteMessage(websocket.TextMessage, data)
+}
+
+func (a *GorillaWebSocketAdapter) Close() error {
+    return a.conn.Close()
+}
+
+// Create upgrader
+type GorillaWebSocketUpgrader struct {
+    upgrader websocket.Upgrader
+}
+
+func (u *GorillaWebSocketUpgrader) Upgrade(w http.ResponseWriter, r *http.Request) (quickgraph.SimpleWebSocketConn, error) {
+    conn, err := u.upgrader.Upgrade(w, r, nil)
+    if err != nil {
+        return nil, err
+    }
+    return &GorillaWebSocketAdapter{conn: conn}, nil
+}
+
+// Use in your server
+upgrader := &GorillaWebSocketUpgrader{
+    upgrader: websocket.Upgrader{
+        CheckOrigin: func(r *http.Request) bool { return true },
+    },
+}
+
+handler := g.HttpHandlerWithWebSocket(upgrader)
+http.Handle("/graphql", handler)
+```
+
+## Client Usage
+
+Clients connect using the standard graphql-ws protocol:
+
+```javascript
+// JavaScript example with graphql-ws
+import { createClient } from 'graphql-ws';
+
+const client = createClient({
+  url: 'ws://localhost:8080/graphql',
+});
+
+client.subscribe(
+  {
+    query: `
+      subscription OnMessageAdded($room: String!) {
+        messageAdded(roomID: $room) {
+          id
+          text
+          user
+          timestamp
+        }
+      }
+    `,
+    variables: { room: 'general' },
+  },
+  {
+    next: (data) => console.log('New message:', data),
+    error: (err) => console.error('Error:', err),
+    complete: () => console.log('Subscription complete'),
+  }
+);
+```
+
+## Subscription Schema
+
+Subscriptions appear in the GraphQL schema alongside queries and mutations:
+
+```graphql
+type Subscription {
+    messageAdded(roomID: String!): Message!
+    orderUpdated(orderID: String!): Order!
+    userStatusChanged(userID: String!): UserStatus!
+}
+```
+
+## Best Practices
+
+1. **Always close channels**: Prevent goroutine leaks by closing channels when done
+2. **Handle context cancellation**: Check `ctx.Done()` to stop processing
+3. **Use buffered channels**: For bursty events, use buffered channels to prevent blocking
+4. **Error handling**: Return errors during setup; for streaming errors, close the channel
+5. **Resource cleanup**: Use `defer` for cleanup operations
+
+## Limitations
+
+- Only one subscription field per request (GraphQL spec requirement)
+- Subscriptions cannot be mixed with queries or mutations
+- Subscriptions require WebSocket transport (HTTP-only not supported)
+
 # Schema Generation
 
 Once a `graphy` is set up with all the query and mutation handlers, you can call:

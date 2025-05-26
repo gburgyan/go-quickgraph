@@ -39,6 +39,7 @@ type GraphFunctionMode int
 const (
 	ModeQuery GraphFunctionMode = iota
 	ModeMutation
+	ModeSubscription
 )
 
 type FunctionDefinition struct {
@@ -98,6 +99,8 @@ type graphFunction struct {
 	// Output handling
 	baseReturnType *typeLookup
 	rawReturnType  reflect.Type
+	isSubscription bool
+	channelType    reflect.Type // For subscriptions, the channel type returned by the function
 }
 
 type functionParamNameMapping struct {
@@ -283,12 +286,13 @@ func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc ref
 	// parameters as we don't have any names to use.
 
 	gf := graphFunction{
-		g:            g,
-		name:         def.Name,
-		mode:         def.Mode,
-		function:     graphFunc,
-		method:       method,
-		paramsByName: map[string]functionParamNameMapping{},
+		g:              g,
+		name:           def.Name,
+		mode:           def.Mode,
+		function:       graphFunc,
+		method:         method,
+		paramsByName:   map[string]functionParamNameMapping{},
+		isSubscription: def.Mode == ModeSubscription,
 	}
 
 	if len(def.ParameterNames) > 0 {
@@ -302,6 +306,18 @@ func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc ref
 	if err != nil {
 		panic(err)
 	}
+
+	// For subscriptions, store the channel type
+	if def.Mode == ModeSubscription && mft.NumOut() > 0 {
+		for i := 0; i < mft.NumOut(); i++ {
+			out := mft.Out(i)
+			if out.Kind() == reflect.Chan {
+				gf.channelType = out
+				break
+			}
+		}
+	}
+
 	if returnType.typ == anyType && len(def.ReturnAnyOverride) > 0 {
 		gf.baseReturnType = g.createImplicitTypeLookupUnion(unionNameGenerator(def), def.ReturnAnyOverride)
 		// We need special handling for the `any` type later.
@@ -352,17 +368,29 @@ func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflec
 	// the names of the struct fields as the parameter names.
 
 	gf := graphFunction{
-		g:         g,
-		name:      def.Name,
-		paramType: NamedParamsStruct,
-		mode:      def.Mode,
-		function:  graphFunc,
-		method:    method,
+		g:              g,
+		name:           def.Name,
+		paramType:      NamedParamsStruct,
+		mode:           def.Mode,
+		function:       graphFunc,
+		method:         method,
+		isSubscription: def.Mode == ModeSubscription,
 	}
 
 	mft := graphFunc.Type()
 	// The error has already been checked earlier.
 	returnType, _ := g.validateFunctionReturnTypes(mft, def)
+
+	// For subscriptions, store the channel type
+	if def.Mode == ModeSubscription && mft.NumOut() > 0 {
+		for i := 0; i < mft.NumOut(); i++ {
+			out := mft.Out(i)
+			if out.Kind() == reflect.Chan {
+				gf.channelType = out
+				break
+			}
+		}
+	}
 
 	if returnType.typ == anyType && len(def.ReturnAnyOverride) > 0 {
 		gf.baseReturnType = g.createImplicitTypeLookupUnion(unionNameGenerator(def), def.ReturnAnyOverride)
@@ -514,7 +542,22 @@ func (g *Graphy) validateFunctionReturnTypes(mft reflect.Type, definition Functi
 	}
 	if len(returnTypes) == 1 {
 		// This is the simple case where we have a single return type.
-		return g.typeLookup(returnTypes[0]), nil
+		rt := returnTypes[0]
+
+		// For subscriptions, validate that the return type is a channel
+		if definition.Mode == ModeSubscription {
+			if rt.Kind() != reflect.Chan {
+				return nil, fmt.Errorf("subscription must return a channel, got %v", rt.Kind())
+			}
+			if rt.ChanDir() == reflect.SendDir {
+				return nil, fmt.Errorf("subscription must return a receive-only or bidirectional channel")
+			}
+			// Get the element type of the channel
+			elemType := rt.Elem()
+			return g.typeLookup(elemType), nil
+		}
+
+		return g.typeLookup(rt), nil
 	}
 	if nonPointerCount > 1 {
 		return nil, fmt.Errorf("function may have at most one non-pointer return value")

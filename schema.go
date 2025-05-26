@@ -59,6 +59,8 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) string {
 			sb.WriteString("Query")
 		case ModeMutation:
 			sb.WriteString("Mutation")
+		case ModeSubscription:
+			sb.WriteString("Subscription")
 		default:
 			panic("unknown mode")
 		}

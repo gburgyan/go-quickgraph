@@ -117,6 +117,43 @@ func (g *Graphy) RegisterMutation(ctx context.Context, name string, f any, names
 	g.processors[name] = gf
 }
 
+// RegisterSubscription registers a function as a subscription.
+//
+// The function must return a channel that emits values of the subscription type.
+// The channel should be closed when the subscription ends. The function may optionally
+// return an error as a second return value.
+//
+// Examples:
+//
+//	// With error return:
+//	g.RegisterSubscription(ctx, "messageAdded", func(ctx context.Context, roomID string) (<-chan Message, error) {
+//	    ch := make(chan Message)
+//	    // Set up subscription logic here
+//	    return ch, nil
+//	})
+//
+//	// Without error return:
+//	g.RegisterSubscription(ctx, "timeUpdate", func(ctx context.Context) <-chan time.Time {
+//	    ch := make(chan time.Time)
+//	    // Set up subscription logic here
+//	    return ch
+//	})
+//
+// If the names are specified, they must match the non-context parameter count of the function.
+// If the names are not specified, then the parameters are dealt with as either anonymous
+// parameters or as a single parameter that is a struct. If the function has a single parameter
+// that is a struct, then the names of the struct fields are used as the parameter names.
+func (g *Graphy) RegisterSubscription(ctx context.Context, name string, f any, names ...string) {
+	g.ensureInitialized()
+	gf := g.newGraphFunction(FunctionDefinition{
+		Name:           name,
+		Function:       f,
+		ParameterNames: names,
+		Mode:           ModeSubscription,
+	}, false)
+	g.processors[name] = gf
+}
+
 // RegisterFunction is similar to both RegisterQuery and RegisterMutation, but it allows
 // the caller to specify additional parameters that are less commonly used. See the
 // FunctionDefinition documentation for more information.

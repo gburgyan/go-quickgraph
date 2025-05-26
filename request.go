@@ -16,6 +16,7 @@ type RequestType int
 const (
 	RequestQuery RequestType = iota
 	RequestMutation
+	RequestSubscription
 )
 
 // RequestStub represents a stub of a GraphQL-like request. It contains the Graphy instance,
@@ -94,6 +95,8 @@ func (g *Graphy) newRequestStub(request string) (*RequestStub, error) {
 		mode = RequestQuery
 	case "mutation":
 		mode = RequestMutation
+	case "subscription":
+		mode = RequestSubscription
 	default:
 		return nil, NewGraphError(fmt.Sprintf("unknown/unsupported call mode %s", parsedCall.Mode), parsedCall.Pos)
 	}
@@ -104,6 +107,15 @@ func (g *Graphy) newRequestStub(request string) (*RequestStub, error) {
 		if processor, ok := g.processors[command.Name]; ok {
 			if mode == RequestQuery && processor.mode == ModeMutation {
 				return nil, NewGraphError(fmt.Sprintf("mutation %s used in query", command.Name), command.Pos)
+			}
+			if mode == RequestQuery && processor.mode == ModeSubscription {
+				return nil, NewGraphError(fmt.Sprintf("subscription %s used in query", command.Name), command.Pos)
+			}
+			if mode == RequestSubscription && processor.mode != ModeSubscription {
+				return nil, NewGraphError(fmt.Sprintf("non-subscription %s used in subscription", command.Name), command.Pos)
+			}
+			if mode == RequestSubscription && len(parsedCall.Commands) > 1 {
+				return nil, NewGraphError("subscriptions can only have one root field", command.Pos)
 			}
 		} else {
 			missingCommands = append(missingCommands, command)

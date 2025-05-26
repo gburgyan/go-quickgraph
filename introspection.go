@@ -137,10 +137,12 @@ func (g *Graphy) EnableIntrospection(ctx context.Context) {
 func (g *Graphy) populateIntrospection(st *schemaTypes) {
 	queries := &__Type{Kind: IntrospectionKindObject, Name: "__query"}
 	mutations := &__Type{Kind: IntrospectionKindObject, Name: "__mutation"}
+	subscriptions := &__Type{Kind: IntrospectionKindObject, Name: "__subscription"}
 
 	is := &__Schema{
 		Queries:          queries,
 		Mutations:        mutations,
+		Subscription:     subscriptions,
 		Types:            []*__Type{},
 		typeLookupByName: make(map[string]*__Type),
 	}
@@ -148,6 +150,7 @@ func (g *Graphy) populateIntrospection(st *schemaTypes) {
 	processorNames := keys(g.processors)
 	sort.Strings(processorNames)
 
+	hasSubscriptions := false
 	for _, name := range processorNames {
 		f := g.processors[name]
 		if strings.HasPrefix(f.name, "__") {
@@ -161,6 +164,9 @@ func (g *Graphy) populateIntrospection(st *schemaTypes) {
 			queries.fieldsRaw = append(queries.fieldsRaw, qf)
 		case ModeMutation:
 			mutations.fieldsRaw = append(mutations.fieldsRaw, qf)
+		case ModeSubscription:
+			subscriptions.fieldsRaw = append(subscriptions.fieldsRaw, qf)
+			hasSubscriptions = true
 		}
 	}
 
@@ -172,6 +178,12 @@ func (g *Graphy) populateIntrospection(st *schemaTypes) {
 	}
 
 	is.Types = append(is.Types, queries, mutations)
+	if hasSubscriptions {
+		is.Types = append(is.Types, subscriptions)
+	} else {
+		// If no subscriptions are registered, set it to nil
+		is.Subscription = nil
+	}
 	g.schemaBuffer.introspectionSchema = is
 }
 

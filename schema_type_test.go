@@ -419,3 +419,176 @@ enum episode {
 	assert.NoError(t, err)
 	assert.Equal(t, `{"data":{"extended":{"newCharacter":{"name":"test"}}}}`, result)
 }
+
+// TestUnionWithInterface tests that unions containing interfaces are expanded to concrete types
+func TestUnionWithInterface(t *testing.T) {
+	ctx := context.Background()
+	g := Graphy{}
+
+	// Define an interface (embedded type)
+	type Employee struct {
+		ID       int
+		Name     string
+		Email    string
+		Salary   float64
+		HireDate string
+	}
+
+	// Define concrete types that embed Employee
+	type Manager struct {
+		Employee
+		Department string
+		TeamSize   int
+	}
+
+	type Developer struct {
+		Employee
+		Language string
+		Level    string
+	}
+
+	// Define other concrete types for the union
+	type Product struct {
+		ID    int
+		Name  string
+		Price float64
+	}
+
+	type Widget struct {
+		ID   int
+		Name string
+	}
+
+	// Register the search function that returns a union including the interface
+	g.RegisterFunction(ctx, FunctionDefinition{
+		Name: "search",
+		Function: func(query string) any {
+			return nil
+		},
+		ReturnAnyOverride: []any{Employee{}, Product{}, Widget{}},
+		Mode:              ModeQuery,
+	})
+
+	// Register functions to ensure concrete types are in schema
+	g.RegisterQuery(ctx, "getManager", func() Manager {
+		return Manager{
+			Employee: Employee{
+				ID:       1,
+				Name:     "John Doe",
+				Email:    "john@example.com",
+				Salary:   100000,
+				HireDate: "2020-01-01",
+			},
+			Department: "Engineering",
+			TeamSize:   5,
+		}
+	})
+
+	g.RegisterQuery(ctx, "getDeveloper", func() Developer {
+		return Developer{
+			Employee: Employee{
+				ID:       2,
+				Name:     "Jane Smith",
+				Email:    "jane@example.com",
+				Salary:   90000,
+				HireDate: "2021-01-01",
+			},
+			Language: "Go",
+			Level:    "Senior",
+		}
+	})
+
+	schema := g.SchemaDefinition(ctx)
+
+	// The union should list concrete types (Developer and Manager), not the interface (Employee)
+	assert.Contains(t, schema, "union searchResultUnion = Developer | Manager | Product | Widget")
+
+	// Should NOT contain Employee in the union
+	assert.NotContains(t, schema, "Employee | Product")
+	assert.NotContains(t, schema, "| Employee |")
+
+	// Verify Employee is an interface
+	assert.Contains(t, schema, "interface Employee {")
+
+	// Verify the concrete types implement Employee
+	assert.Contains(t, schema, "type Manager implements Employee {")
+	assert.Contains(t, schema, "type Developer implements Employee {")
+}
+
+// TestUnionWithMultipleInterfaces tests unions with types implementing multiple interfaces
+func TestUnionWithMultipleInterfaces(t *testing.T) {
+	ctx := context.Background()
+	g := Graphy{}
+
+	// Define two interfaces
+	type Flyable struct {
+		MaxAltitude int
+		WingSpan    float64
+	}
+
+	type Swimmable struct {
+		MaxDepth  int
+		SwimSpeed float64
+	}
+
+	// Define types that implement one or both
+	type Duck struct {
+		Flyable
+		Swimmable
+		Name string
+	}
+
+	type Airplane struct {
+		Flyable
+		Model string
+	}
+
+	type Fish struct {
+		Swimmable
+		Species string
+	}
+
+	// Register a function that returns a union of interfaces
+	g.RegisterFunction(ctx, FunctionDefinition{
+		Name: "getVehicle",
+		Function: func() any {
+			return nil
+		},
+		ReturnAnyOverride: []any{Flyable{}, Swimmable{}},
+		Mode:              ModeQuery,
+	})
+
+	// Ensure concrete types are in schema
+	g.RegisterQuery(ctx, "getDuck", func() Duck {
+		return Duck{
+			Flyable:   Flyable{MaxAltitude: 1000, WingSpan: 1.5},
+			Swimmable: Swimmable{MaxDepth: 10, SwimSpeed: 5},
+			Name:      "Donald",
+		}
+	})
+	g.RegisterQuery(ctx, "getAirplane", func() Airplane {
+		return Airplane{
+			Flyable: Flyable{MaxAltitude: 35000, WingSpan: 50},
+			Model:   "Boeing 747",
+		}
+	})
+	g.RegisterQuery(ctx, "getFish", func() Fish {
+		return Fish{
+			Swimmable: Swimmable{MaxDepth: 200, SwimSpeed: 20},
+			Species:   "Salmon",
+		}
+	})
+
+	schema := g.SchemaDefinition(ctx)
+
+	// The union should contain all concrete types that implement either interface
+	// Duck implements both, so it should appear only once
+	assert.Contains(t, schema, "union getVehicleResultUnion = Airplane | Duck | Fish")
+
+	// Verify the interfaces exist
+	assert.Contains(t, schema, "interface Flyable {")
+	assert.Contains(t, schema, "interface Swimmable {")
+
+	// Verify Duck implements both interfaces
+	assert.Contains(t, schema, "type Duck implements Flyable&  Swimmable {")
+}

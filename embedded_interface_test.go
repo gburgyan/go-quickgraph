@@ -117,5 +117,5 @@ func TestMultiLevelEmbeddingInterface(t *testing.T) {
 	assert.Contains(t, schema, "interface Timestamped implements Identifiable {")
 
 	// Article should implement both Identifiable and Timestamped
-	assert.Contains(t, schema, "type Article implements Timestamped&  Identifiable {")
+	assert.Contains(t, schema, "type Article implements Timestamped & Identifiable {")
 }

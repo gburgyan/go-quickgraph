@@ -590,5 +590,5 @@ func TestUnionWithMultipleInterfaces(t *testing.T) {
 	assert.Contains(t, schema, "interface Swimmable {")
 
 	// Verify Duck implements both interfaces
-	assert.Contains(t, schema, "type Duck implements Flyable&  Swimmable {")
+	assert.Contains(t, schema, "type Duck implements Flyable & Swimmable {")
 }

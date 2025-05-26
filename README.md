@@ -775,6 +775,61 @@ In which case the name of the union is `MyUnion`.
 
 You can also name a type ending with the string `Union` and that type will be treated as a union. The members of that type must all be pointers. The result of the evaluation of the union must have a single non-nil value, and that is the implied type of the result.
 
+#### Interface Expansion in Unions
+
+When a union contains an interface type (a type that is embedded in other types), the union will automatically expand to include all concrete implementations of that interface:
+
+```go
+// Interface type (embedded by other types)
+type Employee struct {
+    ID   int
+    Name string
+}
+
+// Concrete types that embed Employee
+type Developer struct {
+    Employee  // Makes Developer implement the Employee "interface"
+    Languages []string
+}
+
+type Manager struct {
+    Employee   // Makes Manager implement the Employee "interface"
+    Department string
+}
+
+// Union that includes the interface
+type SearchResultUnion struct {
+    Employee *Employee  // Will expand to Developer and Manager
+    Product  *Product
+    Widget   *Widget
+}
+
+// In the generated schema:
+// union SearchResult = Developer | Manager | Product | Widget
+```
+
+#### Registering Types for Schema Generation
+
+Types that aren't directly returned by any GraphQL function need to be explicitly registered to appear in the schema:
+
+```go
+graph := quickgraph.Graphy{}
+
+// Register queries and mutations
+graph.RegisterQuery(ctx, "search", SearchHandler)
+
+// Explicitly register types that aren't directly returned
+// This ensures Developer appears in the schema and unions
+graph.RegisterTypes(ctx, Developer{})
+
+// Now the SearchResult union will correctly include Developer
+```
+
+This is particularly important when:
+- A type only appears as part of an interface (e.g., Developer is only returned as Employee)
+- You want to ensure all possible union members are included in the schema
+- Types are dynamically resolved at runtime but need to be in the schema
+
 # Subscriptions
 
 `go-quickgraph` supports GraphQL subscriptions, allowing clients to receive real-time updates when data changes. Subscriptions follow the same code-first approach as queries and mutations.

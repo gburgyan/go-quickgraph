@@ -143,10 +143,11 @@ func (g *Graphy) getSchemaImplementedInterfaces(t *typeLookup, mapping typeNameM
 	interfaceCount := 0
 	for _, implementedType := range t.implements {
 		if interfaceCount > 0 {
-			sb.WriteString("& ")
+			sb.WriteString(" & ")
+		} else {
+			sb.WriteString(" ")
 		}
 		interfaceCount++
-		sb.WriteString(" ")
 		sb.WriteString(mapping[implementedType])
 	}
 
@@ -226,9 +227,20 @@ func (g *Graphy) schemaForUnion(name string, t *typeLookup, mapping typeNameMapp
 	// If a union member is an interface, we need to include all its implementations
 	concreteTypes := make(map[string]*typeLookup)
 	for _, utl := range t.union {
-		if len(utl.implementedBy) > 0 {
+		// Check if this type has implementedBy relationships
+		// We need to dereference pointer types to check the actual type
+		checkType := utl
+		if utl.isPointer && utl.rootType != nil {
+			// For pointer types, check if the underlying type has implementations
+			baseType := g.typeLookup(utl.rootType)
+			if baseType != nil {
+				checkType = baseType
+			}
+		}
+
+		if len(checkType.implementedBy) > 0 {
 			// This is an interface, add all its implementations
-			for _, impl := range utl.implementedBy {
+			for _, impl := range checkType.implementedBy {
 				concreteTypes[impl.name] = impl
 			}
 		} else {

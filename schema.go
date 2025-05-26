@@ -166,6 +166,9 @@ func (g *Graphy) processFunctionsForSchema() ([]*typeLookup, []*typeLookup, []*t
 		inputTypes, enumTypes = appendTypesForSchema(inputTypes, enumTypes, fInput)
 	}
 
+	// Add explicitly registered types as output types
+	outputTypes, enumTypes = appendTypesForSchema(outputTypes, enumTypes, g.explicitTypes)
+
 	return outputTypes, inputTypes, enumTypes
 }
 

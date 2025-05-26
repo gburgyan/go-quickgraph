@@ -31,6 +31,9 @@ type Graphy struct {
 	typeLookups map[reflect.Type]*typeLookup
 	anyTypes    []*typeLookup
 
+	// explicitTypes holds types that were explicitly registered via RegisterType
+	explicitTypes []*typeLookup
+
 	schemaEnabled bool
 	schemaBuffer  *schemaTypes
 
@@ -202,7 +205,9 @@ func (g *Graphy) RegisterTypes(ctx context.Context, types ...any) {
 	defer g.structureLock.Unlock()
 
 	for _, t := range types {
-		g.typeLookup(reflect.TypeOf(t))
+		tl := g.typeLookup(reflect.TypeOf(t))
+		// Add to explicit types to ensure they're included in schema generation
+		g.explicitTypes = append(g.explicitTypes, tl)
 	}
 
 	g.schemaBuffer = nil

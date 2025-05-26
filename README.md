@@ -706,16 +706,140 @@ type Human struct {
 In this case, a `Human` is a subtype of `Character`. The schema generated from this is:
 
 ```graphql
-type Human implements Character {
+type Human implements ICharacter {
 	FriendsConnection(arg1: Int!): FriendsConnection
 	HeightMeters: Float!
-}
-
-type Character {
 	appearsIn: [episode!]!
 	friends: [Character]!
 	id: String!
 	name: String!
+}
+
+interface ICharacter {
+	appearsIn: [episode!]!
+	friends: [Character]!
+	id: String!
+	name: String!
+}
+
+type Character implements ICharacter {
+	appearsIn: [episode!]!
+	friends: [Character]!
+	id: String!
+	name: String!
+}
+```
+
+### Interface and Concrete Type Generation
+
+When a type is embedded in other structs (making it an "interface" in GraphQL terms), `go-quickgraph` by default generates both:
+- An interface with an "I" prefix (e.g., `interface ICharacter`)
+- A concrete type with the original name (e.g., `type Character implements ICharacter`)
+
+This allows you to:
+1. Query for the interface type when you want polymorphic behavior
+2. Return the base type directly when needed
+3. Use the base type in unions alongside its implementations
+
+For example:
+```go
+// Base type that will become both interface and concrete type
+type Vehicle struct {
+    ID    string
+    Model string
+    Year  int
+}
+
+// Types that embed Vehicle
+type Car struct {
+    Vehicle
+    Doors int
+}
+
+type Motorcycle struct {
+    Vehicle
+    Type string
+}
+
+// Union that can include the base Vehicle type
+type SearchResultUnion struct {
+    Vehicle    *Vehicle     // Can return a generic Vehicle
+    Car        *Car         // Or a specific Car
+    Motorcycle *Motorcycle  // Or a specific Motorcycle
+}
+```
+
+Generated schema:
+```graphql
+interface IVehicle {
+    ID: String!
+    Model: String!
+    Year: Int!
+}
+
+type Vehicle implements IVehicle {
+    ID: String!
+    Model: String!
+    Year: Int!
+}
+
+type Car implements IVehicle {
+    ID: String!
+    Model: String!
+    Year: Int!
+    Doors: Int!
+}
+
+union SearchResult = Car | Motorcycle | Vehicle
+```
+
+### Opting Out of Concrete Type Generation
+
+Sometimes you may want only an interface without the concrete type. You can opt out by implementing the `GraphTypeExtension` interface:
+
+```go
+type BaseComponent struct {
+    ID   int
+    Name string
+}
+
+// Opt out of concrete type generation
+func (b BaseComponent) GraphTypeExtension() GraphTypeInfo {
+    return GraphTypeInfo{
+        Name:          "BaseComponent",
+        InterfaceOnly: true,
+    }
+}
+
+// Types that embed BaseComponent
+type Button struct {
+    BaseComponent
+    Label string
+}
+
+type TextInput struct {
+    BaseComponent
+    Placeholder string
+}
+```
+
+With `InterfaceOnly: true`, the schema generates only the interface:
+```graphql
+interface BaseComponent {
+    ID: Int!
+    Name: String!
+}
+
+type Button implements BaseComponent {
+    ID: Int!
+    Name: String!
+    Label: String!
+}
+
+type TextInput implements BaseComponent {
+    ID: Int!
+    Name: String!
+    Placeholder: String!
 }
 ```
 
@@ -799,13 +923,13 @@ type Manager struct {
 
 // Union that includes the interface
 type SearchResultUnion struct {
-    Employee *Employee  // Will expand to Developer and Manager
+    Employee *Employee  // Will expand to Developer, Manager, and Employee itself
     Product  *Product
     Widget   *Widget
 }
 
 // In the generated schema:
-// union SearchResult = Developer | Manager | Product | Widget
+// union SearchResult = Developer | Employee | Manager | Product | Widget
 ```
 
 #### Registering Types for Schema Generation

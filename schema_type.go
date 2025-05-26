@@ -27,18 +27,51 @@ func (g *Graphy) schemaForTypes(kind TypeKind, mapping typeNameMapping, inputMap
 		if typeQueue[i] == nil {
 			panic(fmt.Sprintf("typeQueue[%d] is nil", i))
 		}
-		name := mapping[typeQueue[i]]
+		t := typeQueue[i]
+		name := mapping[t]
+
+		// Skip if already processed
 		if completed[name] {
 			continue
 		}
-		completed[name] = true
-		t := typeQueue[i]
+
 		if t.fundamental {
 			continue
 		}
-		schema := g.schemaForType(kind, t, mapping, inputMapping)
-		sb.WriteString(schema)
-		sb.WriteString("\n")
+
+		// Check if this type should generate both interface and concrete type
+		if kind == TypeOutput && len(t.implementedBy) > 0 {
+			if t.interfaceOnly {
+				// Generate only interface with original name (no I prefix)
+				completed[name] = true
+				schema := g.schemaForType(kind, t, mapping, inputMapping)
+				sb.WriteString(schema)
+				sb.WriteString("\n")
+			} else {
+				// Generate both interface (with I prefix) and concrete type
+				interfaceName := "I" + name
+				if !completed[interfaceName] {
+					completed[interfaceName] = true
+					interfaceSchema := g.schemaForInterface(t, interfaceName, mapping, inputMapping)
+					sb.WriteString(interfaceSchema)
+					sb.WriteString("\n")
+				}
+
+				// Generate concrete type with original name
+				if !completed[name] {
+					completed[name] = true
+					concreteSchema := g.schemaForConcreteType(t, name, mapping, inputMapping)
+					sb.WriteString(concreteSchema)
+					sb.WriteString("\n")
+				}
+			}
+		} else {
+			// Generate single type as before
+			completed[name] = true
+			schema := g.schemaForType(kind, t, mapping, inputMapping)
+			sb.WriteString(schema)
+			sb.WriteString("\n")
+		}
 	}
 
 	return sb.String()
@@ -102,6 +135,29 @@ func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup, mapping typeNameMap
 	return sb.String()
 }
 
+func (g *Graphy) schemaForInterface(t *typeLookup, interfaceName string, mapping typeNameMapping, inputMapping typeNameMapping) string {
+	sb := &strings.Builder{}
+	sb.WriteString("interface ")
+	sb.WriteString(interfaceName)
+	sb.WriteString(" {\n")
+	sb.WriteString(g.getSchemaFields(t, TypeOutput, mapping, inputMapping))
+	sb.WriteString("}\n")
+	return sb.String()
+}
+
+func (g *Graphy) schemaForConcreteType(t *typeLookup, name string, mapping typeNameMapping, inputMapping typeNameMapping) string {
+	sb := &strings.Builder{}
+	sb.WriteString("type ")
+	sb.WriteString(name)
+	// This concrete type implements the interface
+	sb.WriteString(" implements I")
+	sb.WriteString(name)
+	sb.WriteString(" {\n")
+	sb.WriteString(g.getSchemaFields(t, TypeOutput, mapping, inputMapping))
+	sb.WriteString("}\n")
+	return sb.String()
+}
+
 func (g *Graphy) getSchemaTypePrefix(kind TypeKind, t *typeLookup) string {
 	if kind == TypeInput {
 		return "input "
@@ -148,6 +204,11 @@ func (g *Graphy) getSchemaImplementedInterfaces(t *typeLookup, mapping typeNameM
 			sb.WriteString(" ")
 		}
 		interfaceCount++
+		// If the implemented type has implementedBy relationships and is not interfaceOnly,
+		// use the I prefix for the interface name
+		if len(implementedType.implementedBy) > 0 && !implementedType.interfaceOnly {
+			sb.WriteString("I")
+		}
 		sb.WriteString(mapping[implementedType])
 	}
 
@@ -242,6 +303,10 @@ func (g *Graphy) schemaForUnion(name string, t *typeLookup, mapping typeNameMapp
 			// This is an interface, add all its implementations
 			for _, impl := range checkType.implementedBy {
 				concreteTypes[impl.name] = impl
+			}
+			// If we're not interface-only, include the concrete type too
+			if !checkType.interfaceOnly {
+				concreteTypes[checkType.name] = checkType
 			}
 		} else {
 			// This is a concrete type, add it directly

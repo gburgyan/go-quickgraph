@@ -500,19 +500,16 @@ func TestUnionWithInterface(t *testing.T) {
 
 	schema := g.SchemaDefinition(ctx)
 
-	// The union should list concrete types (Developer and Manager), not the interface (Employee)
-	assert.Contains(t, schema, "union searchResultUnion = Developer | Manager | Product | Widget")
+	// The union should list concrete types including Employee
+	assert.Contains(t, schema, "union searchResultUnion = Developer | Employee | Manager | Product | Widget")
 
-	// Should NOT contain Employee in the union
-	assert.NotContains(t, schema, "Employee | Product")
-	assert.NotContains(t, schema, "| Employee |")
+	// Verify IEmployee is an interface and Employee is a concrete type
+	assert.Contains(t, schema, "interface IEmployee {")
+	assert.Contains(t, schema, "type Employee implements IEmployee {")
 
-	// Verify Employee is an interface
-	assert.Contains(t, schema, "interface Employee {")
-
-	// Verify the concrete types implement Employee
-	assert.Contains(t, schema, "type Manager implements Employee {")
-	assert.Contains(t, schema, "type Developer implements Employee {")
+	// Verify the concrete types implement IEmployee
+	assert.Contains(t, schema, "type Manager implements IEmployee {")
+	assert.Contains(t, schema, "type Developer implements IEmployee {")
 }
 
 // TestUnionWithMultipleInterfaces tests unions with types implementing multiple interfaces
@@ -581,14 +578,17 @@ func TestUnionWithMultipleInterfaces(t *testing.T) {
 
 	schema := g.SchemaDefinition(ctx)
 
-	// The union should contain all concrete types that implement either interface
-	// Duck implements both, so it should appear only once
-	assert.Contains(t, schema, "union getVehicleResultUnion = Airplane | Duck | Fish")
+	// The union should contain all concrete types including the embedded types
+	assert.Contains(t, schema, "union getVehicleResultUnion = Airplane | Duck | Fish | Flyable | Swimmable")
 
-	// Verify the interfaces exist
-	assert.Contains(t, schema, "interface Flyable {")
-	assert.Contains(t, schema, "interface Swimmable {")
+	// Verify the interfaces exist with I prefix
+	assert.Contains(t, schema, "interface IFlyable {")
+	assert.Contains(t, schema, "interface ISwimmable {")
+
+	// Verify concrete types for embedded types
+	assert.Contains(t, schema, "type Flyable implements IFlyable {")
+	assert.Contains(t, schema, "type Swimmable implements ISwimmable {")
 
 	// Verify Duck implements both interfaces
-	assert.Contains(t, schema, "type Duck implements Flyable & Swimmable {")
+	assert.Contains(t, schema, "type Duck implements IFlyable & ISwimmable {")
 }

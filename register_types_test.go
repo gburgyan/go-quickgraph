@@ -98,19 +98,20 @@ func TestUnionWithInterfaceExpansion(t *testing.T) {
 	// Generate schema
 	schema := g.SchemaDefinition(ctx)
 
-	// The union should expand Animal to its concrete implementations
-	assert.Contains(t, schema, "union PetSearchResult = Cat | Dog | Food | Toy")
+	// Debug: print schema to see actual output
+	t.Log("Schema output:")
+	t.Log(schema)
 
-	// Should NOT contain Animal in the union
-	assert.NotContains(t, schema, "Animal | Toy")
-	assert.NotContains(t, schema, "| Animal |")
+	// The union should expand Animal to its concrete implementations plus Animal itself
+	assert.Contains(t, schema, "union PetSearchResult = Animal | Cat | Dog | Food | Toy")
 
-	// Verify Animal is an interface
-	assert.Contains(t, schema, "interface Animal {")
+	// Verify IAnimal is an interface and Animal is a concrete type
+	assert.Contains(t, schema, "interface IAnimal {")
+	assert.Contains(t, schema, "type Animal implements IAnimal {")
 
-	// Verify the concrete types implement Animal
-	assert.Contains(t, schema, "type Dog implements Animal {")
-	assert.Contains(t, schema, "type Cat implements Animal {")
+	// Verify the concrete types implement IAnimal
+	assert.Contains(t, schema, "type Dog implements IAnimal {")
+	assert.Contains(t, schema, "type Cat implements IAnimal {")
 }
 
 // TestUnionInterfaceExpansionWithoutExplicitRegistration tests the behavior when types aren't registered
@@ -162,18 +163,26 @@ func TestUnionInterfaceExpansionWithoutExplicitRegistration(t *testing.T) {
 	// Generate schema without registering Motorcycle
 	schema := g.SchemaDefinition(ctx)
 
-	// The union should only include known implementations
-	assert.Contains(t, schema, "union TransportSearch = Bicycle | Car")
+	// The union should include known implementations plus the concrete Vehicle type
+	assert.Contains(t, schema, "union TransportSearch = Bicycle | Car | Vehicle")
 
 	// Motorcycle should NOT be in the union as it wasn't registered
 	assert.NotContains(t, schema, "Motorcycle")
+
+	// Verify the new interface and concrete type generation
+	assert.Contains(t, schema, "interface IVehicle {")
+	assert.Contains(t, schema, "type Vehicle implements IVehicle {")
+	assert.Contains(t, schema, "type Car implements IVehicle {")
 
 	// Now register Motorcycle and regenerate schema
 	g.RegisterTypes(ctx, Motorcycle{})
 	schema = g.SchemaDefinition(ctx)
 
-	// Now the union should include Motorcycle
-	assert.Contains(t, schema, "union TransportSearch = Bicycle | Car | Motorcycle")
+	// Now the union should include Motorcycle along with Vehicle
+	assert.Contains(t, schema, "union TransportSearch = Bicycle | Car | Motorcycle | Vehicle")
+
+	// Motorcycle should also implement IVehicle
+	assert.Contains(t, schema, "type Motorcycle implements IVehicle {")
 }
 
 // TestRegisterTypesWithPointerInterface tests interface expansion when the union field is a pointer
@@ -228,16 +237,17 @@ func TestRegisterTypesWithPointerInterface(t *testing.T) {
 	// Generate schema
 	schema := g.SchemaDefinition(ctx)
 
-	// Union should contain all concrete shape types
-	assert.Contains(t, schema, "union DrawingElement = Circle | Rectangle | Square | Text")
+	// Union should contain all concrete shape types including Shape itself
+	assert.Contains(t, schema, "union DrawingElement = Circle | Rectangle | Shape | Square | Text")
 
-	// Verify Shape is an interface
-	assert.Contains(t, schema, "interface Shape {")
+	// Verify IShape is an interface and Shape is a concrete type
+	assert.Contains(t, schema, "interface IShape {")
+	assert.Contains(t, schema, "type Shape implements IShape {")
 
 	// Verify implementations
-	assert.Contains(t, schema, "type Circle implements Shape {")
-	assert.Contains(t, schema, "type Square implements Shape {")
-	assert.Contains(t, schema, "type Rectangle implements Shape {")
+	assert.Contains(t, schema, "type Circle implements IShape {")
+	assert.Contains(t, schema, "type Square implements IShape {")
+	assert.Contains(t, schema, "type Rectangle implements IShape {")
 }
 
 // TestComplexUnionWithNestedInterfaces tests unions with nested interface hierarchies
@@ -307,16 +317,89 @@ func TestComplexUnionWithNestedInterfaces(t *testing.T) {
 	// Generate schema
 	schema := g.SchemaDefinition(ctx)
 
-	// The union should contain only concrete types
-	// Note: The current implementation includes Person in the union, which might need further refinement
-	assert.Contains(t, schema, "union EntitySearch = Customer | Document | Employee | Organization | Person")
+	// The union should contain all concrete types including Entity and Person
+	assert.Contains(t, schema, "union EntitySearch = Customer | Document | Employee | Entity | Organization | Person")
 
 	// Verify the interface hierarchy
-	assert.Contains(t, schema, "interface Entity {")
-	assert.Contains(t, schema, "interface Person implements Entity {")
+	assert.Contains(t, schema, "interface IEntity {")
+	assert.Contains(t, schema, "interface IPerson implements IEntity {")
+
+	// Verify concrete types for embedded types
+	assert.Contains(t, schema, "type Entity implements IEntity {")
+	assert.Contains(t, schema, "type Person implements IPerson & IEntity {")
 
 	// In GraphQL, when there's multi-level inheritance, concrete types show all interfaces
-	assert.Contains(t, schema, "type Customer implements Person & Entity {")
-	assert.Contains(t, schema, "type Employee implements Person & Entity {")
-	assert.Contains(t, schema, "type Organization implements Entity {")
+	assert.Contains(t, schema, "type Customer implements IPerson & IEntity {")
+	assert.Contains(t, schema, "type Employee implements IPerson & IEntity {")
+	assert.Contains(t, schema, "type Organization implements IEntity {")
+}
+
+// Types for TestInterfaceOnlyOptOut
+
+// BaseComponentInterfaceOnly is a base type that opts out of concrete type generation
+type BaseComponentInterfaceOnly struct {
+	ID   int
+	Name string
+}
+
+// GraphTypeExtension implementation for BaseComponentInterfaceOnly
+func (b BaseComponentInterfaceOnly) GraphTypeExtension() GraphTypeInfo {
+	return GraphTypeInfo{
+		Name:          "BaseComponentInterfaceOnly",
+		InterfaceOnly: true,
+	}
+}
+
+// ButtonIO embeds BaseComponentInterfaceOnly
+type ButtonIO struct {
+	BaseComponentInterfaceOnly
+	Label   string
+	OnClick string
+}
+
+// TextInputIO embeds BaseComponentInterfaceOnly
+type TextInputIO struct {
+	BaseComponentInterfaceOnly
+	Placeholder string
+	Value       string
+}
+
+// UIElementIOUnion includes BaseComponentInterfaceOnly
+type UIElementIOUnion struct {
+	Component *BaseComponentInterfaceOnly
+	Button    *ButtonIO
+	TextInput *TextInputIO
+}
+
+// TestInterfaceOnlyOptOut tests the InterfaceOnly opt-out mechanism
+func TestInterfaceOnlyOptOut(t *testing.T) {
+	ctx := context.Background()
+	g := Graphy{}
+
+	// Register a query that returns the union
+	g.RegisterQuery(ctx, "getUIElements", func() []UIElementIOUnion {
+		return []UIElementIOUnion{}
+	})
+
+	// Register the concrete types
+	g.RegisterTypes(ctx, ButtonIO{}, TextInputIO{})
+
+	// Generate schema
+	schema := g.SchemaDefinition(ctx)
+
+	// Debug: print schema
+	t.Log("Schema output:")
+	t.Log(schema)
+
+	// The union should NOT contain BaseComponentInterfaceOnly since it's interface-only
+	assert.Contains(t, schema, "union UIElementIO = ButtonIO | TextInputIO")
+	assert.NotContains(t, schema, "| BaseComponentInterfaceOnly")
+
+	// BaseComponentInterfaceOnly should be rendered as an interface only (no I prefix since InterfaceOnly is true)
+	assert.Contains(t, schema, "interface BaseComponentInterfaceOnly {")
+	assert.NotContains(t, schema, "type BaseComponentInterfaceOnly")
+
+	// Concrete types should implement BaseComponentInterfaceOnly
+	assert.Contains(t, schema, "type ButtonIO implements BaseComponentInterfaceOnly {")
+	assert.Contains(t, schema, "type TextInputIO implements BaseComponentInterfaceOnly {")
 }

@@ -44,6 +44,10 @@ type typeLookup struct {
 	description      *string
 	isDeprecated     bool
 	deprecatedReason string
+
+	// interfaceOnly indicates that this type should only generate an interface,
+	// not both interface and concrete type. Used for opt-out behavior.
+	interfaceOnly bool
 }
 
 type typeArrayModifier struct {
@@ -252,9 +256,23 @@ func (g *Graphy) addGraphMethodsForType(typ reflect.Type, index []int, tl *typeL
 		}
 		functionDefs[m.Name] = fd
 	}
-	if typ.Implements(graphTypeExtensionType) {
-		gtev := reflect.New(typ)
-		gtei := gtev.Elem().Interface().(GraphTypeExtension)
+	// Check if the type or its element type implements GraphTypeExtension
+	checkType := typ
+	if typ.Kind() == reflect.Ptr {
+		checkType = typ.Elem()
+	}
+
+	if checkType.Implements(graphTypeExtensionType) || reflect.PtrTo(checkType).Implements(graphTypeExtensionType) {
+		var gtei GraphTypeExtension
+		if checkType.Implements(graphTypeExtensionType) {
+			// Type implements the interface directly (value receiver)
+			gtev := reflect.New(checkType).Elem()
+			gtei = gtev.Interface().(GraphTypeExtension)
+		} else {
+			// Pointer to type implements the interface
+			gtev := reflect.New(checkType)
+			gtei = gtev.Interface().(GraphTypeExtension)
+		}
 		typeExtension := gtei.GraphTypeExtension()
 		for _, override := range typeExtension.FunctionDefinitions {
 			functionDefs[override.Name] = override

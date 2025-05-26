@@ -66,6 +66,10 @@ type GraphTypeInfo struct {
 
 	// Function overrides for the type.
 	FunctionDefinitions []FunctionDefinition
+
+	// InterfaceOnly indicates that this type should only generate an interface,
+	// not both interface and concrete type when it has implementations.
+	InterfaceOnly bool
 }
 
 var ignoredFunctions = map[string]bool{
@@ -286,9 +290,18 @@ func (g *Graphy) typeLookup(typ reflect.Type) *typeLookup {
 
 	result.rootType = rootTyp
 
-	if typ.Implements(graphTypeExtensionType) {
-		gtev := reflect.New(typ)
-		gtei := gtev.Elem().Interface().(GraphTypeExtension)
+	// Check rootTyp instead of typ since we've already dereferenced pointers
+	if rootTyp.Implements(graphTypeExtensionType) || reflect.PtrTo(rootTyp).Implements(graphTypeExtensionType) {
+		var gtei GraphTypeExtension
+		if rootTyp.Implements(graphTypeExtensionType) {
+			// Type implements the interface directly
+			gtev := reflect.New(rootTyp).Elem()
+			gtei = gtev.Interface().(GraphTypeExtension)
+		} else {
+			// Pointer to type implements the interface
+			gtev := reflect.New(rootTyp)
+			gtei = gtev.Interface().(GraphTypeExtension)
+		}
 		typeExtension := gtei.GraphTypeExtension()
 		result.name = typeExtension.Name
 		if typeExtension.Deprecated != "" {
@@ -298,11 +311,17 @@ func (g *Graphy) typeLookup(typ reflect.Type) *typeLookup {
 		if typeExtension.Description != "" {
 			result.description = &typeExtension.Description
 		}
+		result.interfaceOnly = typeExtension.InterfaceOnly
 	} else {
 		result.name = rootTyp.Name()
 	}
 
 	if rootTyp.Kind() == reflect.Struct {
+		// Check for graphy tags on the struct itself
+		// This requires finding the struct field in its parent if embedded
+		// For now, we'll handle this during field processing when we detect
+		// that this type is embedded
+
 		// IMPORTANT: Store the type lookup BEFORE populating to handle circular references.
 		// This prevents infinite recursion when types reference each other (A->B->A).
 		// The type lookup will be incomplete at first, but that's OK - it will be

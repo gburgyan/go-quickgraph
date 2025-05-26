@@ -209,8 +209,18 @@ func solveInputOutputNameMapping(inputTypes []*typeLookup, outputTypes []*typeLo
 
 	// Populate outputMapping and check for name collisions along the way
 	for _, outputType := range outputTypes {
-		outputMapping[outputType] = outputType.name
-		outputNames[outputType.name] = true
+		name := outputType.name
+		// If this type has implementedBy relationships and is not marked as interfaceOnly,
+		// we'll generate both an interface (with I prefix) and a concrete type
+		if len(outputType.implementedBy) > 0 && !outputType.interfaceOnly {
+			// The interface will use the I prefix
+			// The concrete type keeps the original name
+			// We'll handle this in the schema generation phase
+			outputMapping[outputType] = name
+		} else {
+			outputMapping[outputType] = name
+		}
+		outputNames[name] = true
 	}
 
 	// Populate inputMapping, checking for name collisions and resolving them by appending "Input"

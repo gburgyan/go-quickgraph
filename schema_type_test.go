@@ -17,7 +17,7 @@ func TestGraphy_schemaForType(t *testing.T) {
 	typeLookups := g.expandTypeLookups([]*typeLookup{cl})
 	_, outputMap := solveInputOutputNameMapping(nil, typeLookups)
 
-	schema := g.schemaForType(TypeOutput, cl, outputMap)
+	schema := g.schemaForType(TypeOutput, cl, outputMap, nil)
 	expected := `type Character {
 	appearsIn: [episode!]!
 	friends: [Character]!

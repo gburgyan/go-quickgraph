@@ -14,7 +14,7 @@ const (
 	TypeOutput
 )
 
-func (g *Graphy) schemaForTypes(kind TypeKind, mapping typeNameMapping, types ...*typeLookup) string {
+func (g *Graphy) schemaForTypes(kind TypeKind, mapping typeNameMapping, inputMapping typeNameMapping, types ...*typeLookup) string {
 
 	completed := make(map[string]bool)
 
@@ -36,7 +36,7 @@ func (g *Graphy) schemaForTypes(kind TypeKind, mapping typeNameMapping, types ..
 		if t.fundamental {
 			continue
 		}
-		schema := g.schemaForType(kind, t, mapping)
+		schema := g.schemaForType(kind, t, mapping, inputMapping)
 		sb.WriteString(schema)
 		sb.WriteString("\n")
 	}
@@ -84,7 +84,7 @@ func (g *Graphy) schemaForEnum(et *typeLookup) string {
 	return sb.String()
 }
 
-func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup, mapping typeNameMapping) string {
+func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup, mapping typeNameMapping, inputMapping typeNameMapping) string {
 	name := mapping[t]
 
 	if len(t.union) > 0 {
@@ -96,7 +96,7 @@ func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup, mapping typeNameMap
 	sb.WriteString(name)
 	sb.WriteString(g.getSchemaImplementedInterfaces(t, mapping))
 	sb.WriteString(" {\n")
-	sb.WriteString(g.getSchemaFields(t, kind, mapping))
+	sb.WriteString(g.getSchemaFields(t, kind, mapping, inputMapping))
 	sb.WriteString("}\n")
 
 	return sb.String()
@@ -153,7 +153,7 @@ func (g *Graphy) getSchemaImplementedInterfaces(t *typeLookup, mapping typeNameM
 	return sb.String()
 }
 
-func (g *Graphy) getSchemaFields(t *typeLookup, kind TypeKind, mapping typeNameMapping) string {
+func (g *Graphy) getSchemaFields(t *typeLookup, kind TypeKind, mapping typeNameMapping, inputMapping typeNameMapping) string {
 	sb := &strings.Builder{}
 
 	// Use fieldsLowercase with sortedKeys as in the original implementation
@@ -165,7 +165,7 @@ func (g *Graphy) getSchemaFields(t *typeLookup, kind TypeKind, mapping typeNameM
 		// embedded struct fields have multiple indexes (e.g., [0 0] for the first field
 		// of the first embedded struct) and we want to include those in the schema
 
-		fieldTypeString := g.getSchemaFieldType(&field, kind, mapping)
+		fieldTypeString := g.getSchemaFieldType(&field, kind, mapping, inputMapping)
 		if fieldTypeString == "" {
 			continue
 		}
@@ -186,27 +186,33 @@ func (g *Graphy) getSchemaFields(t *typeLookup, kind TypeKind, mapping typeNameM
 	return sb.String()
 }
 
-func (g *Graphy) getSchemaFieldType(field *fieldLookup, kind TypeKind, mapping typeNameMapping) string {
+func (g *Graphy) getSchemaFieldType(field *fieldLookup, kind TypeKind, mapping typeNameMapping, inputMapping typeNameMapping) string {
 	switch field.fieldType {
 	case FieldTypeField:
 		return ": " + g.schemaRefForType(g.typeLookup(field.resultType), mapping)
 	case FieldTypeGraphFunction:
 		if kind == TypeOutput {
-			return g.getSchemaGraphFunctionType(field, mapping)
+			return g.getSchemaGraphFunctionType(field, mapping, inputMapping)
 		}
 	}
 	return ""
 }
 
-func (g *Graphy) getSchemaGraphFunctionType(field *fieldLookup, mapping typeNameMapping) string {
+func (g *Graphy) getSchemaGraphFunctionType(field *fieldLookup, outputMapping typeNameMapping, inputMapping typeNameMapping) string {
 	sb := &strings.Builder{}
 	if len(field.graphFunction.paramsByName) > 0 {
 		sb.WriteString("(")
-		sb.WriteString(g.schemaForFunctionParameters(field.graphFunction, mapping))
+		// Use input mapping for function parameters
+		mappingToUse := inputMapping
+		if mappingToUse == nil {
+			mappingToUse = outputMapping // fallback for backwards compatibility
+		}
+		sb.WriteString(g.schemaForFunctionParameters(field.graphFunction, mappingToUse))
 		sb.WriteString(")")
 	}
 	sb.WriteString(": ")
-	sb.WriteString(g.schemaRefForType(field.graphFunction.baseReturnType, mapping))
+	// Use output mapping for return type
+	sb.WriteString(g.schemaRefForType(field.graphFunction.baseReturnType, outputMapping))
 
 	return sb.String()
 }
@@ -215,22 +221,38 @@ func (g *Graphy) schemaForUnion(name string, t *typeLookup, mapping typeNameMapp
 	sb.WriteString("union ")
 	sb.WriteString(name)
 	sb.WriteString(" =")
-	unionCount := 0
-	// Get the union names in alphabetical order.
-	var unionNames []string
+
+	// Collect all concrete types for the union
+	// If a union member is an interface, we need to include all its implementations
+	concreteTypes := make(map[string]*typeLookup)
 	for _, utl := range t.union {
-		unionNames = append(unionNames, mapping[utl])
-	}
-	sort.Strings(unionNames)
-	for _, unionName := range unionNames {
-		unionType := t.union[unionName]
-		sb.WriteString(" ")
-		if unionCount > 0 {
-			sb.WriteString("| ")
+		if len(utl.implementedBy) > 0 {
+			// This is an interface, add all its implementations
+			for _, impl := range utl.implementedBy {
+				concreteTypes[impl.name] = impl
+			}
+		} else {
+			// This is a concrete type, add it directly
+			concreteTypes[utl.name] = utl
 		}
-		unionCount++
-		sb.WriteString(unionType.name)
 	}
+
+	// Sort the concrete type names
+	var typeNames []string
+	for name := range concreteTypes {
+		typeNames = append(typeNames, name)
+	}
+	sort.Strings(typeNames)
+
+	// Build the union string
+	for i, typeName := range typeNames {
+		if i > 0 {
+			sb.WriteString(" |")
+		}
+		sb.WriteString(" ")
+		sb.WriteString(typeName)
+	}
+
 	sb.WriteString("\n")
 	return sb.String()
 }

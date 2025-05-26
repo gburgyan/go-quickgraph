@@ -90,10 +90,10 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) string {
 		sb.WriteString("}\n\n")
 	}
 
-	inputSchema := g.schemaForTypes(TypeInput, st.inputTypeNameLookup, st.inputTypes...)
+	inputSchema := g.schemaForTypes(TypeInput, st.inputTypeNameLookup, nil, st.inputTypes...)
 	sb.WriteString(inputSchema)
 
-	outputSchema := g.schemaForTypes(TypeOutput, st.outputTypeNameLookup, st.outputTypes...)
+	outputSchema := g.schemaForTypes(TypeOutput, st.outputTypeNameLookup, st.inputTypeNameLookup, st.outputTypes...)
 	sb.WriteString(outputSchema)
 
 	enumSchema := g.schemaForEnumTypes(st.enumTypes...)

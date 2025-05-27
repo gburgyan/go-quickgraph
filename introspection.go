@@ -30,7 +30,7 @@ type __Schema struct {
 
 type __Type struct {
 	Kind           __TypeKind `json:"kind"`
-	Name           string     `json:"name"`
+	Name           *string    `json:"name"`
 	Description    *string    `json:"description"`
 	fieldsRaw      []__Field
 	Interfaces     []*__Type `json:"interfaces"`
@@ -38,7 +38,7 @@ type __Type struct {
 	enumValuesRaw  []__EnumValue
 	InputFields    []__InputValue
 	OfType         *__Type `json:"ofType"`
-	SpecifiedByUrl string  `json:"specifiedByUrl"`
+	SpecifiedByUrl *string `json:"specifiedByUrl"`
 }
 
 type __EnumValue struct {
@@ -135,9 +135,12 @@ func (g *Graphy) EnableIntrospection(ctx context.Context) {
 }
 
 func (g *Graphy) populateIntrospection(st *schemaTypes) {
-	queries := &__Type{Kind: IntrospectionKindObject, Name: "__query"}
-	mutations := &__Type{Kind: IntrospectionKindObject, Name: "__mutation"}
-	subscriptions := &__Type{Kind: IntrospectionKindObject, Name: "__subscription"}
+	queryName := "__query"
+	mutationName := "__mutation"
+	subscriptionName := "__subscription"
+	queries := &__Type{Kind: IntrospectionKindObject, Name: &queryName}
+	mutations := &__Type{Kind: IntrospectionKindObject, Name: &mutationName}
+	subscriptions := &__Type{Kind: IntrospectionKindObject, Name: &subscriptionName}
 
 	is := &__Schema{
 		Queries:          queries,
@@ -177,8 +180,13 @@ func (g *Graphy) populateIntrospection(st *schemaTypes) {
 		is.Types = append(is.Types, is.typeLookupByName[name])
 	}
 
+	// Add the root types to the lookup map
+	is.typeLookupByName["__query"] = queries
+	is.typeLookupByName["__mutation"] = mutations
+
 	is.Types = append(is.Types, queries, mutations)
 	if hasSubscriptions {
+		is.typeLookupByName["__subscription"] = subscriptions
 		is.Types = append(is.Types, subscriptions)
 	} else {
 		// If no subscriptions are registered, set it to nil
@@ -206,11 +214,51 @@ func (g *Graphy) getIntrospectionBaseType(is *__Schema, tl *typeLookup, io TypeK
 		panic("unknown IO type")
 	}
 
+	// Check if we need to handle interface/concrete type split
+	hasImplementedBy := len(tl.implementedBy) > 0
+	if io == TypeOutput && hasImplementedBy && !tl.interfaceOnly {
+		// This type needs both interface and concrete type like in schema generation
+		// First ensure the interface with "I" prefix exists
+		interfaceName := "I" + name
+		if _, ok := is.typeLookupByName[interfaceName]; !ok {
+			interfaceType := &__Type{
+				Name: &interfaceName,
+				Kind: IntrospectionKindInterface,
+			}
+			is.typeLookupByName[interfaceName] = interfaceType
+			// Add fields to interface
+			g.addIntrospectionSchemaFields(is, tl, io, interfaceType)
+			// Add possible types (implementations) including the concrete type
+			// First add the concrete type itself
+			concreteType := &__Type{
+				Name: &name,
+				Kind: IntrospectionKindObject,
+			}
+			interfaceType.PossibleTypes = append(interfaceType.PossibleTypes, concreteType)
+			// Then add other implementations
+			for _, impl := range tl.implementedBy {
+				implType := g.getIntrospectionBaseType(is, impl, io)
+				interfaceType.PossibleTypes = append(interfaceType.PossibleTypes, implType)
+			}
+		}
+
+		// Now handle the concrete type
+		if existing, ok := is.typeLookupByName[name]; ok {
+			return existing
+		}
+
+		// Create the concrete type
+		result := &__Type{Name: &name}
+		is.typeLookupByName[name] = result
+		// The concrete type will have its kind set by the caller
+		return result
+	}
+
 	if existing, ok := is.typeLookupByName[name]; ok {
 		return existing
 	}
 
-	result := &__Type{Name: name}
+	result := &__Type{Name: &name}
 	is.typeLookupByName[name] = result
 
 	switch {
@@ -253,7 +301,7 @@ func (g *Graphy) getIntrospectionBaseType(is *__Schema, tl *typeLookup, io TypeK
 
 	case tl.fundamental:
 		result.Kind = IntrospectionKindScalar
-		result.Name = name
+		// Name is already set as &name above
 
 	case io == TypeInput:
 		result.Kind = IntrospectionKindInputObject
@@ -262,8 +310,45 @@ func (g *Graphy) getIntrospectionBaseType(is *__Schema, tl *typeLookup, io TypeK
 	default:
 		result.Kind = IntrospectionKindObject
 		g.addIntrospectionSchemaFields(is, tl, io, result)
+
+		// Handle interface references
 		for _, impls := range sortedKeys(tl.implements) {
-			result.Interfaces = append(result.Interfaces, g.getIntrospectionModifiedType(is, tl.implements[impls], io))
+			implTl := tl.implements[impls]
+			// Get the interface name (with "I" prefix if applicable)
+			var interfaceName string
+			if implTl.rootType != nil && implTl.rootType.ConvertibleTo(stringEnumValuesType) {
+				interfaceName = g.schemaBuffer.enumTypeNameLookup[implTl]
+			} else if io == TypeOutput || implTl.fundamental {
+				interfaceName = g.schemaBuffer.outputTypeNameLookup[implTl]
+			} else {
+				interfaceName = g.schemaBuffer.inputTypeNameLookup[implTl]
+			}
+
+			// Check if this interface uses the "I" prefix pattern
+			if len(implTl.implementedBy) > 0 && !implTl.interfaceOnly {
+				interfaceName = "I" + interfaceName
+			}
+
+			// Look up the interface type by name
+			if interfaceType, ok := is.typeLookupByName[interfaceName]; ok {
+				result.Interfaces = append(result.Interfaces, interfaceType)
+			} else {
+				// If not found, create a reference to it
+				interfaceType := &__Type{
+					Name: &interfaceName,
+					Kind: IntrospectionKindInterface,
+				}
+				result.Interfaces = append(result.Interfaces, interfaceType)
+			}
+		}
+
+		// If this type has implementedBy, it should also implement its own interface
+		if len(tl.implementedBy) > 0 && !tl.interfaceOnly {
+			typeName := g.schemaBuffer.outputTypeNameLookup[tl]
+			interfaceName := "I" + typeName
+			if interfaceType, ok := is.typeLookupByName[interfaceName]; ok {
+				result.Interfaces = append(result.Interfaces, interfaceType)
+			}
 		}
 	}
 
@@ -298,9 +383,12 @@ func (g *Graphy) addIntrospectionSchemaFields(is *__Schema, tl *typeLookup, io T
 		ft := fieldsCopy[fieldName]
 		if ft.fieldType == FieldTypeField {
 			if io == TypeOutput {
+				// Let the type lookup handle whether this should be an interface
+				fieldType := g.getIntrospectionModifiedType(is, g.typeLookup(ft.resultType), io)
+
 				field := __Field{
 					Name:         fieldName,
-					Type:         g.getIntrospectionModifiedType(is, g.typeLookup(ft.resultType), io),
+					Type:         fieldType,
 					IsDeprecated: ft.isDeprecated,
 				}
 				if ft.isDeprecated {
@@ -322,6 +410,7 @@ func (g *Graphy) addIntrospectionSchemaFields(is *__Schema, tl *typeLookup, io T
 }
 
 func (g *Graphy) introspectionCall(is *__Schema, f *graphFunction) (*__Type, []__InputValue) {
+	// Get the base return type
 	result := g.getIntrospectionModifiedType(is, f.baseReturnType, TypeOutput)
 
 	var args []__InputValue
@@ -355,6 +444,16 @@ func (g *Graphy) getIntrospectionModifiedType(is *__Schema, tl *typeLookup, io T
 	// Get the introspection type of the base type
 	ret := g.getIntrospectionBaseType(is, tl, io)
 
+	// For output types with implementations (not interface-only), we should return the interface type
+	// This matches the behavior in schemaRefForType
+	if io == TypeOutput && len(tl.implementedBy) > 0 && !tl.interfaceOnly {
+		baseName := g.schemaBuffer.outputTypeNameLookup[tl]
+		interfaceName := "I" + baseName
+		if interfaceType, ok := is.typeLookupByName[interfaceName]; ok {
+			ret = interfaceType
+		}
+	}
+
 	// If the base type is a slice, wrap the introspection type as a list
 	if tl.array != nil {
 		ret = g.wrapArrayTypes(ret, tl.array)
@@ -362,7 +461,7 @@ func (g *Graphy) getIntrospectionModifiedType(is *__Schema, tl *typeLookup, io T
 
 	// If the base type is not a pointer, wrap the introspection type as a non-null type
 	if !tl.isPointer {
-		ret = g.wrapType(ret, "required", IntrospectionKindNonNull)
+		ret = g.wrapType(ret, "", IntrospectionKindNonNull) // Empty name for NON_NULL wrapper
 	}
 
 	// Return the modified introspection type
@@ -374,9 +473,9 @@ func (g *Graphy) wrapArrayTypes(ret *__Type, array *typeArrayModifier) *__Type {
 		ret = g.wrapArrayTypes(ret, array.array)
 	}
 	if !array.isPointer {
-		ret = g.wrapType(ret, "required", IntrospectionKindNonNull)
+		ret = g.wrapType(ret, "", IntrospectionKindNonNull) // Empty name for NON_NULL wrapper
 	}
-	ret = g.wrapType(ret, "list", IntrospectionKindList)
+	ret = g.wrapType(ret, "", IntrospectionKindList) // Empty name for LIST wrapper
 	return ret
 }
 
@@ -394,8 +493,17 @@ func (g *Graphy) wrapArrayTypes(ret *__Type, array *typeArrayModifier) *__Type {
 // and its OfType field is set to the given type. This represents that the new type is a list of
 // or a non-null version of the given type.
 func (g *Graphy) wrapType(t *__Type, name string, kind __TypeKind) *__Type {
+	// NON_NULL and LIST wrapper types should have null names in GraphQL introspection
+	if kind == IntrospectionKindNonNull || kind == IntrospectionKindList {
+		return &__Type{
+			Name:   nil, // Null name for wrapper types per GraphQL spec
+			Kind:   kind,
+			OfType: t,
+		}
+	}
+	// For other types, use the provided name
 	return &__Type{
-		Name:   name,
+		Name:   &name,
 		Kind:   kind,
 		OfType: t,
 	}

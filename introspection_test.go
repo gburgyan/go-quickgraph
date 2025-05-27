@@ -153,7 +153,7 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
                   "name": "arg1",
                   "type": {
                     "kind": "NON_NULL",
-                    "name": "required",
+                    "name": null,
                     "ofType": {
                       "kind": "SCALAR",
                       "name": "int",
@@ -180,13 +180,13 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
               "name": "appearsIn",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "LIST",
-                  "name": "list",
+                  "name": null,
                   "ofType": {
                     "kind": "NON_NULL",
-                    "name": "required",
+                    "name": null,
                     "ofType": {
                       "kind": "ENUM",
                       "name": "episode",
@@ -204,10 +204,10 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
               "name": "friends",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "LIST",
-                  "name": "list",
+                  "name": null,
                   "ofType": {
                     "kind": "OBJECT",
                     "name": "Character",
@@ -224,7 +224,7 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
               "name": "id",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "string",
@@ -240,7 +240,7 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
               "name": "name",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "string",
@@ -290,7 +290,7 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
                   "name": "arg1",
                   "type": {
                     "kind": "NON_NULL",
-                    "name": "required",
+                    "name": null,
                     "ofType": {
                       "kind": "SCALAR",
                       "name": "int",
@@ -317,13 +317,13 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
               "name": "appearsIn",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "LIST",
-                  "name": "list",
+                  "name": null,
                   "ofType": {
                     "kind": "NON_NULL",
-                    "name": "required",
+                    "name": null,
                     "ofType": {
                       "kind": "ENUM",
                       "name": "episode",
@@ -341,10 +341,10 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
               "name": "friends",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "LIST",
-                  "name": "list",
+                  "name": null,
                   "ofType": {
                     "kind": "OBJECT",
                     "name": "Character",
@@ -361,7 +361,7 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
               "name": "id",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "string",
@@ -377,7 +377,7 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
               "name": "name",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "string",
@@ -393,7 +393,7 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
               "name": "primaryFunction",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "string",
@@ -405,13 +405,9 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
           "inputFields": [],
           "interfaces": [
             {
-              "kind": "NON_NULL",
-              "name": "required",
-              "ofType": {
-                "kind": "OBJECT",
-                "name": "Character",
-                "ofType": null
-              }
+              "kind": "INTERFACE",
+              "name": "ICharacter",
+              "ofType": null
             }
           ],
           "kind": "OBJECT",
@@ -430,10 +426,10 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
               "name": "edges",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "LIST",
-                  "name": "list",
+                  "name": null,
                   "ofType": {
                     "kind": "OBJECT",
                     "name": "ConnectionEdge",
@@ -450,7 +446,7 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
               "name": "totalCount",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "int",
@@ -477,7 +473,7 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
                   "name": "arg1",
                   "type": {
                     "kind": "NON_NULL",
-                    "name": "required",
+                    "name": null,
                     "ofType": {
                       "kind": "SCALAR",
                       "name": "int",
@@ -515,7 +511,7 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
               "name": "Height",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "float64",
@@ -531,7 +527,7 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
               "name": "HeightMeters",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "float64",
@@ -547,13 +543,13 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
               "name": "appearsIn",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "LIST",
-                  "name": "list",
+                  "name": null,
                   "ofType": {
                     "kind": "NON_NULL",
-                    "name": "required",
+                    "name": null,
                     "ofType": {
                       "kind": "ENUM",
                       "name": "episode",
@@ -571,10 +567,10 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
               "name": "friends",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "LIST",
-                  "name": "list",
+                  "name": null,
                   "ofType": {
                     "kind": "OBJECT",
                     "name": "Character",
@@ -591,7 +587,7 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
               "name": "id",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "string",
@@ -607,7 +603,7 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
               "name": "name",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "string",
@@ -619,13 +615,9 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
           "inputFields": [],
           "interfaces": [
             {
-              "kind": "NON_NULL",
-              "name": "required",
-              "ofType": {
-                "kind": "OBJECT",
-                "name": "Character",
-                "ofType": null
-              }
+              "kind": "INTERFACE",
+              "name": "ICharacter",
+              "ofType": null
             }
           ],
           "kind": "OBJECT",
@@ -670,7 +662,7 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
               "name": "id",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "string",
@@ -686,7 +678,7 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
               "name": "name",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "string",
@@ -782,7 +774,7 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
                   "name": "search",
                   "type": {
                     "kind": "NON_NULL",
-                    "name": "required",
+                    "name": null,
                     "ofType": {
                       "kind": "SCALAR",
                       "name": "string",
@@ -797,13 +789,13 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
               "name": "search",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "LIST",
-                  "name": "list",
+                  "name": null,
                   "ofType": {
                     "kind": "NON_NULL",
-                    "name": "required",
+                    "name": null,
                     "ofType": {
                       "kind": "UNION",
                       "name": "SearchResult",
@@ -840,6 +832,11 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
 	assert.NoError(t, err)
 
 	formatted := buff.String()
+
+	// Debug: print the actual output
+	if formatted != expected {
+		t.Logf("ACTUAL OUTPUT:\n%s", formatted)
+	}
 
 	assert.Equal(t, expected, formatted)
 }
@@ -982,7 +979,7 @@ func TestGraphy_Introspection_Deprecation(t *testing.T) {
               "name": "AnEnum",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "ENUM",
                   "name": "enumWithDescription",
@@ -998,7 +995,7 @@ func TestGraphy_Introspection_Deprecation(t *testing.T) {
               "name": "deprecatedField",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "string",
@@ -1064,7 +1061,7 @@ func TestGraphy_Introspection_Deprecation(t *testing.T) {
                   "name": "input",
                   "type": {
                     "kind": "NON_NULL",
-                    "name": "required",
+                    "name": null,
                     "ofType": {
                       "kind": "SCALAR",
                       "name": "string",
@@ -1079,13 +1076,13 @@ func TestGraphy_Introspection_Deprecation(t *testing.T) {
               "name": "sample",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "LIST",
-                  "name": "list",
+                  "name": null,
                   "ofType": {
                     "kind": "NON_NULL",
-                    "name": "required",
+                    "name": null,
                     "ofType": {
                       "kind": "OBJECT",
                       "name": "TestType",
@@ -1175,7 +1172,7 @@ func TestGraphy_Introspection_Interface(t *testing.T) {
                   "name": "arg1",
                   "type": {
                     "kind": "NON_NULL",
-                    "name": "required",
+                    "name": null,
                     "ofType": {
                       "kind": "SCALAR",
                       "name": "int",
@@ -1202,13 +1199,13 @@ func TestGraphy_Introspection_Interface(t *testing.T) {
               "name": "appearsIn",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "LIST",
-                  "name": "list",
+                  "name": null,
                   "ofType": {
                     "kind": "NON_NULL",
-                    "name": "required",
+                    "name": null,
                     "ofType": {
                       "kind": "ENUM",
                       "name": "episode",
@@ -1226,12 +1223,12 @@ func TestGraphy_Introspection_Interface(t *testing.T) {
               "name": "friends",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "LIST",
-                  "name": "list",
+                  "name": null,
                   "ofType": {
-                    "kind": "INTERFACE",
+                    "kind": "OBJECT",
                     "name": "Character",
                     "ofType": null
                   }
@@ -1246,7 +1243,7 @@ func TestGraphy_Introspection_Interface(t *testing.T) {
               "name": "id",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "string",
@@ -1262,7 +1259,7 @@ func TestGraphy_Introspection_Interface(t *testing.T) {
               "name": "name",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "string",
@@ -1273,15 +1270,9 @@ func TestGraphy_Introspection_Interface(t *testing.T) {
           ],
           "inputFields": [],
           "interfaces": [],
-          "kind": "INTERFACE",
+          "kind": "OBJECT",
           "name": "Character",
-          "possibleTypes": [
-            {
-              "kind": "OBJECT",
-              "name": "Droid",
-              "ofType": null
-            }
-          ]
+          "possibleTypes": []
         },
         {
           "description": null,
@@ -1294,7 +1285,7 @@ func TestGraphy_Introspection_Interface(t *testing.T) {
               "isDeprecated": false,
               "name": "node",
               "type": {
-                "kind": "INTERFACE",
+                "kind": "OBJECT",
                 "name": "Character",
                 "ofType": null
               }
@@ -1318,7 +1309,7 @@ func TestGraphy_Introspection_Interface(t *testing.T) {
                   "name": "arg1",
                   "type": {
                     "kind": "NON_NULL",
-                    "name": "required",
+                    "name": null,
                     "ofType": {
                       "kind": "SCALAR",
                       "name": "int",
@@ -1345,13 +1336,13 @@ func TestGraphy_Introspection_Interface(t *testing.T) {
               "name": "appearsIn",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "LIST",
-                  "name": "list",
+                  "name": null,
                   "ofType": {
                     "kind": "NON_NULL",
-                    "name": "required",
+                    "name": null,
                     "ofType": {
                       "kind": "ENUM",
                       "name": "episode",
@@ -1369,12 +1360,12 @@ func TestGraphy_Introspection_Interface(t *testing.T) {
               "name": "friends",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "LIST",
-                  "name": "list",
+                  "name": null,
                   "ofType": {
-                    "kind": "INTERFACE",
+                    "kind": "OBJECT",
                     "name": "Character",
                     "ofType": null
                   }
@@ -1389,7 +1380,7 @@ func TestGraphy_Introspection_Interface(t *testing.T) {
               "name": "id",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "string",
@@ -1405,7 +1396,7 @@ func TestGraphy_Introspection_Interface(t *testing.T) {
               "name": "name",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "string",
@@ -1421,7 +1412,7 @@ func TestGraphy_Introspection_Interface(t *testing.T) {
               "name": "primaryFunction",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "string",
@@ -1433,13 +1424,9 @@ func TestGraphy_Introspection_Interface(t *testing.T) {
           "inputFields": [],
           "interfaces": [
             {
-              "kind": "NON_NULL",
-              "name": "required",
-              "ofType": {
-                "kind": "INTERFACE",
-                "name": "Character",
-                "ofType": null
-              }
+              "kind": "INTERFACE",
+              "name": "ICharacter",
+              "ofType": null
             }
           ],
           "kind": "OBJECT",
@@ -1458,10 +1445,10 @@ func TestGraphy_Introspection_Interface(t *testing.T) {
               "name": "edges",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "LIST",
-                  "name": "list",
+                  "name": null,
                   "ofType": {
                     "kind": "OBJECT",
                     "name": "ConnectionEdge",
@@ -1478,7 +1465,7 @@ func TestGraphy_Introspection_Interface(t *testing.T) {
               "name": "totalCount",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "int",
@@ -1492,6 +1479,131 @@ func TestGraphy_Introspection_Interface(t *testing.T) {
           "kind": "OBJECT",
           "name": "FriendsConnection",
           "possibleTypes": []
+        },
+        {
+          "description": null,
+          "enumValues": [],
+          "fields": [
+            {
+              "args": [
+                {
+                  "defaultValue": null,
+                  "description": null,
+                  "name": "arg1",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "int",
+                      "ofType": null
+                    }
+                  }
+                }
+              ],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "FriendsConnection",
+              "type": {
+                "kind": "OBJECT",
+                "name": "FriendsConnection",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "appearsIn",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "ENUM",
+                      "name": "episode",
+                      "ofType": null
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "friends",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "OBJECT",
+                    "name": "Character",
+                    "ofType": null
+                  }
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "id",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "string",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "name",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "string",
+                  "ofType": null
+                }
+              }
+            }
+          ],
+          "inputFields": [],
+          "interfaces": [],
+          "kind": "INTERFACE",
+          "name": "ICharacter",
+          "possibleTypes": [
+            {
+              "kind": "OBJECT",
+              "name": "Character",
+              "ofType": null
+            },
+            {
+              "kind": "OBJECT",
+              "name": "Droid",
+              "ofType": null
+            }
+          ]
         },
         {
           "description": null,
@@ -1543,10 +1655,10 @@ func TestGraphy_Introspection_Interface(t *testing.T) {
           "possibleTypes": [
             {
               "kind": "NON_NULL",
-              "name": "required",
+              "name": null,
               "ofType": {
                 "kind": "INTERFACE",
-                "name": "Character",
+                "name": "ICharacter",
                 "ofType": null
               }
             }
@@ -1574,7 +1686,7 @@ func TestGraphy_Introspection_Interface(t *testing.T) {
                   "name": "input",
                   "type": {
                     "kind": "NON_NULL",
-                    "name": "required",
+                    "name": null,
                     "ofType": {
                       "kind": "SCALAR",
                       "name": "string",
@@ -1589,7 +1701,7 @@ func TestGraphy_Introspection_Interface(t *testing.T) {
               "name": "sample",
               "type": {
                 "kind": "NON_NULL",
-                "name": "required",
+                "name": null,
                 "ofType": {
                   "kind": "UNION",
                   "name": "sampleResultUnion",
@@ -1618,12 +1730,16 @@ func TestGraphy_Introspection_Interface(t *testing.T) {
     }
   }
 }`
-
 	buff := bytes.Buffer{}
 	err = json.Indent(&buff, []byte(result), "", "  ")
 	assert.NoError(t, err)
 
 	formatted := buff.String()
+
+	// Debug: print the actual output for interface test
+	if formatted != expected {
+		t.Logf("ACTUAL OUTPUT:\n%s", formatted)
+	}
 
 	assert.Equal(t, expected, formatted)
 }
@@ -1652,9 +1768,259 @@ func TestIntrospectionScalarName_WithStringType(t *testing.T) {
 	assert.Equal(t, "String", result)
 }
 
+func TestWrapType_WithNonWrapperKind(t *testing.T) {
+	g := &Graphy{}
+
+	// Create a base type to wrap
+	baseType := &__Type{
+		Name: strPtr("BaseType"),
+		Kind: IntrospectionKindObject,
+	}
+
+	// Test wrapping with a custom name (non-wrapper kind)
+	// This tests the else path in wrapType where name is used
+	wrapped := g.wrapType(baseType, "CustomType", IntrospectionKindObject)
+
+	assert.NotNil(t, wrapped)
+	assert.NotNil(t, wrapped.Name)
+	assert.Equal(t, "CustomType", *wrapped.Name)
+	assert.Equal(t, IntrospectionKindObject, wrapped.Kind)
+	assert.Equal(t, baseType, wrapped.OfType)
+}
+
+func TestWrapType_WithWrapperKinds(t *testing.T) {
+	g := &Graphy{}
+
+	// Create a base type to wrap
+	baseType := &__Type{
+		Name: strPtr("BaseType"),
+		Kind: IntrospectionKindObject,
+	}
+
+	// Test NON_NULL wrapper - should have nil name
+	nonNullWrapped := g.wrapType(baseType, "ignored", IntrospectionKindNonNull)
+	assert.NotNil(t, nonNullWrapped)
+	assert.Nil(t, nonNullWrapped.Name)
+	assert.Equal(t, IntrospectionKindNonNull, nonNullWrapped.Kind)
+	assert.Equal(t, baseType, nonNullWrapped.OfType)
+
+	// Test LIST wrapper - should have nil name
+	listWrapped := g.wrapType(baseType, "alsoIgnored", IntrospectionKindList)
+	assert.NotNil(t, listWrapped)
+	assert.Nil(t, listWrapped.Name)
+	assert.Equal(t, IntrospectionKindList, listWrapped.Kind)
+	assert.Equal(t, baseType, listWrapped.OfType)
+}
+
+// Helper function to create string pointers
+func strPtr(s string) *string {
+	return &s
+}
+
 func TestIntrospectionScalarName_WithUnknownType(t *testing.T) {
 	tl := &typeLookup{rootType: reflect.TypeOf(map[string]string{})}
 	assert.PanicsWithValue(t, "unknown scalar type", func() {
 		introspectionScalarName(tl)
 	})
+}
+
+// TestIntrospectionInterfaceKind tests that interface references in introspection have correct kind
+func TestIntrospectionInterfaceKind(t *testing.T) {
+	g := Graphy{}
+	ctx := context.Background()
+
+	// Define types that implement interfaces similar to Employee/Developer/Manager pattern
+	type BaseEmployee struct {
+		ID   int
+		Name string
+	}
+
+	type Developer struct {
+		BaseEmployee
+		Language string
+	}
+
+	type Manager struct {
+		BaseEmployee
+		Department string
+	}
+
+	// Register a query that returns the base type
+	g.RegisterQuery(ctx, "getEmployee", func(ctx context.Context, id int) BaseEmployee {
+		return BaseEmployee{ID: id, Name: "Test Employee"}
+	}, "id")
+
+	// Register concrete types
+	g.RegisterTypes(ctx, BaseEmployee{}, Developer{}, Manager{})
+
+	// Enable introspection
+	g.EnableIntrospection(ctx)
+
+	// Execute introspection query to check interface kinds
+	query := `{
+		__schema {
+			types {
+				name
+				kind
+				interfaces {
+					name
+					kind
+				}
+			}
+		}
+	}`
+
+	result, _ := g.ProcessRequest(ctx, query, "")
+
+	var response map[string]interface{}
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("Failed to parse introspection response: %v", err)
+	}
+
+	// Check for errors
+	if errors, ok := response["errors"]; ok {
+		t.Fatalf("Introspection query returned errors: %v", errors)
+	}
+
+	// Extract types from response
+	data := response["data"].(map[string]interface{})
+	schema := data["__schema"].(map[string]interface{})
+	types := schema["types"].([]interface{})
+
+	// Check Developer type
+	for _, typeData := range types {
+		typeMap := typeData.(map[string]interface{})
+		name := typeMap["name"].(string)
+
+		if name == "Developer" {
+			interfaces := typeMap["interfaces"].([]interface{})
+			if len(interfaces) > 0 {
+				for _, iface := range interfaces {
+					ifaceMap := iface.(map[string]interface{})
+					ifaceKind := ifaceMap["kind"].(string)
+					ifaceName := ifaceMap["name"].(string)
+
+					// The key assertion: interfaces must have kind INTERFACE
+					if ifaceKind != "INTERFACE" {
+						t.Errorf("Interface %s referenced by Developer has incorrect kind: %s, expected INTERFACE", ifaceName, ifaceKind)
+					}
+				}
+			}
+		}
+
+		if name == "Manager" {
+			interfaces := typeMap["interfaces"].([]interface{})
+			if len(interfaces) > 0 {
+				for _, iface := range interfaces {
+					ifaceMap := iface.(map[string]interface{})
+					ifaceKind := ifaceMap["kind"].(string)
+					ifaceName := ifaceMap["name"].(string)
+
+					// The key assertion: interfaces must have kind INTERFACE
+					if ifaceKind != "INTERFACE" {
+						t.Errorf("Interface %s referenced by Manager has incorrect kind: %s, expected INTERFACE", ifaceName, ifaceKind)
+					}
+				}
+			}
+		}
+	}
+}
+
+// TestIntrospectionWrapperTypeNames tests that NON_NULL and LIST wrapper types have null names
+func TestIntrospectionWrapperTypeNames(t *testing.T) {
+	g := Graphy{}
+	ctx := context.Background()
+
+	// Register a query that returns various wrapped types
+	g.RegisterQuery(ctx, "getStrings", func(ctx context.Context) []string {
+		return []string{"test"}
+	})
+
+	g.RegisterQuery(ctx, "getOptionalString", func(ctx context.Context) *string {
+		s := "test"
+		return &s
+	})
+
+	// Enable introspection
+	g.EnableIntrospection(ctx)
+
+	// Execute introspection query
+	query := `{
+		__type(name: "__query") {
+			fields {
+				name
+				type {
+					kind
+					name
+					ofType {
+						kind
+						name
+						ofType {
+							kind
+							name
+						}
+					}
+				}
+			}
+		}
+	}`
+
+	result, _ := g.ProcessRequest(ctx, query, "")
+
+	var response map[string]interface{}
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Fatalf("Failed to parse introspection response: %v", err)
+	}
+
+	// Check for errors
+	if errors, ok := response["errors"]; ok {
+		t.Fatalf("Introspection query returned errors: %v", errors)
+	}
+
+	// Extract fields
+	data := response["data"].(map[string]interface{})
+	typeData := data["__type"].(map[string]interface{})
+	fields := typeData["fields"].([]interface{})
+
+	for _, fieldData := range fields {
+		field := fieldData.(map[string]interface{})
+		fieldName := field["name"].(string)
+		typeInfo := field["type"].(map[string]interface{})
+
+		if fieldName == "getStrings" {
+			// Should be NON_NULL -> LIST -> NON_NULL -> string
+			if typeInfo["kind"] != "NON_NULL" {
+				t.Errorf("getStrings: expected outer NON_NULL, got %s", typeInfo["kind"])
+			}
+			if typeInfo["name"] != nil {
+				t.Error("getStrings: NON_NULL wrapper should have null name")
+			}
+
+			listType := typeInfo["ofType"].(map[string]interface{})
+			if listType["kind"] != "LIST" {
+				t.Errorf("getStrings: expected LIST, got %s", listType["kind"])
+			}
+			if listType["name"] != nil {
+				t.Error("getStrings: LIST wrapper should have null name")
+			}
+
+			innerNonNull := listType["ofType"].(map[string]interface{})
+			if innerNonNull["kind"] != "NON_NULL" {
+				t.Errorf("getStrings: expected inner NON_NULL, got %s", innerNonNull["kind"])
+			}
+			if innerNonNull["name"] != nil {
+				t.Error("getStrings: inner NON_NULL wrapper should have null name")
+			}
+		}
+
+		if fieldName == "getOptionalString" {
+			// Should be just SCALAR string (nullable)
+			if typeInfo["kind"] != "SCALAR" {
+				t.Errorf("getOptionalString: expected SCALAR, got %s", typeInfo["kind"])
+			}
+			if typeInfo["name"] != "string" {
+				t.Errorf("getOptionalString: expected name 'string', got %v", typeInfo["name"])
+			}
+		}
+	}
 }

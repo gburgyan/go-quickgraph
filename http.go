@@ -85,6 +85,7 @@ func (g GraphHttpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	// Return the response string.
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(200) // Errors are in the response body, and there may be mixed errors and results.
+
 	_, err = writer.Write([]byte(res))
 	if err != nil {
 		log.Printf("Error writing response: %v", err)

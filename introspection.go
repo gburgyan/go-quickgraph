@@ -192,6 +192,57 @@ func (g *Graphy) populateIntrospection(st *schemaTypes) {
 		// If no subscriptions are registered, set it to nil
 		is.Subscription = nil
 	}
+	// Do a final pass to collect any interface types that were created during processing
+	// but not yet added to is.Types
+	for name, typ := range is.typeLookupByName {
+		found := false
+		for _, existing := range is.Types {
+			if existing.Name != nil && *existing.Name == name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			is.Types = append(is.Types, typ)
+		}
+	}
+
+	// Post-process to ensure concrete types with interfaces are properly linked
+	// This handles cases like Employee implementing IEmployee
+	for _, typ := range is.Types {
+		if typ.Kind == IntrospectionKindObject && typ.Name != nil {
+			typeName := *typ.Name
+			interfaceName := "I" + typeName
+			if interfaceType, ok := is.typeLookupByName[interfaceName]; ok {
+				if interfaceType.Kind == IntrospectionKindInterface {
+					// Check if this type already implements the interface
+					implementsInterface := false
+					for _, iface := range typ.Interfaces {
+						if iface.Name != nil && *iface.Name == interfaceName {
+							implementsInterface = true
+							break
+						}
+					}
+					if !implementsInterface {
+						typ.Interfaces = append(typ.Interfaces, interfaceType)
+					}
+
+					// Check if this type is in the interface's possible types
+					inPossibleTypes := false
+					for _, pt := range interfaceType.PossibleTypes {
+						if pt.Name != nil && *pt.Name == typeName {
+							inPossibleTypes = true
+							break
+						}
+					}
+					if !inPossibleTypes {
+						interfaceType.PossibleTypes = append(interfaceType.PossibleTypes, typ)
+					}
+				}
+			}
+		}
+	}
+
 	g.schemaBuffer.introspectionSchema = is
 }
 
@@ -344,6 +395,26 @@ func (g *Graphy) getIntrospectionBaseType(is *__Schema, tl *typeLookup, io TypeK
 		result.Kind = IntrospectionKindObject
 		g.addIntrospectionSchemaFields(is, tl, io, result)
 
+		// Check if this type should implement its own interface (like Employee implements IEmployee)
+		if io == TypeOutput && len(tl.implementedBy) > 0 && !tl.interfaceOnly {
+			typeName := *result.Name
+			interfaceName := "I" + typeName
+			if interfaceType, ok := is.typeLookupByName[interfaceName]; ok {
+				result.Interfaces = append(result.Interfaces, interfaceType)
+				// Add this type to the interface's possible types if not already present
+				found := false
+				for _, pt := range interfaceType.PossibleTypes {
+					if pt.Name != nil && *pt.Name == typeName {
+						found = true
+						break
+					}
+				}
+				if !found {
+					interfaceType.PossibleTypes = append(interfaceType.PossibleTypes, result)
+				}
+			}
+		}
+
 		// Handle interface references
 		for _, impls := range sortedKeys(tl.implements) {
 			implTl := tl.implements[impls]
@@ -365,12 +436,20 @@ func (g *Graphy) getIntrospectionBaseType(is *__Schema, tl *typeLookup, io TypeK
 			// Look up the interface type by name
 			if interfaceType, ok := is.typeLookupByName[interfaceName]; ok {
 				result.Interfaces = append(result.Interfaces, interfaceType)
+				// Add this type to the interface's possible types
+				interfaceType.PossibleTypes = append(interfaceType.PossibleTypes, result)
 			} else {
-				// If not found, create a reference to it
+				// If not found, create the interface type and add it to the schema
 				interfaceType := &__Type{
 					Name: &interfaceName,
 					Kind: IntrospectionKindInterface,
 				}
+				is.typeLookupByName[interfaceName] = interfaceType
+				// Add fields to the interface based on the embedded type
+				g.addIntrospectionSchemaFields(is, implTl, io, interfaceType)
+				// Add possible types (implementations)
+				interfaceType.PossibleTypes = []*__Type{result}
+				// The concrete types that implement this interface will be added later
 				result.Interfaces = append(result.Interfaces, interfaceType)
 			}
 		}
@@ -380,6 +459,21 @@ func (g *Graphy) getIntrospectionBaseType(is *__Schema, tl *typeLookup, io TypeK
 			typeName := g.schemaBuffer.outputTypeNameLookup[tl]
 			interfaceName := "I" + typeName
 			if interfaceType, ok := is.typeLookupByName[interfaceName]; ok {
+				result.Interfaces = append(result.Interfaces, interfaceType)
+				// Add this type to the interface's possible types
+				interfaceType.PossibleTypes = append(interfaceType.PossibleTypes, result)
+			} else {
+				// Create the interface if it doesn't exist yet
+				interfaceType := &__Type{
+					Name: &interfaceName,
+					Kind: IntrospectionKindInterface,
+				}
+				is.typeLookupByName[interfaceName] = interfaceType
+				// Add fields to the interface based on this type
+				g.addIntrospectionSchemaFields(is, tl, io, interfaceType)
+				// Initialize possible types with this concrete type
+				interfaceType.PossibleTypes = []*__Type{result}
+				// Add the interface to this type's interfaces
 				result.Interfaces = append(result.Interfaces, interfaceType)
 			}
 		}

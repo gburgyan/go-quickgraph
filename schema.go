@@ -52,7 +52,14 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) string {
 		procByMode[function.mode] = append(byMode, &function)
 	}
 
-	for mode, functions := range procByMode {
+	// Process modes in a consistent order: Query, Mutation, Subscription
+	modes := []GraphFunctionMode{ModeQuery, ModeMutation, ModeSubscription}
+	for _, mode := range modes {
+		functions, exists := procByMode[mode]
+		if !exists || len(functions) == 0 {
+			continue
+		}
+
 		sb.WriteString("type ")
 		switch mode {
 		case ModeQuery:

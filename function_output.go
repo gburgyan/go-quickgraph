@@ -32,7 +32,17 @@ func (f *graphFunction) processCallOutput(ctx context.Context, req *request, fil
 	}
 
 	if (kind == reflect.Pointer) && !callResult.IsNil() {
-		// If this is a pointer, dereference it.
+		// Check if the pointed-to type is a struct - if so, let processOutputStruct handle it
+		// This preserves pointer types for type discovery
+		elemKind := callResult.Elem().Kind()
+		if elemKind == reflect.Struct {
+			sr, err := f.processOutputStruct(ctx, req, filter, callResult)
+			if err != nil {
+				return nil, AugmentGraphError(err, fmt.Sprintf("error processing struct"), pos)
+			}
+			return sr, nil
+		}
+		// For non-struct pointers, dereference as before
 		callResult = callResult.Elem()
 		kind = callResult.Kind() // Update the kind
 	}
@@ -101,8 +111,34 @@ func (f *graphFunction) processOutputStruct(ctx context.Context, req *request, f
 		return nil, nil
 	}
 
-	// Dereference interfaces and pointers to get to the actual struct
-	for structValue.Kind() == reflect.Interface || structValue.Kind() == reflect.Ptr {
+	// Dereference interfaces to get to the actual value
+	for structValue.Kind() == reflect.Interface {
+		if structValue.IsNil() {
+			return nil, nil
+		}
+		structValue = structValue.Elem()
+	}
+
+	// Apply type discovery before dereferencing pointers
+	// This is important because TypeDiscoverable might be implemented on pointer types
+	if structValue.CanInterface() {
+		// fmt.Printf("DEBUG: Before discovery - type: %v, value type: %T\n", structValue.Type(), structValue.Interface())
+		if actual, ok := DiscoverType(structValue.Interface()); ok && actual != nil {
+			// Get a reflect.Value from the discovered type
+			actualValue := reflect.ValueOf(actual)
+			// Only use the discovered type if it's valid and not nil
+			if actualValue.IsValid() && (!actualValue.CanInterface() || actualValue.Interface() != nil) {
+				// Check if we actually discovered a different type
+				if actualValue.Type() != structValue.Type() {
+					// fmt.Printf("DEBUG: After discovery - type: %v, value type: %T\n", actualValue.Type(), actual)
+					structValue = actualValue
+				}
+			}
+		}
+	}
+
+	// Now dereference pointers to get to the actual struct
+	for structValue.Kind() == reflect.Ptr {
 		if structValue.IsNil() {
 			return nil, nil
 		}
@@ -138,7 +174,15 @@ func (f *graphFunction) processOutputStruct(ctx context.Context, req *request, f
 		} else if fragmentCall.FragmentRef != nil {
 			f = req.stub.fragments[*fragmentCall.FragmentRef].Definition
 		}
-		if found, tl := fieldMap.ImplementsInterface(f.TypeName); found {
+		// Check if the current type matches the fragment type name OR implements it as an interface
+		// This handles both concrete types (e.g., ... on Developer) and interfaces (e.g., ... on Employee)
+		if strings.EqualFold(typeName, f.TypeName) {
+			// Direct type match - use the current fieldMap
+			for _, field := range f.Filter.Fields {
+				fieldsToProcess = append(fieldsToProcess, field)
+			}
+		} else if found, tl := fieldMap.ImplementsInterface(f.TypeName); found {
+			// Interface implementation match
 			fieldMap = tl
 			for _, field := range f.Filter.Fields {
 				fieldsToProcess = append(fieldsToProcess, field)

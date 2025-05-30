@@ -367,6 +367,141 @@ Regardless of how the function is defined, it is required to return a struct, a 
 
 There is a special case where a function can return an `any` type. This is valid from a runtime perspective as the type of the object can be determined at runtime, but it precludes schema generation for the result as the type of the result cannot be determined by the signature of the function.
 
+### GraphQL Interfaces and Unions
+
+GraphQL supports interfaces and unions, which allow a field to return different concrete types. `go-quickgraph` provides multiple approaches to handle these cases:
+
+#### Approach 1: Multiple Return Values (Union-like)
+
+The simplest approach is to return multiple pointers where only one is non-nil:
+
+```go
+func CreateContent(input ContentInput) (*Article, *Video, error) {
+    if input.Type == "article" {
+        article := &Article{Title: input.Title, Body: input.Body}
+        return article, nil, nil
+    } else {
+        video := &Video{Title: input.Title, Duration: input.Duration}
+        return nil, video, nil
+    }
+}
+```
+
+**Pros:**
+- Simple and explicit
+- Clear at the function signature what types can be returned
+- No additional setup required
+
+**Cons:**
+- Function signatures become unwieldy with many types
+- Callers must check multiple return values
+- Not idiomatic Go for functions with many possible return types
+
+#### Approach 2: Explicit Union Types
+
+Define a struct with "Union" suffix containing pointers to possible types:
+
+```go
+type ContentResultUnion struct {
+    Article *Article
+    Video   *Video
+}
+
+func CreateContent(input ContentInput) (ContentResultUnion, error) {
+    if input.Type == "article" {
+        return ContentResultUnion{Article: &Article{Title: input.Title}}, nil
+    } else {
+        return ContentResultUnion{Video: &Video{Title: input.Title}}, nil
+    }
+}
+```
+
+**Pros:**
+- Clean function signatures
+- Type-safe at compile time
+- Easy to extend with new types
+
+**Cons:**
+- Requires defining union types
+- Callers must check which field is non-nil
+
+#### Approach 3: Interface with Type Discovery
+
+For GraphQL interfaces (common fields with different implementations), use embedded structs with optional type discovery:
+
+```go
+// Base type with common fields
+type Content struct {
+    ID    string
+    Title string
+    // Optional: enable type discovery
+    actualType interface{} `json:"-" graphy:"-"`
+}
+
+// Implement TypeDiscoverable for runtime type resolution
+func (c *Content) ActualType() interface{} {
+    if c.actualType != nil {
+        return c.actualType
+    }
+    return c
+}
+
+// Concrete types embed the base type
+type Article struct {
+    Content
+    Body string
+}
+
+type Video struct {
+    Content
+    Duration int
+}
+
+// Constructor enables type discovery
+func NewArticle(id, title, body string) *Article {
+    a := &Article{
+        Content: Content{ID: id, Title: title},
+        Body:    body,
+    }
+    a.Content.actualType = a // Enable type discovery
+    return a
+}
+
+// Functions can return the base type
+func GetContent(id string) (*Content, error) {
+    // In practice, load from database
+    if id == "article-1" {
+        article := NewArticle(id, "My Article", "Article body...")
+        return &article.Content, nil
+    } else {
+        video := NewVideo(id, "My Video", 120)
+        return &video.Content, nil
+    }
+}
+```
+
+**Pros:**
+- Natural Go interfaces and embedding
+- Functions return single, clean types
+- Supports GraphQL fragments and introspection
+- Optional - only add type discovery where needed
+- Zero overhead for types that don't need discovery
+
+**Cons:**
+- Requires constructor functions for discoverable types
+- Additional field in base types (8 bytes per instance)
+- Slightly more complex setup
+
+#### When to Use Each Approach
+
+1. **Multiple Return Values**: Best for simple cases with 2-3 types, especially for mutations that create different types based on input.
+
+2. **Union Types**: Ideal when you have a clear set of unrelated types that can be returned, like search results that might return Products, Users, or Orders.
+
+3. **Type Discovery**: Perfect for GraphQL interfaces where types share common fields and behavior. This approach scales well and provides the best GraphQL experience with proper fragment support.
+
+The type discovery approach is particularly powerful because it allows your Go code to follow natural patterns (returning interface or base types) while still providing full GraphQL type information at runtime.
+
 ## Output Functions
 
 When calling a function to service a request, that function returns the value that is processed into the response -- that part is obvious. Another feature is that those objects can have functions on them as well. This plays into the overall Graph functionality that is exposed by `Graphy`. These receiver functions follow the same pattern as above.

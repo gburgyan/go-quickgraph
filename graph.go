@@ -74,6 +74,7 @@ type GraphTypeInfo struct {
 
 var ignoredFunctions = map[string]bool{
 	"GraphTypeExtension": true,
+	"ActualType":         true,
 }
 
 var contextType = reflect.TypeOf((*context.Context)(nil)).Elem()

@@ -236,6 +236,11 @@ func (g *Graphy) baseFieldLookup(field reflect.StructField, index []int) fieldLo
 	if graphyTag := field.Tag.Get("graphy"); graphyTag != "" {
 		graphyParts := strings.Split(graphyTag, ",")
 
+		// Check if the first part is "-" which means exclude the field
+		if len(graphyParts) > 0 && graphyParts[0] == "-" {
+			return fieldLookup{}
+		}
+
 		// First part, if it has no special meaning, is the name of the field.
 		// All the parts are name=value pairs (except the first part, which can be special).
 		// If there are quotes around the value, they are stripped.

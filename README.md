@@ -1,8 +1,93 @@
 ![Build status](https://github.com/gburgyan/go-quickgraph/actions/workflows/go.yml/badge.svg) [![Go Report Card](https://goreportcard.com/badge/github.com/gburgyan/go-quickgraph)](https://goreportcard.com/report/github.com/gburgyan/go-quickgraph) [![PkgGoDev](https://pkg.go.dev/badge/github.com/gburgyan/go-quickgraph)](https://pkg.go.dev/github.com/gburgyan/go-quickgraph)
 
-# About
+# go-quickgraph
 
-`go-quickgraph` presents a simple code-first library for creating a GraphQL service in Go. The intent is to have a simple way to create a GraphQL service without having to write a lot of boilerplate code. Since this is a code-first implementation, the library is also able to generate a GraphQL schema from the set-up GraphQL environment.
+**A code-first GraphQL library for Go** - Write regular Go functions and structs, get a full GraphQL API.
+
+## Quick Start
+
+```bash
+go get github.com/gburgyan/go-quickgraph
+```
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/gburgyan/go-quickgraph"
+)
+
+type User struct {
+    Name  string `json:"name"
+    Email string `json:"email"`
+}
+
+func main() {
+    ctx := context.Background()
+    g := quickgraph.Graphy{}
+    
+    // Register a simple query - just a regular Go function!
+    g.RegisterQuery(ctx, "user", func(ctx context.Context, id int) *User {
+        return &User{Name: "Alice", Email: "alice@example.com"}
+    }, "id")
+    
+    // That's it! You have a GraphQL API
+    query := `{ user(id: 1) { name email } }`
+    result, _ := g.ProcessRequest(ctx, query, "")
+    fmt.Println(result) // {"data":{"user":{"name":"Alice","email":"alice@example.com"}}}
+}
+```
+
+Want to serve it over HTTP? Just add:
+
+```go
+g.EnableIntrospection(ctx) // Enable GraphQL playground
+http.Handle("/graphql", g.HttpHandler())
+http.ListenAndServe(":8080", nil)
+```
+
+Now visit http://localhost:8080/graphql to explore your API with GraphQL playground!
+
+## Why Code-First?
+
+**Traditional Schema-First Approach:**
+1. Write GraphQL schema (SDL)
+2. Generate Go code from schema
+3. Implement resolver interfaces
+4. Keep schema and code in sync
+
+**go-quickgraph Code-First Approach:**
+1. Write regular Go functions and structs
+2. That's it - GraphQL schema is generated automatically!
+
+### Benefits
+
+✅ **No Schema Files** - Your Go code is the single source of truth
+
+✅ **Type Safety** - Full Go type checking, no runtime type mismatches
+
+✅ **IDE Support** - Autocomplete, refactoring, and all your favorite Go tools work naturally
+
+✅ **No Code Generation** - No build steps, no generated files to maintain
+
+✅ **Minimal Boilerplate** - Register a function, it becomes a GraphQL operation
+
+## About
+
+`go-quickgraph` is a code-first GraphQL library that generates your GraphQL schema from your Go code. Write idiomatic Go, get a fully-compliant GraphQL API.
+
+## Table of Contents
+
+- [Quick Start](#quick-start)
+- [Why Code-First?](#why-code-first)
+- [Installation](#installation)
+- [Basic Examples](#basic-examples)
+- [Design Goals](#design-goals)
+- [Common Patterns](#common-patterns)
+- [Advanced Features](#advanced-features)
+- [API Reference](#api-reference)
 
 # Design Goals
 
@@ -22,88 +107,223 @@ The last point is critical in thinking about how the library is built. It relies
 go get github.com/gburgyan/go-quickgraph
 ```
 
-# Usage and Examples
+Requires Go 1.21 or later.
 
-The examples here, as well as many of the unit tests are based directly on the examples from the GraphQL [documentation examples](https://graphql.org/learn/queries/).
+# Basic Examples
 
-An example service that uses this can be found in the https://github.com/gburgyan/go-quickgraph-sample repo.
+## 1. Simple Query
+
+The simplest possible GraphQL API - just register a Go function:
 
 ```go
+// Define your data types
+type Product struct {
+    ID    int     `json:"id"`
+    Name  string  `json:"name"`
+    Price float64 `json:"price"`
+}
+
+// Create and configure your GraphQL API
+g := quickgraph.Graphy{}
+g.RegisterQuery(ctx, "product", func(ctx context.Context, id int) *Product {
+    // Your business logic here
+    return &Product{ID: id, Name: "Widget", Price: 9.99}
+}, "id")
+```
+
+That's it! This creates a GraphQL query:
+```graphql
+query {
+  product(id: 123) {
+    id
+    name
+    price
+  }
+}
+```
+
+## 2. Query with Multiple Parameters
+
+```go
+// Using multiple named parameters
+g.RegisterQuery(ctx, "search", func(ctx context.Context, query string, limit int) []Product {
+    // Search logic here
+    return searchProducts(query, limit)
+}, "query", "limit")
+
+// Or use a struct for parameters (recommended for 3+ params)
+type SearchInput struct {
+    Query  string   `json:"query"`
+    Limit  int      `json:"limit"`
+    Filter []string `json:"filter"`
+}
+
+g.RegisterQuery(ctx, "searchProducts", func(ctx context.Context, input SearchInput) []Product {
+    // Search with complex parameters
+    return advancedSearch(input)
+}, "input")
+```
+
+## 3. Mutations
+
+```go
+type CreateUserInput struct {
+    Name  string `json:"name"`
+    Email string `json:"email"`
+}
+
+// Mutations follow the same pattern as queries
+g.RegisterMutation(ctx, "createUser", func(ctx context.Context, input CreateUserInput) (*User, error) {
+    // Validation
+    if input.Email == "" {
+        return nil, fmt.Errorf("email is required")
+    }
+    
+    // Create user
+    user := &User{
+        ID:    generateID(),
+        Name:  input.Name,
+        Email: input.Email,
+    }
+    saveUser(user)
+    return user, nil
+}, "input")
+```
+
+## 4. Working with Enums
+
+```go
+type Status string
+
+// Implement EnumValues for GraphQL schema generation
+func (s Status) EnumValues() []string {
+    return []string{"ACTIVE", "INACTIVE", "PENDING"}
+}
+
+type User struct {
+    Name   string `json:"name"`
+    Status Status `json:"status"`
+}
+```
+
+## 5. Nested Objects and Relationships
+
+```go
+type Author struct {
+    ID   int    `json:"id"`
+    Name string `json:"name"`
+}
+
+type Book struct {
+    Title  string  `json:"title"`
+    Author *Author `json:"author"`  // Nested object
+}
+
+// Methods on structs become GraphQL fields
+func (a *Author) Books(ctx context.Context) []Book {
+    // Load books for this author
+    return getBooksByAuthor(a.ID)
+}
+
+// Register the query
+g.RegisterQuery(ctx, "author", getAuthorByID, "id")
+```
+
+This automatically generates the schema:
+```graphql
+type Author {
+  id: Int!
+  name: String!
+  books: [Book!]!
+}
+
+type Book {
+  title: String!
+  author: Author
+}
+```
+
+## 6. Subscriptions (Real-time Updates)
+
+```go
+// Subscriptions return channels
+g.RegisterSubscription(ctx, "orderStatus", func(ctx context.Context, orderID string) (<-chan OrderUpdate, error) {
+    updates := make(chan OrderUpdate)
+    
+    go func() {
+        defer close(updates)
+        // Send updates when order status changes
+        for {
+            select {
+            case <-ctx.Done():
+                return
+            case update := <-getOrderUpdates(orderID):
+                updates <- update
+            }
+        }
+    }()
+    
+    return updates, nil
+}, "orderID")
+```
+
+## Complete Example
+
+Here's a complete example from the GraphQL [documentation examples](https://graphql.org/learn/queries/):
+
+```go
+package main
+
+import (
+    "context"
+    "net/http"
+    "github.com/gburgyan/go-quickgraph"
+)
+
 type Character struct {
-	Id        string       `json:"id"`
-	Name      string       `json:"name"`
-	Friends   []*Character `json:"friends"`
-	AppearsIn []Episode    `json:"appearsIn"`
+    Id        string       `json:"id"`
+    Name      string       `json:"name"`
+    Friends   []*Character `json:"friends"`
+    AppearsIn []Episode    `json:"appearsIn"`
 }
 
 type Episode string
 
-// Go doesn't have a way reflecting these values, so we need to implement
-// the EnumValues interface if we want to use them in our GraphQL schema.
-// If not provided, the library will use the string representation of the
-// enum values.
 func (e Episode) EnumValues() []string {
-    return []string{
-        "NEWHOPE",
-        "EMPIRE",
-        "JEDI",
+    return []string{"NEWHOPE", "EMPIRE", "JEDI"}
+}
+
+func GetHero(ctx context.Context, episode Episode) *Character {
+    // Return different heroes based on episode
+    if episode == "EMPIRE" {
+        return &Character{
+            Id:        "1000",
+            Name:      "Luke Skywalker",
+            AppearsIn: []Episode{"NEWHOPE", "EMPIRE", "JEDI"},
+        }
+    }
+    return &Character{
+        Id:        "2001",
+        Name:      "R2-D2",
+        AppearsIn: []Episode{"NEWHOPE", "EMPIRE", "JEDI"},
     }
 }
 
-func HeroProvider(ctx context.Context) Character {
-	// Logic for resolving the Hero query
-}
-
-// How to manually run a query.
-func RunExampleQuery(ctx context.Context) (string, err){
-    g := Graphy{}
-    g.RegisterQuery(ctx, "hero", HeroProvider)
-    input := `
-    {
-      hero {
-        name
-      }
-    }`
-    return g.ProcessRequest(ctx, input, "") // The last parameter is the variable JSON (optional)
-}
-
 func main() {
-	ctx := context.Background()
-
-	graph := quickgraph.Graphy{}
-	graph.RegisterQuery(ctx, "hero", HeroProvider)
-	graph.EnableIntrospection(ctx)
-
-	http.Handle("/graphql", graph.HttpHandler())
-	err := http.ListenAndServe(":8080", nil)
-	if err != nil {
-		panic(err)
-	}
+    ctx := context.Background()
+    
+    // Create GraphQL server
+    g := quickgraph.Graphy{}
+    g.RegisterQuery(ctx, "hero", GetHero, "episode")
+    g.EnableIntrospection(ctx)
+    
+    // Serve GraphQL API
+    http.Handle("/graphql", g.HttpHandler())
+    http.ListenAndServe(":8080", nil)
 }
-
 ```
 
-## What's going on here?
-
-When we define the `Character` type, it's simply a Go struct. We have decorated the struct's fields with the standard `json` tags that will be used to serialize the result to JSON. If those tags are omitted, the library will use the field names as the JSON keys.
-
-There is also an enumeration for the `Episode`. Go doesn't natively support enums, so we have made a type that implements the `StringEnumValues` interface. This is used to generate the GraphQL schema as well as for soe validation during the processing of the request. This, as with the `json` tags, is also optional. The fallback is to just treat things as strings and leave the validation to the functions that process the request.
-
-The `HeroProvider` function is the function that will be called when the `hero` query is processed. The function takes a context as a parameter, and returns a `Character` struct. This is the primary example of the "code-first" approach. We write the Go functions and structs, and the library takes care of the rest. There are ways to tweak the behavior of things, but the defaults should be sufficient for many use cases.
-
-Finally, we set up a `Graphy` object and tell it about the function that will process the `hero` query. We then call the `ProcessRequest` function with the GraphQL query and the variable JSON (if any). The result is a JSON string that can be returned to the client.
-
-In normal usage, we would initialize the `Graphy` object once, and then use it to process multiple requests. The `Graphy` object is thread-safe, so it can be used concurrently. It also caches all the reflection information that instructs it how to process the requests, so it is more efficient to reuse the same object. Additionally, it caches the parsed *queries* as well so if the same query is processed multiple times, it will be faster. This allows for the same query to be resused with different variable values.
-
-Finally, `Graphy` provides a default HTTP handler that works with the native Go HTTP server. It allows for both schema output if it's called with a GET request, and a POST will execute the query.
-
-To enable schema generation with the default HTTP server, you must also enable introspection:
-
-```go
-graph.EnableIntrospection(ctx)
-```
-
-This is to ensure that if you don't want the be able to serve up the introspection schema, you won't get schema generation either. These are enabled together as they have the potential to "leak" internal information.
+For more examples, check out the [go-quickgraph-sample](https://github.com/gburgyan/go-quickgraph-sample) repository.
 
 # Theory of Operation
 

@@ -122,7 +122,6 @@ func (f *graphFunction) processOutputStruct(ctx context.Context, req *request, f
 	// Apply type discovery before dereferencing pointers
 	// This is important because TypeDiscoverable might be implemented on pointer types
 	if structValue.CanInterface() {
-		// fmt.Printf("DEBUG: Before discovery - type: %v, value type: %T\n", structValue.Type(), structValue.Interface())
 		if actual, ok := DiscoverType(structValue.Interface()); ok && actual != nil {
 			// Get a reflect.Value from the discovered type
 			actualValue := reflect.ValueOf(actual)

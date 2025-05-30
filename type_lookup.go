@@ -438,10 +438,6 @@ func (t *fieldLookup) fetchGraphFunction(ctx context.Context, req *request, v re
 		return nil, NewGraphError("invalid value after field navigation", pos)
 	}
 
-	// Debug: log the value state before calling
-	// fmt.Printf("DEBUG fetchGraphFunction: v.Type=%v, v.Kind=%v, v.CanAddr=%v, method=%v\n",
-	//     v.Type(), v.Kind(), v.CanAddr(), t.name)
-
 	// Call the method with the navigated value as the receiver
 	// The Call function will handle ensuring the receiver type matches what the method expects
 	// (e.g., converting Employee to *Employee if needed)

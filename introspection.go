@@ -315,6 +315,9 @@ func (g *Graphy) getIntrospectionBaseType(is *__Schema, tl *typeLookup, io TypeK
 	switch {
 	case len(tl.union) > 0:
 		result.Kind = IntrospectionKindUnion
+		// Collect concrete types to avoid duplicates
+		concreteTypes := make(map[string]*__Type)
+
 		for _, name := range sortedKeys(tl.union) {
 			ul := tl.union[name]
 			// For union possibleTypes, we need to get the actual type that will be in the union
@@ -332,25 +335,46 @@ func (g *Graphy) getIntrospectionBaseType(is *__Schema, tl *typeLookup, io TypeK
 				}
 			}
 
-			// For types with implementations, we might need to use the interface type
-			if hasImplementations && !ul.interfaceOnly {
-				// This type has implementations, so check if we should report the interface
-				interfaceName := "I" + *baseType.Name
-				if interfaceType, ok := is.typeLookupByName[interfaceName]; ok {
-					// For the failing test case, it expects the interface wrapped in NON_NULL
-					if ul.array == nil && !ul.isPointer {
-						wrappedType := g.wrapType(interfaceType, "", IntrospectionKindNonNull)
-						result.PossibleTypes = append(result.PossibleTypes, wrappedType)
-					} else {
-						result.PossibleTypes = append(result.PossibleTypes, interfaceType)
+			// For types with implementations, we need to add the concrete implementations
+			// not the interface itself (unions can't contain interfaces)
+			if hasImplementations {
+				// Get the actual type lookup to access implementations
+				checkType := ul
+				if ul.rootType != nil && ul.rootType != ul.typ {
+					if rootLookup, ok := g.typeLookups[ul.rootType]; ok {
+						checkType = rootLookup
 					}
-					continue
+				}
+
+				// Add all implementations
+				for _, impl := range checkType.implementedBy {
+					implType := g.getIntrospectionBaseType(is, impl, io)
+					if implType.Name != nil {
+						concreteTypes[*implType.Name] = implType
+					}
+				}
+
+				// If not interface-only, include the concrete type too
+				if !checkType.interfaceOnly && baseType.Name != nil {
+					concreteTypes[*baseType.Name] = baseType
+				}
+			} else {
+				// For regular types (not interfaces), just add the base type
+				if baseType.Name != nil {
+					concreteTypes[*baseType.Name] = baseType
 				}
 			}
+		}
 
-			// For regular types (not interfaces), just add the base type
-			// Unions can't have nullable members in their possibleTypes list
-			result.PossibleTypes = append(result.PossibleTypes, baseType)
+		// Sort the concrete types by name and add to possibleTypes
+		var typeNames []string
+		for name := range concreteTypes {
+			typeNames = append(typeNames, name)
+		}
+		sort.Strings(typeNames)
+
+		for _, name := range typeNames {
+			result.PossibleTypes = append(result.PossibleTypes, concreteTypes[name])
 		}
 	case len(tl.implementedBy) > 0:
 		result.Kind = IntrospectionKindInterface
@@ -573,8 +597,16 @@ func (g *Graphy) getIntrospectionModifiedType(is *__Schema, tl *typeLookup, io T
 
 	// For output types with implementations (not interface-only), we should return the interface type
 	// This matches the behavior in schemaRefForType
-	if io == TypeOutput && len(tl.implementedBy) > 0 && !tl.interfaceOnly {
-		baseName := g.schemaBuffer.outputTypeNameLookup[tl]
+	checkType := tl
+	if tl.rootType != nil && tl.rootType != tl.typ {
+		// For pointer/slice types, check the underlying type
+		if rootLookup, ok := g.typeLookups[tl.rootType]; ok {
+			checkType = rootLookup
+		}
+	}
+
+	if io == TypeOutput && len(checkType.implementedBy) > 0 && !checkType.interfaceOnly {
+		baseName := g.schemaBuffer.outputTypeNameLookup[checkType]
 		interfaceName := "I" + baseName
 		if interfaceType, ok := is.typeLookupByName[interfaceName]; ok {
 			ret = interfaceType

@@ -250,7 +250,13 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
             }
           ],
           "inputFields": [],
-          "interfaces": [],
+          "interfaces": [
+            {
+              "kind": "INTERFACE",
+              "name": "ICharacter",
+              "ofType": null
+            }
+          ],
           "kind": "OBJECT",
           "name": "Character",
           "possibleTypes": []
@@ -572,8 +578,8 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
                   "kind": "LIST",
                   "name": null,
                   "ofType": {
-                    "kind": "OBJECT",
-                    "name": "Character",
+                    "kind": "INTERFACE",
+                    "name": "ICharacter",
                     "ofType": null
                   }
                 }
@@ -623,6 +629,136 @@ func TestGraphy_Introspection_Schema(t *testing.T) {
           "kind": "OBJECT",
           "name": "Human",
           "possibleTypes": []
+        },
+        {
+          "description": null,
+          "enumValues": [],
+          "fields": [
+            {
+              "args": [
+                {
+                  "defaultValue": null,
+                  "description": null,
+                  "name": "arg1",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "int",
+                      "ofType": null
+                    }
+                  }
+                }
+              ],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "FriendsConnection",
+              "type": {
+                "kind": "OBJECT",
+                "name": "FriendsConnection",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "appearsIn",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "ENUM",
+                      "name": "episode",
+                      "ofType": null
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "friends",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "INTERFACE",
+                    "name": "ICharacter",
+                    "ofType": null
+                  }
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "id",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "string",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "name",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "string",
+                  "ofType": null
+                }
+              }
+            }
+          ],
+          "inputFields": [],
+          "interfaces": [],
+          "kind": "INTERFACE",
+          "name": "ICharacter",
+          "possibleTypes": [
+            {
+              "kind": "OBJECT",
+              "name": "Droid",
+              "ofType": null
+            },
+            {
+              "kind": "OBJECT",
+              "name": "Human",
+              "ofType": null
+            },
+            {
+              "kind": "OBJECT",
+              "name": "Character",
+              "ofType": null
+            }
+          ]
         },
         {
           "description": null,
@@ -1228,8 +1364,8 @@ func TestGraphy_Introspection_Interface(t *testing.T) {
                   "kind": "LIST",
                   "name": null,
                   "ofType": {
-                    "kind": "OBJECT",
-                    "name": "Character",
+                    "kind": "INTERFACE",
+                    "name": "ICharacter",
                     "ofType": null
                   }
                 }
@@ -1269,7 +1405,13 @@ func TestGraphy_Introspection_Interface(t *testing.T) {
             }
           ],
           "inputFields": [],
-          "interfaces": [],
+          "interfaces": [
+            {
+              "kind": "INTERFACE",
+              "name": "ICharacter",
+              "ofType": null
+            }
+          ],
           "kind": "OBJECT",
           "name": "Character",
           "possibleTypes": []
@@ -1285,8 +1427,8 @@ func TestGraphy_Introspection_Interface(t *testing.T) {
               "isDeprecated": false,
               "name": "node",
               "type": {
-                "kind": "OBJECT",
-                "name": "Character",
+                "kind": "INTERFACE",
+                "name": "ICharacter",
                 "ofType": null
               }
             }
@@ -1365,8 +1507,8 @@ func TestGraphy_Introspection_Interface(t *testing.T) {
                   "kind": "LIST",
                   "name": null,
                   "ofType": {
-                    "kind": "OBJECT",
-                    "name": "Character",
+                    "kind": "INTERFACE",
+                    "name": "ICharacter",
                     "ofType": null
                   }
                 }
@@ -1548,8 +1690,8 @@ func TestGraphy_Introspection_Interface(t *testing.T) {
                   "kind": "LIST",
                   "name": null,
                   "ofType": {
-                    "kind": "OBJECT",
-                    "name": "Character",
+                    "kind": "INTERFACE",
+                    "name": "ICharacter",
                     "ofType": null
                   }
                 }
@@ -1596,6 +1738,11 @@ func TestGraphy_Introspection_Interface(t *testing.T) {
             {
               "kind": "OBJECT",
               "name": "Character",
+              "ofType": null
+            },
+            {
+              "kind": "OBJECT",
+              "name": "Droid",
               "ofType": null
             },
             {
@@ -1654,13 +1801,14 @@ func TestGraphy_Introspection_Interface(t *testing.T) {
           "name": "sampleResultUnion",
           "possibleTypes": [
             {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "kind": "INTERFACE",
-                "name": "ICharacter",
-                "ofType": null
-              }
+              "kind": "OBJECT",
+              "name": "Character",
+              "ofType": null
+            },
+            {
+              "kind": "OBJECT",
+              "name": "Droid",
+              "ofType": null
             }
           ]
         },

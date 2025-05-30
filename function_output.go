@@ -181,9 +181,10 @@ func (f *graphFunction) processOutputStruct(ctx context.Context, req *request, f
 			for _, field := range f.Filter.Fields {
 				fieldsToProcess = append(fieldsToProcess, field)
 			}
-		} else if found, tl := fieldMap.ImplementsInterface(f.TypeName); found {
+		} else if found, _ := fieldMap.ImplementsInterface(f.TypeName); found {
 			// Interface implementation match
-			fieldMap = tl
+			// Don't change fieldMap - the current type's fieldMap should already include
+			// methods from embedded types
 			for _, field := range f.Filter.Fields {
 				fieldsToProcess = append(fieldsToProcess, field)
 			}

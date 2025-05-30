@@ -606,10 +606,13 @@ func (g *Graphy) getIntrospectionModifiedType(is *__Schema, tl *typeLookup, io T
 	}
 
 	if io == TypeOutput && len(checkType.implementedBy) > 0 && !checkType.interfaceOnly {
-		baseName := g.schemaBuffer.outputTypeNameLookup[checkType]
-		interfaceName := "I" + baseName
-		if interfaceType, ok := is.typeLookupByName[interfaceName]; ok {
-			ret = interfaceType
+		// Ensure we have the schema buffer (it should be available from populateIntrospection)
+		if g.schemaBuffer != nil && g.schemaBuffer.outputTypeNameLookup != nil {
+			baseName := g.schemaBuffer.outputTypeNameLookup[checkType]
+			interfaceName := "I" + baseName
+			if interfaceType, ok := is.typeLookupByName[interfaceName]; ok {
+				ret = interfaceType
+			}
 		}
 	}
 

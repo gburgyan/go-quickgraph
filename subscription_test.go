@@ -207,6 +207,58 @@ type Order struct {
 	Total  float64
 }
 
+// TestSubscriptionImmediateContextCancellation tests that subscriptions handle immediate context cancellation
+func TestSubscriptionImmediateContextCancellation(t *testing.T) {
+	g := Graphy{}
+	ctx := context.Background()
+
+	g.RegisterSubscription(ctx, "blockingSubscription", func(ctx context.Context) (<-chan int, error) {
+		ch := make(chan int)
+
+		go func() {
+			defer close(ch)
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					time.Sleep(1 * time.Second) // Long delay to test blocking
+				}
+			}
+		}()
+
+		return ch, nil
+	})
+
+	// Create context that's already cancelled
+	subCtx, cancel := context.WithCancel(ctx)
+	cancel() // Cancel immediately
+
+	query := `subscription { blockingSubscription }`
+	msgChan, err := g.ProcessSubscription(subCtx, query, "")
+	assert.NoError(t, err)
+
+	// Should get no messages because context is already cancelled
+	messageCount := 0
+	timeout := time.After(100 * time.Millisecond)
+
+	for {
+		select {
+		case _, ok := <-msgChan:
+			if !ok {
+				goto done // Channel closed
+			}
+			messageCount++
+		case <-timeout:
+			goto done
+		}
+	}
+done:
+
+	// Should have received no messages due to immediate cancellation
+	assert.Equal(t, 0, messageCount)
+}
+
 // TestMultipleSubscriptionsNotAllowed tests that only one subscription per request is allowed
 func TestMultipleSubscriptionsNotAllowed(t *testing.T) {
 	g := Graphy{}

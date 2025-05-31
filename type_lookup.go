@@ -133,7 +133,13 @@ func (g *Graphy) processBaseTypeFieldLookup(typ reflect.Type, prevIndex []int, t
 			capturedField := field
 			capturedIndex := index
 			deferredAnonymous = append(deferredAnonymous, func() {
-				g.populateTypeLookup(capturedField.Type, capturedIndex, tl)
+				// Handle pointer types in anonymous fields - if the field type is a pointer,
+				// we need to dereference it to get the actual struct type before processing
+				fieldType := capturedField.Type
+				if fieldType.Kind() == reflect.Ptr {
+					fieldType = fieldType.Elem()
+				}
+				g.populateTypeLookup(fieldType, capturedIndex, tl)
 			})
 			// Get the name of the type of the field.
 			name := field.Type.Name()

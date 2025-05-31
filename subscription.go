@@ -59,15 +59,20 @@ func (r *request) executeSubscription(ctx context.Context) (*SubscriptionResult,
 	go func() {
 		defer close(outChan)
 
+		// Create select cases for both context cancellation and channel reception
+		selectCases := []reflect.SelectCase{
+			{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(ctx.Done())},
+			{Dir: reflect.SelectRecv, Chan: channelValue},
+		}
+
 		// Listen for values from the subscription channel
 		for {
-			select {
-			case <-ctx.Done():
+			chosen, value, ok := reflect.Select(selectCases)
+			switch chosen {
+			case 0: // ctx.Done()
 				// Context cancelled, stop processing
 				return
-			default:
-				// Try to receive from the channel
-				value, ok := channelValue.Recv()
+			case 1: // channelValue
 				if !ok {
 					// Channel closed, subscription complete
 					return

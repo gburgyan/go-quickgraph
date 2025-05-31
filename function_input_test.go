@@ -326,7 +326,7 @@ func Test_parseIntIntoValue_Overflow(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			v := reflect.ValueOf(tt.target).Elem()
-			err := parseIntIntoValue(tt.value, v)
+			err := parseIntIntoValue(nil, tt.value, v)
 
 			if tt.wantError {
 				assert.Error(t, err)
@@ -374,7 +374,7 @@ func Test_parseIntIntoValue_Float(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			v := reflect.ValueOf(tt.target).Elem()
-			err := parseIntIntoValue(tt.value, v)
+			err := parseIntIntoValue(nil, tt.value, v)
 
 			assert.NoError(t, err)
 
@@ -472,7 +472,7 @@ func Test_parseIntIntoValue_UnsignedTypes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			v := reflect.ValueOf(tt.target).Elem()
-			err := parseIntIntoValue(tt.value, v)
+			err := parseIntIntoValue(nil, tt.value, v)
 
 			if tt.wantError {
 				assert.Error(t, err)
@@ -526,7 +526,7 @@ func Test_parseIntIntoValue_RegularInt(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			v := reflect.ValueOf(tt.target).Elem()
-			err := parseIntIntoValue(tt.value, v)
+			err := parseIntIntoValue(nil, tt.value, v)
 
 			assert.NoError(t, err)
 			assert.Equal(t, int(tt.value), v.Interface().(int))
@@ -546,7 +546,7 @@ func Test_parseIntIntoValue_Uint32BitSystem(t *testing.T) {
 	value := int64(5000000000)
 
 	// On a 64-bit system, this won't error, but the code checks for it
-	err := parseIntIntoValue(value, v)
+	err := parseIntIntoValue(nil, value, v)
 
 	// On 64-bit systems, uint is 64-bit, so this should succeed
 	if v.Type().Size() == 8 {

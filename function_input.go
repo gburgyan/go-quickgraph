@@ -264,10 +264,10 @@ func parseInputIntoValue(req *request, inValue genericValue, targetValue reflect
 		err = parseIdentifierIntoValue(*inValue.Identifier, targetValue)
 	} else if inValue.Int != nil {
 		i := *inValue.Int
-		err = parseIntIntoValue(i, targetValue)
+		err = parseIntIntoValue(req, i, targetValue)
 	} else if inValue.Float != nil {
 		f := *inValue.Float
-		parseFloatIntoValue(f, targetValue)
+		err = parseFloatIntoValue(req, f, targetValue)
 	} else if inValue.List != nil || isSlice {
 		err = parseListIntoValue(req, inValue, targetValue)
 	} else if inValue.Map != nil || isStruct {
@@ -330,7 +330,19 @@ func parseStringIntoValue(req *request, s string, targetValue reflect.Value, pos
 }
 
 // parseIntIntoValue converts an int64 to the appropriate type and assigns it to targetValue.
-func parseIntIntoValue(i int64, targetValue reflect.Value) error {
+func parseIntIntoValue(req *request, i int64, targetValue reflect.Value) error {
+	// Check for custom scalar parsing first (only if graphy is available)
+	if req != nil && req.graphy != nil {
+		if scalar, exists := req.graphy.GetScalarByType(targetValue.Type()); exists {
+			parsed, err := scalar.ParseValue(i)
+			if err != nil {
+				return fmt.Errorf("failed to parse %s from int %d: %v", scalar.Name, i, err)
+			}
+			targetValue.Set(reflect.ValueOf(parsed))
+			return nil
+		}
+	}
+
 	// Check bounds based on the target type to prevent overflow
 	switch targetValue.Kind() {
 	case reflect.Int8:
@@ -385,8 +397,22 @@ func parseIntIntoValue(i int64, targetValue reflect.Value) error {
 }
 
 // parseFloatIntoValue converts a float64 to the appropriate type and assigns it to targetValue.
-func parseFloatIntoValue(f float64, targetValue reflect.Value) {
+func parseFloatIntoValue(req *request, f float64, targetValue reflect.Value) error {
+	// Check for custom scalar parsing first (only if graphy is available)
+	if req != nil && req.graphy != nil {
+		if scalar, exists := req.graphy.GetScalarByType(targetValue.Type()); exists {
+			parsed, err := scalar.ParseValue(f)
+			if err != nil {
+				return fmt.Errorf("failed to parse %s from float %f: %v", scalar.Name, f, err)
+			}
+			targetValue.Set(reflect.ValueOf(parsed))
+			return nil
+		}
+	}
+
+	// Default float handling
 	targetValue.SetFloat(f)
+	return nil
 }
 
 // parseIdentifierIntoValue attempts to interpret an identifier and assign its corresponding value to targetValue. It supports

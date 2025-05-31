@@ -34,6 +34,9 @@ type Graphy struct {
 	// explicitTypes holds types that were explicitly registered via RegisterType
 	explicitTypes []*typeLookup
 
+	// scalars holds registered custom scalar types
+	scalars *scalarRegistry
+
 	schemaEnabled bool
 	schemaBuffer  *schemaTypes
 
@@ -351,6 +354,14 @@ func (g *Graphy) typeLookup(typ reflect.Type) *typeLookup {
 		}
 	} else {
 		result.name = rootTyp.Name()
+	}
+
+	// Check if this type is registered as a scalar first
+	if _, isScalar := g.GetScalarByType(rootTyp); isScalar {
+		result.fundamental = true
+		g.typeLookups[typ] = result
+		g.typeMutex.Unlock()
+		return result
 	}
 
 	if rootTyp.Kind() == reflect.Struct {

@@ -1309,6 +1309,357 @@ This is particularly important when:
 - You want to ensure all possible union members are included in the schema
 - Types are dynamically resolved at runtime but need to be in the schema
 
+# Common Patterns
+
+This section covers common patterns and best practices when building GraphQL APIs with go-quickgraph.
+
+## Authentication and Authorization
+
+### Pattern 1: Context-based Authentication
+
+```go
+// Middleware to add user to context
+func authMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        token := r.Header.Get("Authorization")
+        user, err := validateToken(token)
+        if err != nil {
+            http.Error(w, "Unauthorized", 401)
+            return
+        }
+        ctx := context.WithValue(r.Context(), "user", user)
+        next.ServeHTTP(w, r.WithContext(ctx))
+    })
+}
+
+// Use authentication in your resolvers
+func GetMyProfile(ctx context.Context) (*User, error) {
+    user, ok := ctx.Value("user").(*User)
+    if !ok {
+        return nil, fmt.Errorf("unauthorized")
+    }
+    return user, nil
+}
+
+// Set up the server
+http.Handle("/graphql", authMiddleware(g.HttpHandler()))
+```
+
+### Pattern 2: Field-level Authorization
+
+```go
+type User struct {
+    ID    string
+    Name  string
+    Email string // Only visible to self or admin
+}
+
+// Use methods for sensitive fields
+func (u *User) Email(ctx context.Context) (*string, error) {
+    currentUser := ctx.Value("user").(*User)
+    if currentUser.ID != u.ID && !currentUser.IsAdmin {
+        return nil, nil // Return nil for unauthorized access
+    }
+    return &u.Email, nil
+}
+```
+
+## Pagination
+
+### Pattern 1: Offset-based Pagination
+
+```go
+type ProductsInput struct {
+    Limit  int `json:"limit"`
+    Offset int `json:"offset"`
+}
+
+type ProductList struct {
+    Items      []Product `json:"items"`
+    TotalCount int       `json:"totalCount"`
+    HasMore    bool      `json:"hasMore"`
+}
+
+func GetProducts(ctx context.Context, input ProductsInput) (*ProductList, error) {
+    if input.Limit <= 0 {
+        input.Limit = 20 // Default
+    }
+    if input.Limit > 100 {
+        input.Limit = 100 // Max
+    }
+    
+    products, total := db.GetProducts(input.Offset, input.Limit)
+    
+    return &ProductList{
+        Items:      products,
+        TotalCount: total,
+        HasMore:    input.Offset+len(products) < total,
+    }, nil
+}
+```
+
+### Pattern 2: Cursor-based Pagination (Relay-style)
+
+```go
+type Connection struct {
+    Edges    []Edge   `json:"edges"`
+    PageInfo PageInfo `json:"pageInfo"`
+}
+
+type Edge struct {
+    Node   interface{} `json:"node"`
+    Cursor string      `json:"cursor"`
+}
+
+type PageInfo struct {
+    HasNextPage     bool   `json:"hasNextPage"`
+    HasPreviousPage bool   `json:"hasPreviousPage"`
+    StartCursor     string `json:"startCursor"`
+    EndCursor       string `json:"endCursor"`
+}
+
+// Implement for your types
+func GetUserConnection(ctx context.Context, first int, after string) (*Connection, error) {
+    // Decode cursor, fetch data, build connection
+    // See go-quickgraph-sample for full implementation
+}
+```
+
+## Error Handling
+
+### Pattern 1: Structured Errors
+
+```go
+type ValidationError struct {
+    Field   string `json:"field"`
+    Message string `json:"message"`
+}
+
+func (e ValidationError) Error() string {
+    return fmt.Sprintf("%s: %s", e.Field, e.Message)
+}
+
+func CreateUser(ctx context.Context, input CreateUserInput) (*User, error) {
+    if input.Email == "" {
+        return nil, ValidationError{
+            Field:   "email",
+            Message: "Email is required",
+        }
+    }
+    // Create user...
+}
+```
+
+### Pattern 2: Multiple Errors
+
+```go
+type MultiError struct {
+    Errors []error `json:"errors"`
+}
+
+func (m MultiError) Error() string {
+    return fmt.Sprintf("%d validation errors", len(m.Errors))
+}
+```
+
+## N+1 Query Prevention
+
+### Pattern 1: DataLoader Pattern
+
+```go
+// Create a batch loader
+type UserLoader struct {
+    mu    sync.Mutex
+    batch map[string]*User
+    wait  sync.WaitGroup
+}
+
+func (l *UserLoader) Load(ctx context.Context, id string) (*User, error) {
+    l.mu.Lock()
+    if l.batch == nil {
+        l.batch = make(map[string]*User)
+        l.wait.Add(1)
+        
+        // Batch load after current tick
+        go func() {
+            time.Sleep(1 * time.Millisecond)
+            l.loadBatch()
+        }()
+    }
+    l.batch[id] = nil // Mark as requested
+    l.mu.Unlock()
+    
+    l.wait.Wait() // Wait for batch to complete
+    
+    l.mu.Lock()
+    user := l.batch[id]
+    l.mu.Unlock()
+    
+    return user, nil
+}
+
+// Add loader to context in your HTTP handler
+func (g *Graphy) HttpHandlerWithLoader() http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        ctx := context.WithValue(r.Context(), "userLoader", &UserLoader{})
+        g.HttpHandler().ServeHTTP(w, r.WithContext(ctx))
+    })
+}
+```
+
+### Pattern 2: Eager Loading
+
+```go
+type Post struct {
+    ID       string
+    AuthorID string
+    author   *User // Private field for caching
+}
+
+// Lazy load author
+func (p *Post) Author(ctx context.Context) (*User, error) {
+    if p.author != nil {
+        return p.author, nil
+    }
+    
+    // Use dataloader from context if available
+    if loader, ok := ctx.Value("userLoader").(*UserLoader); ok {
+        return loader.Load(ctx, p.AuthorID)
+    }
+    
+    // Fallback to direct load
+    return getUserByID(p.AuthorID)
+}
+
+// For queries that return multiple posts
+func GetPosts(ctx context.Context) ([]Post, error) {
+    posts := fetchPosts()
+    
+    // Optionally preload authors if requested
+    if shouldPreloadAuthors(ctx) {
+        authorIDs := collectAuthorIDs(posts)
+        authors := batchLoadUsers(authorIDs)
+        // Attach authors to posts...
+    }
+    
+    return posts, nil
+}
+```
+
+## File Uploads
+
+```go
+// GraphQL doesn't have a native file type, so use a custom scalar
+type Upload struct {
+    Filename string
+    Size     int64
+    Content  io.Reader
+}
+
+// In your HTTP handler, process multipart form data
+func HandleGraphQLWithUploads(g *Graphy) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        if r.Method == "POST" && strings.Contains(r.Header.Get("Content-Type"), "multipart/form-data") {
+            // Parse multipart form
+            // Extract operations and map variables
+            // Process with g.ProcessRequest()
+        } else {
+            g.HttpHandler().ServeHTTP(w, r)
+        }
+    }
+}
+```
+
+## Testing
+
+### Pattern 1: Unit Testing Resolvers
+
+```go
+func TestGetUser(t *testing.T) {
+    ctx := context.Background()
+    g := quickgraph.Graphy{}
+    
+    // Mock your data layer
+    mockDB := &MockDB{
+        users: map[string]*User{
+            "1": {ID: "1", Name: "Alice"},
+        },
+    }
+    
+    g.RegisterQuery(ctx, "user", func(ctx context.Context, id string) *User {
+        return mockDB.GetUser(id)
+    }, "id")
+    
+    query := `{ user(id: "1") { name } }`
+    result, err := g.ProcessRequest(ctx, query, "")
+    
+    assert.NoError(t, err)
+    assert.Contains(t, result, `"name":"Alice"`)
+}
+```
+
+### Pattern 2: Integration Testing
+
+```go
+func TestGraphQLAPI(t *testing.T) {
+    // Set up your full GraphQL server
+    g := setupGraphy()
+    server := httptest.NewServer(g.HttpHandler())
+    defer server.Close()
+    
+    // Make HTTP requests
+    query := `{"query": "{ users { name } }"}`
+    resp, err := http.Post(server.URL+"/graphql", "application/json", strings.NewReader(query))
+    
+    // Assert response
+    assert.Equal(t, 200, resp.StatusCode)
+}
+```
+
+## Performance Optimization
+
+### Pattern 1: Query Result Caching
+
+```go
+// The Graphy object already caches parsed queries
+// You can add result caching for expensive operations
+
+var resultCache = make(map[string]interface{})
+var cacheMu sync.RWMutex
+
+func GetExpensiveData(ctx context.Context, id string) (*Data, error) {
+    cacheKey := fmt.Sprintf("data:%s", id)
+    
+    cacheMu.RLock()
+    if cached, ok := resultCache[cacheKey]; ok {
+        cacheMu.RUnlock()
+        return cached.(*Data), nil
+    }
+    cacheMu.RUnlock()
+    
+    // Compute expensive data
+    data := computeExpensiveData(id)
+    
+    cacheMu.Lock()
+    resultCache[cacheKey] = data
+    cacheMu.Unlock()
+    
+    return data, nil
+}
+```
+
+### Pattern 2: Selective Field Resolution
+
+```go
+// Only compute expensive fields when requested
+func (u *User) Statistics(ctx context.Context) (*UserStats, error) {
+    // This method only runs if the client requests the statistics field
+    return calculateUserStats(u.ID)
+}
+```
+
+For more examples and patterns, see the [go-quickgraph-sample](https://github.com/gburgyan/go-quickgraph-sample) repository.
+
 # Subscriptions
 
 `go-quickgraph` supports GraphQL subscriptions, allowing clients to receive real-time updates when data changes. Subscriptions follow the same code-first approach as queries and mutations.

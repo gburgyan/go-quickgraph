@@ -81,6 +81,16 @@ func (f *graphFunction) processCallOutput(ctx context.Context, req *request, fil
 		}
 		return sr, nil
 	} else {
+		// Check for custom scalar serialization (only if graphy is available)
+		if req != nil && req.graphy != nil {
+			if scalar, exists := req.graphy.GetScalarByType(callResult.Type()); exists {
+				serialized, err := scalar.Serialize(callResult.Interface())
+				if err != nil {
+					return nil, NewGraphError(fmt.Sprintf("failed to serialize %s: %v", scalar.Name, err), pos)
+				}
+				return serialized, nil
+			}
+		}
 		return callResult.Interface(), nil
 	}
 }

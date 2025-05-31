@@ -6,6 +6,8 @@ import (
 	"math"
 	"reflect"
 	"strings"
+
+	"github.com/alecthomas/participle/v2/lexer"
 )
 
 // getCallParameters returns the parameters to use when calling the function represented by this graphFunction.
@@ -255,7 +257,7 @@ func parseInputIntoValue(req *request, inValue genericValue, targetValue reflect
 	} else if inValue.String != nil {
 		// The string value has quotes around it, remove them.
 		literalValue := (*inValue.String)[1 : len(*inValue.String)-1]
-		parseStringIntoValue(literalValue, targetValue)
+		err = parseStringIntoValue(req, literalValue, targetValue, inValue.Pos)
 	} else if inValue.Identifier != nil {
 		// This is where we handle enums. We have to look up the value based on the field.
 		// This will only work with enums that are strings.
@@ -291,13 +293,40 @@ func parseVariableIntoValue(req *request, variableName string, targetValue refle
 	if value.Kind() == reflect.Ptr {
 		value = value.Elem()
 	}
+
+	// Check for custom scalar parsing (only if graphy is available)
+	if req != nil && req.graphy != nil {
+		if scalar, exists := req.graphy.GetScalarByType(targetValue.Type()); exists {
+			parsed, err := scalar.ParseValue(value.Interface())
+			if err != nil {
+				return fmt.Errorf("failed to parse variable %s as %s: %v", variableName, scalar.Name, err)
+			}
+			targetValue.Set(reflect.ValueOf(parsed))
+			return nil
+		}
+	}
+
 	targetValue.Set(value)
 	return nil
 }
 
 // parseStringIntoValue interprets the provided string and assigns it to targetValue.
-func parseStringIntoValue(s string, targetValue reflect.Value) {
+func parseStringIntoValue(req *request, s string, targetValue reflect.Value, pos lexer.Position) error {
+	// Check for custom scalar parsing first (only if graphy is available)
+	if req != nil && req.graphy != nil {
+		if scalar, exists := req.graphy.GetScalarByType(targetValue.Type()); exists {
+			parsed, err := scalar.ParseLiteral(s)
+			if err != nil {
+				return NewGraphError(fmt.Sprintf("failed to parse %s literal: %v", scalar.Name, err), pos)
+			}
+			targetValue.Set(reflect.ValueOf(parsed))
+			return nil
+		}
+	}
+
+	// Default string handling
 	targetValue.SetString(s)
+	return nil
 }
 
 // parseIntIntoValue converts an int64 to the appropriate type and assigns it to targetValue.

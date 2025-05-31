@@ -106,6 +106,9 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) string {
 	enumSchema := g.schemaForEnumTypes(st.enumTypes...)
 	sb.WriteString(enumSchema)
 
+	scalarSchema := g.schemaForScalarTypes()
+	sb.WriteString(scalarSchema)
+
 	return sb.String()
 }
 

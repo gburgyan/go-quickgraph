@@ -397,44 +397,49 @@ func (g *Graphy) schemaRefForType(t *typeLookup, mapping typeNameMapping) string
 	if t.rootType == nil {
 		baseType = t.name
 	} else {
-		switch t.rootType.Kind() {
-		case reflect.String:
-			if t.rootType.AssignableTo(stringEnumValuesType) {
-				baseType = t.name
-			} else {
-				baseType = "String"
-			}
-
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			baseType = "Int"
-
-		case reflect.Float32, reflect.Float64:
-			baseType = "Float"
-
-		case reflect.Bool:
-			baseType = "Boolean"
-
-		case reflect.Struct:
-			if t != nil {
-				baseType = mapping[t]
-				// Check if this type has implementations and should be referenced as an interface
-				if len(t.implementedBy) > 0 && !t.interfaceOnly {
-					baseType = "I" + baseType
+		// Check for custom scalar first
+		if scalar, exists := g.GetScalarByType(t.rootType); exists {
+			baseType = scalar.Name
+		} else {
+			switch t.rootType.Kind() {
+			case reflect.String:
+				if t.rootType.AssignableTo(stringEnumValuesType) {
+					baseType = t.name
+				} else {
+					baseType = "String"
 				}
-			}
 
-		case reflect.Interface:
-			// Interfaces are represented as the GraphQL any type
-			// If the interface has specific implementations registered,
-			// they would be handled through the union mechanism
-			baseType = t.name
-			if baseType == "" {
-				baseType = "Any"
-			}
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+				reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+				baseType = "Int"
 
-		default:
-			panic(fmt.Sprintf("unsupported type: %v", t.rootType.Kind()))
+			case reflect.Float32, reflect.Float64:
+				baseType = "Float"
+
+			case reflect.Bool:
+				baseType = "Boolean"
+
+			case reflect.Struct:
+				if t != nil {
+					baseType = mapping[t]
+					// Check if this type has implementations and should be referenced as an interface
+					if len(t.implementedBy) > 0 && !t.interfaceOnly {
+						baseType = "I" + baseType
+					}
+				}
+
+			case reflect.Interface:
+				// Interfaces are represented as the GraphQL any type
+				// If the interface has specific implementations registered,
+				// they would be handled through the union mechanism
+				baseType = t.name
+				if baseType == "" {
+					baseType = "Any"
+				}
+
+			default:
+				panic(fmt.Sprintf("unsupported type: %v", t.rootType.Kind()))
+			}
 		}
 	}
 
@@ -459,4 +464,42 @@ func (g *Graphy) wrapSchemaArray(work string, array *typeArrayModifier) string {
 		work = work + "!"
 	}
 	return "[" + work + "]"
+}
+
+func (g *Graphy) schemaForScalarTypes() string {
+	if g.scalars == nil {
+		return ""
+	}
+
+	g.scalars.mu.RLock()
+	defer g.scalars.mu.RUnlock()
+
+	if len(g.scalars.byName) == 0 {
+		return ""
+	}
+
+	sb := strings.Builder{}
+
+	// Sort scalar names for deterministic output
+	var scalarNames []string
+	for name := range g.scalars.byName {
+		scalarNames = append(scalarNames, name)
+	}
+	sort.Strings(scalarNames)
+
+	for _, name := range scalarNames {
+		scalar := g.scalars.byName[name]
+		sb.WriteString("scalar ")
+		sb.WriteString(scalar.Name)
+		if scalar.Description != "" {
+			// Add description as a comment for now
+			// In a full GraphQL implementation, this would use the description syntax
+			sb.WriteString(" # ")
+			sb.WriteString(scalar.Description)
+		}
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString("\n")
+	return sb.String()
 }

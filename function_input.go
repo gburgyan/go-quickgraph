@@ -294,18 +294,6 @@ func parseVariableIntoValue(req *request, variableName string, targetValue refle
 		value = value.Elem()
 	}
 
-	// Check for custom scalar parsing (only if graphy is available)
-	if req != nil && req.graphy != nil {
-		if scalar, exists := req.graphy.GetScalarByType(targetValue.Type()); exists {
-			parsed, err := scalar.ParseValue(value.Interface())
-			if err != nil {
-				return fmt.Errorf("failed to parse variable %s as %s: %v", variableName, scalar.Name, err)
-			}
-			targetValue.Set(reflect.ValueOf(parsed))
-			return nil
-		}
-	}
-
 	targetValue.Set(value)
 	return nil
 }

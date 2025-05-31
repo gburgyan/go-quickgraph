@@ -525,9 +525,27 @@ func (rs *RequestStub) newRequest(ctx context.Context, variableJson string) (*re
 		// Then unmarshal the variable from JSON.
 		variableValue := reflect.New(variable.Type)
 		if variableJson, found := rawVariables[varName]; found {
-			err := json.Unmarshal(variableJson, variableValue.Interface())
-			if err != nil {
-				return nil, AugmentGraphError(err, fmt.Sprintf("error parsing variable %s into type %s", varName, variable.Type.Name()), lexer.Position{}, varName)
+			// Check if this is a custom scalar type
+			if scalar, exists := rs.graphy.GetScalarByType(variable.Type); exists {
+				// For custom scalars, first unmarshal to interface{} then use scalar's ParseValue
+				var rawValue interface{}
+				err := json.Unmarshal(variableJson, &rawValue)
+				if err != nil {
+					return nil, AugmentGraphError(err, fmt.Sprintf("error parsing variable %s JSON", varName), lexer.Position{}, varName)
+				}
+
+				parsed, err := scalar.ParseValue(rawValue)
+				if err != nil {
+					return nil, AugmentGraphError(err, fmt.Sprintf("error parsing variable %s as %s", varName, scalar.Name), lexer.Position{}, varName)
+				}
+
+				variableValue.Elem().Set(reflect.ValueOf(parsed))
+			} else {
+				// For non-scalar types, use direct JSON unmarshaling
+				err := json.Unmarshal(variableJson, variableValue.Interface())
+				if err != nil {
+					return nil, AugmentGraphError(err, fmt.Sprintf("error parsing variable %s into type %s", varName, variable.Type.Name()), lexer.Position{}, varName)
+				}
 			}
 			variables[varName] = variableValue.Elem()
 		} else if variable.Default != nil {

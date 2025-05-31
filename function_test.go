@@ -847,13 +847,13 @@ query {
 `
 	response, err := g.ProcessRequest(ctx, gql, "")
 	assert.Error(t, err)
-	assert.Equal(t, `{"data":{},"errors":[{"message":"maps not supported","locations":[{"line":4,"column":5}],"path":["mapper"]}]}`, response)
+	assert.Equal(t, `{"data":{},"errors":[{"message":"maps not supported (unless registered as custom scalar)","locations":[{"line":4,"column":5}],"path":["mapper"]}]}`, response)
 }
 
 func TestGraphFunction_InvalidParamMap(t *testing.T) {
 	ctx := context.Background()
 	g := Graphy{}
-	assert.PanicsWithValue(t, "not valid graph function: function mapper has a parameter 0 of type map, which is not supported", func() {
+	assert.PanicsWithValue(t, "not valid graph function: function mapper has a parameter 0 of type map, which is not supported (unless registered as a custom scalar)", func() {
 		g.RegisterQuery(ctx, "mapper", func(m map[string]string) string {
 			return "foo"
 		})
@@ -866,7 +866,7 @@ func TestGraphFunction_InvalidParamInterface(t *testing.T) {
 	type SampleInterface interface {
 		Value() string
 	}
-	assert.PanicsWithValue(t, "not valid graph function: function interfacer has a parameter 0 of type interface, which is not supported", func() {
+	assert.PanicsWithValue(t, "not valid graph function: function interfacer has a parameter 0 of type interface, which is not supported (unless registered as a custom scalar)", func() {
 		g.RegisterQuery(ctx, "interfacer", func(i SampleInterface) string {
 			return i.Value()
 		})

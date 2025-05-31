@@ -142,10 +142,16 @@ func (g *Graphy) validateGraphFunction(graphFunc reflect.Value, name string, met
 			}
 			switch funcParam.Kind() {
 			case reflect.Map:
-				return fmt.Errorf("function %s has a parameter %d of type map, which is not supported", name, logicalParamNumber)
+				// Allow maps that are registered as custom scalars (e.g., JSON scalar)
+				if _, exists := g.GetScalarByType(funcParam); !exists {
+					return fmt.Errorf("function %s has a parameter %d of type map, which is not supported (unless registered as a custom scalar)", name, logicalParamNumber)
+				}
 
 			case reflect.Interface:
-				return fmt.Errorf("function %s has a parameter %d of type interface, which is not supported", name, logicalParamNumber)
+				// Allow interfaces that are registered as custom scalars
+				if _, exists := g.GetScalarByType(funcParam); !exists {
+					return fmt.Errorf("function %s has a parameter %d of type interface, which is not supported (unless registered as a custom scalar)", name, logicalParamNumber)
+				}
 			}
 		}
 	}

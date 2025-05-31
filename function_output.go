@@ -72,8 +72,18 @@ func (f *graphFunction) processCallOutput(ctx context.Context, req *request, fil
 		}
 		return []any{}, nil
 	} else if kind == reflect.Map {
-		// TODO: Handle maps?
-		return nil, NewGraphError(fmt.Sprintf("maps not supported"), pos)
+		// Check for custom scalar serialization for maps (e.g., JSON scalar)
+		if req != nil && req.graphy != nil {
+			if scalar, exists := req.graphy.GetScalarByType(callResult.Type()); exists {
+				serialized, err := scalar.Serialize(callResult.Interface())
+				if err != nil {
+					return nil, NewGraphError(fmt.Sprintf("failed to serialize %s: %v", scalar.Name, err), pos)
+				}
+				return serialized, nil
+			}
+		}
+		// TODO: Handle other maps?
+		return nil, NewGraphError(fmt.Sprintf("maps not supported (unless registered as custom scalar)"), pos)
 	} else if kind == reflect.Struct {
 		// Check for custom scalar serialization before processing as struct
 		if req != nil && req.graphy != nil {

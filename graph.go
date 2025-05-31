@@ -357,8 +357,9 @@ func (g *Graphy) typeLookup(typ reflect.Type) *typeLookup {
 	}
 
 	// Check if this type is registered as a scalar first
-	if _, isScalar := g.GetScalarByType(rootTyp); isScalar {
+	if scalar, isScalar := g.GetScalarByType(rootTyp); isScalar {
 		result.fundamental = true
+		result.name = scalar.Name // Use the scalar name instead of the Go type name
 		g.typeLookups[typ] = result
 		g.typeMutex.Unlock()
 		return result

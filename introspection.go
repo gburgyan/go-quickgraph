@@ -296,9 +296,24 @@ func (g *Graphy) resolveIntrospectionTypeName(tl *typeLookup, io TypeKind) strin
 		if otlName, ok := g.schemaBuffer.outputTypeNameLookup[tl]; ok {
 			return otlName
 		}
-		return introspectionScalarName(tl)
+		// Check for custom scalar first
+		if scalar, exists := g.GetScalarByType(tl.rootType); exists {
+			return scalar.Name
+		}
+		// If no custom scalar found but it's fundamental, try built-in scalar names
+		if tl.rootType != nil {
+			result := introspectionScalarName(tl)
+			if result == "" {
+				// This is a fundamental type that's not a basic Go type and not a registered custom scalar
+				// This shouldn't happen in normal operation
+				return fmt.Sprintf("UnknownFundamental_%v", tl.rootType.Kind())
+			}
+			return result
+		}
+		// If rootType is nil, we have a problem - return a fallback name with debug info
+		return fmt.Sprintf("UnknownScalar_%v", tl.typ)
 	}
-	if io == TypeOutput || tl.fundamental {
+	if io == TypeOutput {
 		return g.schemaBuffer.outputTypeNameLookup[tl]
 	}
 	if io == TypeInput {
@@ -495,7 +510,9 @@ func introspectionScalarName(tl *typeLookup) string {
 	case reflect.String:
 		return "String"
 	default:
-		panic("unknown scalar type")
+		// For types that don't match basic Go types but are marked as fundamental,
+		// return an empty string to indicate they should be handled by custom scalar logic
+		return ""
 	}
 }
 

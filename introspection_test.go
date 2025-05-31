@@ -1967,9 +1967,8 @@ func strPtr(s string) *string {
 
 func TestIntrospectionScalarName_WithUnknownType(t *testing.T) {
 	tl := &typeLookup{rootType: reflect.TypeOf(map[string]string{})}
-	assert.PanicsWithValue(t, "unknown scalar type", func() {
-		introspectionScalarName(tl)
-	})
+	result := introspectionScalarName(tl)
+	assert.Equal(t, "", result, "Unknown scalar types should return empty string")
 }
 
 // TestIntrospectionInterfaceKind tests that interface references in introspection have correct kind

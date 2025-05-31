@@ -246,264 +246,241 @@ func (g *Graphy) populateIntrospection(st *schemaTypes) {
 	g.schemaBuffer.introspectionSchema = is
 }
 
+// getIntrospectionBaseType creates a GraphQL introspection type from a type lookup.
+// This is the main entry point for converting internal type representations to GraphQL introspection format.
+// It handles the complete type creation workflow including name resolution, caching, and delegation to specialized creators.
 func (g *Graphy) getIntrospectionBaseType(is *__Schema, tl *typeLookup, io TypeKind) *__Type {
-	var name string
+	// Resolve the GraphQL type name
+	name := g.resolveIntrospectionTypeName(tl, io)
 
+	// Handle interface/concrete type split for types with implementations
+	if io == TypeOutput && len(tl.implementedBy) > 0 && !tl.interfaceOnly {
+		return g.handleInterfaceConcreteTypeSplit(is, tl, io, name)
+	}
+
+	// Return existing type if already created
+	if existing, ok := is.typeLookupByName[name]; ok {
+		return existing
+	}
+
+	// Create new type and add to lookup
+	result := &__Type{Name: &name}
+	is.typeLookupByName[name] = result
+
+	// Delegate to specialized type creators based on type characteristics
+	switch {
+	case len(tl.union) > 0:
+		g.createUnionIntrospectionType(is, tl, io, result)
+	case tl.rootType != nil && tl.rootType.ConvertibleTo(stringEnumValuesType):
+		g.createEnumIntrospectionType(tl, result)
+	case tl.fundamental:
+		result.Kind = IntrospectionKindScalar
+	case io == TypeInput:
+		result.Kind = IntrospectionKindInputObject
+		g.addIntrospectionSchemaFields(is, tl, io, result)
+	default:
+		g.createObjectIntrospectionType(is, tl, io, result)
+	}
+
+	return result
+}
+
+// resolveIntrospectionTypeName determines the GraphQL type name for a type lookup.
+// It handles enum types, fundamental types, and input/output type distinctions.
+// Returns the appropriate name based on the type's characteristics and usage context.
+func (g *Graphy) resolveIntrospectionTypeName(tl *typeLookup, io TypeKind) string {
 	if tl.rootType != nil && tl.rootType.ConvertibleTo(stringEnumValuesType) {
-		name = g.schemaBuffer.enumTypeNameLookup[tl]
-	} else if tl.fundamental {
+		return g.schemaBuffer.enumTypeNameLookup[tl]
+	}
+	if tl.fundamental {
 		if otlName, ok := g.schemaBuffer.outputTypeNameLookup[tl]; ok {
-			name = otlName
-		} else {
-			name = introspectionScalarName(tl)
+			return otlName
 		}
-	} else if io == TypeOutput || tl.fundamental {
-		name = g.schemaBuffer.outputTypeNameLookup[tl]
-	} else if io == TypeInput {
-		name = g.schemaBuffer.inputTypeNameLookup[tl]
-	} else {
-		panic("unknown IO type")
+		return introspectionScalarName(tl)
+	}
+	if io == TypeOutput || tl.fundamental {
+		return g.schemaBuffer.outputTypeNameLookup[tl]
+	}
+	if io == TypeInput {
+		return g.schemaBuffer.inputTypeNameLookup[tl]
+	}
+	// This should never happen with current TypeKind enum values
+	panic("unknown IO type")
+}
+
+// handleInterfaceConcreteTypeSplit manages types that need both interface and concrete representations.
+// This occurs when a type has implementations but is not marked as interface-only.
+// It creates an interface type with "I" prefix and returns a concrete type that implements it.
+func (g *Graphy) handleInterfaceConcreteTypeSplit(is *__Schema, tl *typeLookup, io TypeKind, name string) *__Type {
+	interfaceName := "I" + name
+
+	// Create interface type if it doesn't exist
+	if _, ok := is.typeLookupByName[interfaceName]; !ok {
+		interfaceType := &__Type{
+			Name: &interfaceName,
+			Kind: IntrospectionKindInterface,
+		}
+		is.typeLookupByName[interfaceName] = interfaceType
+
+		// Add fields to interface
+		g.addIntrospectionSchemaFields(is, tl, io, interfaceType)
+
+		// Add concrete type as possible implementation
+		concreteType := &__Type{
+			Name: &name,
+			Kind: IntrospectionKindObject,
+		}
+		interfaceType.PossibleTypes = append(interfaceType.PossibleTypes, concreteType)
+
+		// Add other implementations
+		for _, impl := range tl.implementedBy {
+			implType := g.getIntrospectionBaseType(is, impl, io)
+			interfaceType.PossibleTypes = append(interfaceType.PossibleTypes, implType)
+		}
 	}
 
-	// Check if we need to handle interface/concrete type split
-	hasImplementedBy := len(tl.implementedBy) > 0
-	if io == TypeOutput && hasImplementedBy && !tl.interfaceOnly {
-		// This type needs both interface and concrete type like in schema generation
-		// First ensure the interface with "I" prefix exists
-		interfaceName := "I" + name
-		if _, ok := is.typeLookupByName[interfaceName]; !ok {
-			interfaceType := &__Type{
-				Name: &interfaceName,
-				Kind: IntrospectionKindInterface,
-			}
-			is.typeLookupByName[interfaceName] = interfaceType
-			// Add fields to interface
-			g.addIntrospectionSchemaFields(is, tl, io, interfaceType)
-			// Add possible types (implementations) including the concrete type
-			// First add the concrete type itself
-			concreteType := &__Type{
-				Name: &name,
-				Kind: IntrospectionKindObject,
-			}
-			interfaceType.PossibleTypes = append(interfaceType.PossibleTypes, concreteType)
-			// Then add other implementations
-			for _, impl := range tl.implementedBy {
-				implType := g.getIntrospectionBaseType(is, impl, io)
-				interfaceType.PossibleTypes = append(interfaceType.PossibleTypes, implType)
-			}
-		}
-
-		// Now handle the concrete type
-		if existing, ok := is.typeLookupByName[name]; ok {
-			return existing
-		}
-
-		// Create the concrete type
-		result := &__Type{Name: &name}
-		is.typeLookupByName[name] = result
-		// The concrete type will have its kind set by the caller
-		return result
-	}
-
+	// Return existing concrete type or create new one
 	if existing, ok := is.typeLookupByName[name]; ok {
 		return existing
 	}
 
 	result := &__Type{Name: &name}
 	is.typeLookupByName[name] = result
+	return result
+}
 
-	switch {
-	case len(tl.union) > 0:
-		result.Kind = IntrospectionKindUnion
-		// Collect concrete types to avoid duplicates
-		concreteTypes := make(map[string]*__Type)
+// createUnionIntrospectionType populates a union type with its possible concrete types.
+// It resolves all union members, handling interface implementations correctly,
+// and ensures only concrete types (not interfaces) are included in the union.
+func (g *Graphy) createUnionIntrospectionType(is *__Schema, tl *typeLookup, io TypeKind, result *__Type) {
+	result.Kind = IntrospectionKindUnion
+	concreteTypes := make(map[string]*__Type)
 
-		for _, name := range sortedKeys(tl.union) {
-			ul := tl.union[name]
-			// For union possibleTypes, we need to get the actual type that will be in the union
-			// This is different from regular type resolution because unions have special handling
+	for _, name := range sortedKeys(tl.union) {
+		ul := tl.union[name]
+		baseType := g.getIntrospectionBaseType(is, ul, io)
 
-			// First get the base type without any modifications
-			baseType := g.getIntrospectionBaseType(is, ul, io)
+		// Check if this type has implementations (is an interface)
+		hasImplementations := len(ul.implementedBy) > 0
+		if !hasImplementations && ul.rootType != nil && ul.rootType != ul.typ {
+			if rootLookup, ok := g.typeLookups[ul.rootType]; ok {
+				hasImplementations = len(rootLookup.implementedBy) > 0
+			}
+		}
 
-			// Check if this type has implementations (is an interface)
-			hasImplementations := len(ul.implementedBy) > 0
-			if !hasImplementations && ul.rootType != nil && ul.rootType != ul.typ {
-				// Check the root type for implementations
+		if hasImplementations {
+			// For interface types, add concrete implementations to union
+			checkType := ul
+			if ul.rootType != nil && ul.rootType != ul.typ {
 				if rootLookup, ok := g.typeLookups[ul.rootType]; ok {
-					hasImplementations = len(rootLookup.implementedBy) > 0
+					checkType = rootLookup
 				}
 			}
 
-			// For types with implementations, we need to add the concrete implementations
-			// not the interface itself (unions can't contain interfaces)
-			if hasImplementations {
-				// Get the actual type lookup to access implementations
-				checkType := ul
-				if ul.rootType != nil && ul.rootType != ul.typ {
-					if rootLookup, ok := g.typeLookups[ul.rootType]; ok {
-						checkType = rootLookup
-					}
-				}
-
-				// Add all implementations
-				for _, impl := range checkType.implementedBy {
-					implType := g.getIntrospectionBaseType(is, impl, io)
-					if implType.Name != nil {
-						concreteTypes[*implType.Name] = implType
-					}
-				}
-
-				// If not interface-only, include the concrete type too
-				if !checkType.interfaceOnly && baseType.Name != nil {
-					concreteTypes[*baseType.Name] = baseType
-				}
-			} else {
-				// For regular types (not interfaces), just add the base type
-				if baseType.Name != nil {
-					concreteTypes[*baseType.Name] = baseType
+			// Add all implementations
+			for _, impl := range checkType.implementedBy {
+				implType := g.getIntrospectionBaseType(is, impl, io)
+				if implType.Name != nil {
+					concreteTypes[*implType.Name] = implType
 				}
 			}
-		}
 
-		// Sort the concrete types by name and add to possibleTypes
-		var typeNames []string
-		for name := range concreteTypes {
-			typeNames = append(typeNames, name)
-		}
-		sort.Strings(typeNames)
-
-		for _, name := range typeNames {
-			result.PossibleTypes = append(result.PossibleTypes, concreteTypes[name])
-		}
-	case len(tl.implementedBy) > 0:
-		result.Kind = IntrospectionKindInterface
-		g.addIntrospectionSchemaFields(is, tl, io, result)
-		impls := tl.implementedBy
-		sort.Slice(impls, func(i, j int) bool {
-			return impls[i].name < impls[j].name
-		})
-		for _, impl := range impls {
-			implType := g.getIntrospectionBaseType(is, impl, io)
-			result.PossibleTypes = append(result.PossibleTypes, implType)
-		}
-	case tl.rootType.ConvertibleTo(stringEnumValuesType):
-		result.Kind = IntrospectionKindEnum
-		enumValue := reflect.New(tl.rootType)
-		sev := enumValue.Convert(stringEnumValuesType)
-		se := sev.Interface().(StringEnumValues)
-		for _, s := range se.EnumValues() {
-			s := s
-			value := __EnumValue{
-				Name: s.Name,
+			// Include concrete type if not interface-only
+			if !checkType.interfaceOnly && baseType.Name != nil {
+				concreteTypes[*baseType.Name] = baseType
 			}
-			if s.Description != "" {
-				value.Description = &s.Description
-			}
-			if s.IsDeprecated {
-				value.IsDeprecated = true
-				value.DeprecationReason = &s.DeprecationReason
-			}
-			result.enumValuesRaw = append(result.enumValuesRaw, value)
-		}
-
-	case tl.fundamental:
-		result.Kind = IntrospectionKindScalar
-		// Name is already set as &name above
-
-	case io == TypeInput:
-		result.Kind = IntrospectionKindInputObject
-		g.addIntrospectionSchemaFields(is, tl, io, result)
-
-	default:
-		result.Kind = IntrospectionKindObject
-		g.addIntrospectionSchemaFields(is, tl, io, result)
-
-		// Check if this type should implement its own interface (like Employee implements IEmployee)
-		if io == TypeOutput && len(tl.implementedBy) > 0 && !tl.interfaceOnly {
-			typeName := *result.Name
-			interfaceName := "I" + typeName
-			if interfaceType, ok := is.typeLookupByName[interfaceName]; ok {
-				result.Interfaces = append(result.Interfaces, interfaceType)
-				// Add this type to the interface's possible types if not already present
-				found := false
-				for _, pt := range interfaceType.PossibleTypes {
-					if pt.Name != nil && *pt.Name == typeName {
-						found = true
-						break
-					}
-				}
-				if !found {
-					interfaceType.PossibleTypes = append(interfaceType.PossibleTypes, result)
-				}
-			}
-		}
-
-		// Handle interface references
-		for _, impls := range sortedKeys(tl.implements) {
-			implTl := tl.implements[impls]
-			// Get the interface name (with "I" prefix if applicable)
-			var interfaceName string
-			if implTl.rootType != nil && implTl.rootType.ConvertibleTo(stringEnumValuesType) {
-				interfaceName = g.schemaBuffer.enumTypeNameLookup[implTl]
-			} else if io == TypeOutput || implTl.fundamental {
-				interfaceName = g.schemaBuffer.outputTypeNameLookup[implTl]
-			} else {
-				interfaceName = g.schemaBuffer.inputTypeNameLookup[implTl]
-			}
-
-			// Check if this interface uses the "I" prefix pattern
-			if len(implTl.implementedBy) > 0 && !implTl.interfaceOnly {
-				interfaceName = "I" + interfaceName
-			}
-
-			// Look up the interface type by name
-			if interfaceType, ok := is.typeLookupByName[interfaceName]; ok {
-				result.Interfaces = append(result.Interfaces, interfaceType)
-				// Add this type to the interface's possible types
-				interfaceType.PossibleTypes = append(interfaceType.PossibleTypes, result)
-			} else {
-				// If not found, create the interface type and add it to the schema
-				interfaceType := &__Type{
-					Name: &interfaceName,
-					Kind: IntrospectionKindInterface,
-				}
-				is.typeLookupByName[interfaceName] = interfaceType
-				// Add fields to the interface based on the embedded type
-				g.addIntrospectionSchemaFields(is, implTl, io, interfaceType)
-				// Add possible types (implementations)
-				interfaceType.PossibleTypes = []*__Type{result}
-				// The concrete types that implement this interface will be added later
-				result.Interfaces = append(result.Interfaces, interfaceType)
-			}
-		}
-
-		// If this type has implementedBy, it should also implement its own interface
-		if len(tl.implementedBy) > 0 && !tl.interfaceOnly {
-			typeName := g.schemaBuffer.outputTypeNameLookup[tl]
-			interfaceName := "I" + typeName
-			if interfaceType, ok := is.typeLookupByName[interfaceName]; ok {
-				result.Interfaces = append(result.Interfaces, interfaceType)
-				// Add this type to the interface's possible types
-				interfaceType.PossibleTypes = append(interfaceType.PossibleTypes, result)
-			} else {
-				// Create the interface if it doesn't exist yet
-				interfaceType := &__Type{
-					Name: &interfaceName,
-					Kind: IntrospectionKindInterface,
-				}
-				is.typeLookupByName[interfaceName] = interfaceType
-				// Add fields to the interface based on this type
-				g.addIntrospectionSchemaFields(is, tl, io, interfaceType)
-				// Initialize possible types with this concrete type
-				interfaceType.PossibleTypes = []*__Type{result}
-				// Add the interface to this type's interfaces
-				result.Interfaces = append(result.Interfaces, interfaceType)
+		} else {
+			// For regular types, add directly to union
+			if baseType.Name != nil {
+				concreteTypes[*baseType.Name] = baseType
 			}
 		}
 	}
 
-	return result
+	// Sort and add concrete types to union
+	var typeNames []string
+	for name := range concreteTypes {
+		typeNames = append(typeNames, name)
+	}
+	sort.Strings(typeNames)
+
+	for _, name := range typeNames {
+		result.PossibleTypes = append(result.PossibleTypes, concreteTypes[name])
+	}
+}
+
+// createEnumIntrospectionType populates an enum type with its values and metadata.
+// It extracts enum values from types implementing StringEnumValues interface,
+// including descriptions and deprecation information.
+func (g *Graphy) createEnumIntrospectionType(tl *typeLookup, result *__Type) {
+	result.Kind = IntrospectionKindEnum
+	enumValue := reflect.New(tl.rootType)
+	sev := enumValue.Convert(stringEnumValuesType)
+	se := sev.Interface().(StringEnumValues)
+
+	for _, s := range se.EnumValues() {
+		s := s
+		value := __EnumValue{
+			Name: s.Name,
+		}
+		if s.Description != "" {
+			value.Description = &s.Description
+		}
+		if s.IsDeprecated {
+			value.IsDeprecated = true
+			value.DeprecationReason = &s.DeprecationReason
+		}
+		result.enumValuesRaw = append(result.enumValuesRaw, value)
+	}
+}
+
+// createObjectIntrospectionType creates an object type with fields and interface relationships.
+// It handles the complex logic of interface implementations and embedded interfaces,
+// ensuring proper GraphQL schema representation of Go type relationships.
+func (g *Graphy) createObjectIntrospectionType(is *__Schema, tl *typeLookup, io TypeKind, result *__Type) {
+	result.Kind = IntrospectionKindObject
+	g.addIntrospectionSchemaFields(is, tl, io, result)
+
+	// Add interface relationships for embedded interfaces
+	for _, impls := range sortedKeys(tl.implements) {
+		implTl := tl.implements[impls]
+		interfaceName := g.resolveEmbeddedInterfaceName(implTl, io)
+
+		if interfaceType, ok := is.typeLookupByName[interfaceName]; ok {
+			result.Interfaces = append(result.Interfaces, interfaceType)
+			interfaceType.PossibleTypes = append(interfaceType.PossibleTypes, result)
+		} else {
+			// Create missing interface type
+			interfaceType := &__Type{
+				Name: &interfaceName,
+				Kind: IntrospectionKindInterface,
+			}
+			is.typeLookupByName[interfaceName] = interfaceType
+			g.addIntrospectionSchemaFields(is, implTl, io, interfaceType)
+			interfaceType.PossibleTypes = []*__Type{result}
+			result.Interfaces = append(result.Interfaces, interfaceType)
+		}
+	}
+}
+
+// resolveEmbeddedInterfaceName determines the correct interface name for embedded types.
+// It applies the "I" prefix pattern when appropriate and handles type name resolution.
+func (g *Graphy) resolveEmbeddedInterfaceName(implTl *typeLookup, io TypeKind) string {
+	var interfaceName string
+	if implTl.rootType != nil && implTl.rootType.ConvertibleTo(stringEnumValuesType) {
+		interfaceName = g.schemaBuffer.enumTypeNameLookup[implTl]
+	} else if io == TypeOutput || implTl.fundamental {
+		interfaceName = g.schemaBuffer.outputTypeNameLookup[implTl]
+	} else {
+		interfaceName = g.schemaBuffer.inputTypeNameLookup[implTl]
+	}
+
+	// Apply "I" prefix pattern for interface types with implementations
+	if len(implTl.implementedBy) > 0 && !implTl.interfaceOnly {
+		interfaceName = "I" + interfaceName
+	}
+
+	return interfaceName
 }
 
 func introspectionScalarName(tl *typeLookup) string {

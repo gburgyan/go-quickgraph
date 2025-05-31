@@ -75,6 +75,17 @@ func (f *graphFunction) processCallOutput(ctx context.Context, req *request, fil
 		// TODO: Handle maps?
 		return nil, NewGraphError(fmt.Sprintf("maps not supported"), pos)
 	} else if kind == reflect.Struct {
+		// Check for custom scalar serialization before processing as struct
+		if req != nil && req.graphy != nil {
+			if scalar, exists := req.graphy.GetScalarByType(callResult.Type()); exists {
+				serialized, err := scalar.Serialize(callResult.Interface())
+				if err != nil {
+					return nil, NewGraphError(fmt.Sprintf("failed to serialize %s: %v", scalar.Name, err), pos)
+				}
+				return serialized, nil
+			}
+		}
+
 		sr, err := f.processOutputStruct(ctx, req, filter, callResult)
 		if err != nil {
 			return nil, AugmentGraphError(err, fmt.Sprintf("error processing struct"), pos)

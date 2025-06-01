@@ -2,6 +2,7 @@ package quickgraph
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/gburgyan/go-timing"
 	"log"
 	"net/http"
@@ -27,8 +28,16 @@ func (g GraphHttpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	// Recover from any panics to prevent server crashes
 	defer func() {
 		if r := recover(); r != nil {
-			// Log the panic details internally (including stack trace)
-			log.Printf("Panic in GraphQL HTTP handler: %v\nStack trace:\n%s", r, debug.Stack())
+			// Report the panic through error handler
+			err := GraphError{
+				Message:    "Internal server error",
+				InnerError: fmt.Errorf("panic: %v", r),
+			}
+			g.graphy.handleError(request.Context(), ErrorCategoryInternal, err, map[string]interface{}{
+				"stack_trace":    string(debug.Stack()),
+				"request_method": request.Method,
+				"request_path":   request.URL.Path,
+			})
 
 			// Return a generic error to the client (no internal details)
 			writer.Header().Set("Content-Type", "application/json")
@@ -53,13 +62,19 @@ func (g GraphHttpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Re
 			writer.WriteHeader(200)
 			_, err := writer.Write([]byte(schema))
 			if err != nil {
-				log.Printf("Error writing response: %v", err)
+				g.graphy.handleError(ctx, ErrorCategoryHTTP, err, map[string]interface{}{
+					"operation":      "write_schema_response",
+					"request_method": request.Method,
+				})
 			}
 		} else {
 			writer.WriteHeader(404)
 			_, err := writer.Write([]byte("Not Found"))
 			if err != nil {
-				log.Printf("Error writing response: %v", err)
+				g.graphy.handleError(ctx, ErrorCategoryHTTP, err, map[string]interface{}{
+					"operation":      "write_not_found_response",
+					"request_method": request.Method,
+				})
 			}
 		}
 		return
@@ -68,7 +83,10 @@ func (g GraphHttpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	var req graphqlRequest
 	err := json.NewDecoder(request.Body).Decode(&req)
 	if err != nil {
-		log.Printf("Error decoding request: %v", err)
+		g.graphy.handleError(ctx, ErrorCategoryHTTP, err, map[string]interface{}{
+			"operation":      "decode_request_body",
+			"request_method": request.Method,
+		})
 		writer.WriteHeader(400)
 		return
 	}
@@ -79,7 +97,11 @@ func (g GraphHttpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	// Process the request.
 	res, err := g.graphy.ProcessRequest(ctx, query, variables)
 	if err != nil {
-		log.Printf("Error processing request: %v (will still return response)", err)
+		g.graphy.handleError(ctx, ErrorCategoryExecution, err, map[string]interface{}{
+			"operation": "process_request",
+			"query":     query,
+			"variables": variables,
+		})
 	}
 
 	// Return the response string.
@@ -88,11 +110,15 @@ func (g GraphHttpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Re
 
 	_, err = writer.Write([]byte(res))
 	if err != nil {
-		log.Printf("Error writing response: %v", err)
+		g.graphy.handleError(ctx, ErrorCategoryHTTP, err, map[string]interface{}{
+			"operation":      "write_response",
+			"request_method": request.Method,
+		})
 	}
 
 	if g.graphy.EnableTiming {
 		complete()
+		// Keep timing logs as they are - they're not errors
 		log.Printf("Timing: %v", timingContext.String())
 	}
 }

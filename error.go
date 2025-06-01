@@ -1,12 +1,47 @@
 package quickgraph
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/alecthomas/participle/v2/lexer"
 	"strings"
 )
+
+// ErrorCategory represents different types of errors that can occur
+type ErrorCategory string
+
+const (
+	// ErrorCategoryValidation - GraphQL validation errors (invalid queries, missing variables, etc.)
+	ErrorCategoryValidation ErrorCategory = "validation"
+	// ErrorCategoryExecution - Runtime errors during GraphQL execution
+	ErrorCategoryExecution ErrorCategory = "execution"
+	// ErrorCategoryWebSocket - WebSocket connection and protocol errors
+	ErrorCategoryWebSocket ErrorCategory = "websocket"
+	// ErrorCategoryHTTP - HTTP protocol errors (malformed requests, etc.)
+	ErrorCategoryHTTP ErrorCategory = "http"
+	// ErrorCategoryInternal - Internal library errors
+	ErrorCategoryInternal ErrorCategory = "internal"
+)
+
+// ErrorHandler is an interface for handling different types of errors
+// Applications can implement this to customize error logging and handling
+type ErrorHandler interface {
+	// HandleError is called when an error occurs during GraphQL processing
+	// ctx: the request context (may be nil for some errors)
+	// category: the type of error that occurred
+	// err: the error (will be a GraphError if possible)
+	// details: additional context about the error (e.g., "subscription_id", "request_method")
+	HandleError(ctx context.Context, category ErrorCategory, err error, details map[string]interface{})
+}
+
+// ErrorHandlerFunc is a function adapter for ErrorHandler
+type ErrorHandlerFunc func(ctx context.Context, category ErrorCategory, err error, details map[string]interface{})
+
+func (f ErrorHandlerFunc) HandleError(ctx context.Context, category ErrorCategory, err error, details map[string]interface{}) {
+	f(ctx, category, err, details)
+}
 
 // GraphError represents an error that occurs within a graph structure.
 // It provides a structured way to express errors with added context,

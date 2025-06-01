@@ -3,6 +3,7 @@ package quickgraph
 import (
 	"context"
 	"github.com/gburgyan/go-timing"
+	"log"
 	"reflect"
 	"strings"
 	"sync"
@@ -47,6 +48,9 @@ type Graphy struct {
 	// structureLock ensures that there cannot be concurrent modifications to the
 	// processors while there are schema-related requests in progress.
 	structureLock sync.RWMutex
+
+	// errorHandler for handling errors in a customizable way
+	errorHandler ErrorHandler
 
 	// schemaLock ensures that there is only a single schema-generation request in
 	// progress at a time.
@@ -219,6 +223,23 @@ func (g *Graphy) RegisterTypes(ctx context.Context, types ...any) {
 	}
 
 	g.schemaBuffer = nil
+}
+
+// SetErrorHandler sets a custom error handler for the Graphy instance
+// This allows applications to customize how errors are logged and handled
+func (g *Graphy) SetErrorHandler(handler ErrorHandler) {
+	g.errorHandler = handler
+}
+
+// handleError is an internal helper that calls the registered error handler
+// or falls back to default logging if no handler is set
+func (g *Graphy) handleError(ctx context.Context, category ErrorCategory, err error, details map[string]interface{}) {
+	if g.errorHandler != nil {
+		g.errorHandler.HandleError(ctx, category, err, details)
+	} else {
+		// Default fallback behavior - log to standard logger
+		log.Printf("[%s] %v", category, err)
+	}
 }
 
 func (g *Graphy) ensureInitialized() {

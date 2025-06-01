@@ -50,6 +50,10 @@ http.ListenAndServe(":8080", nil)
 
 Now visit http://localhost:8080/graphql to explore your API with GraphQL playground!
 
+## Custom HTTP Implementation
+
+The built-in `GraphHttpHandler` implementation can be used as a template if you need custom functionality like special logging, context injection, authentication middleware, or custom error handling. The actual GraphQL processing is handled by `ProcessRequest` - everything in `GraphHttpHandler` is just a standard HTTP handler implementation that you can customize as needed.
+
 ## Why Code-First?
 
 **Traditional Schema-First Approach:**

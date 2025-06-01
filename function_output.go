@@ -160,7 +160,6 @@ func (f *graphFunction) processOutputStruct(ctx context.Context, req *request, f
 			if actualValue.IsValid() && (!actualValue.CanInterface() || actualValue.Interface() != nil) {
 				// Check if we actually discovered a different type
 				if actualValue.Type() != structValue.Type() {
-					// fmt.Printf("DEBUG: After discovery - type: %v, value type: %T\n", actualValue.Type(), actual)
 					structValue = actualValue
 				}
 			}

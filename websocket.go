@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -83,14 +82,19 @@ func (h *GraphQLWebSocketHandler) HandleConnection(ctx context.Context, conn Sim
 		data, err := conn.ReadMessage()
 		if err != nil {
 			if err != io.EOF {
-				log.Printf("WebSocket read error: %v", err)
+				h.graphy.handleError(ctx, ErrorCategoryWebSocket, err, map[string]interface{}{
+					"operation": "read_websocket_message",
+				})
 			}
 			return
 		}
 
 		var msg WebSocketMessage
 		if err := json.Unmarshal(data, &msg); err != nil {
-			log.Printf("Failed to parse WebSocket message: %v", err)
+			h.graphy.handleError(ctx, ErrorCategoryWebSocket, err, map[string]interface{}{
+				"operation":   "parse_websocket_message",
+				"raw_message": string(data),
+			})
 			continue
 		}
 
@@ -151,6 +155,13 @@ func (h *GraphQLWebSocketHandler) HandleConnection(ctx context.Context, conn Sim
 				// Process subscription
 				msgChan, err := h.graphy.ProcessSubscription(subCtx, payload.Query, string(payload.Variables))
 				if err != nil {
+					// Categorize the error appropriately
+					h.graphy.handleError(subCtx, ErrorCategoryValidation, err, map[string]interface{}{
+						"operation":       "process_subscription",
+						"subscription_id": id,
+						"query":           payload.Query,
+						"variables":       string(payload.Variables),
+					})
 					h.sendError(conn, id, err)
 					return
 				}
@@ -221,7 +232,11 @@ func (h *GraphHttpHandlerWithWS) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	if r.Header.Get("Upgrade") == "websocket" {
 		conn, err := h.upgrader.Upgrade(w, r)
 		if err != nil {
-			log.Printf("WebSocket upgrade failed: %v", err)
+			h.graphy.handleError(r.Context(), ErrorCategoryWebSocket, err, map[string]interface{}{
+				"operation":      "websocket_upgrade",
+				"request_method": r.Method,
+				"request_path":   r.URL.Path,
+			})
 			http.Error(w, "WebSocket upgrade failed", http.StatusBadRequest)
 			return
 		}

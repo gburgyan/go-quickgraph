@@ -601,14 +601,21 @@ func (f *graphFunction) Call(ctx context.Context, req *request, params *paramete
 	// Catch panics and return them as errors.
 	defer func() {
 		if r := recover(); r != nil {
-			stack := string(debug.Stack())
 			val = reflect.Value{}
 			var pos lexer.Position
 			if params != nil {
 				pos = params.Pos
 			}
-			gErr := NewGraphError(fmt.Sprintf("function %s panicked: %v", f.name, r), pos)
-			gErr.AddExtension("stack", stack)
+
+			// Create panic error with both dev and production messages
+			gErr := NewPanicError(f.name, r, pos)
+
+			// Add sensitive extensions that will be filtered in production
+			stack := string(debug.Stack())
+			gErr.AddSensitiveExtension("stack", stack)
+			gErr.AddSensitiveExtension("function_name", f.name)
+			gErr.AddSensitiveExtension("panic_value", fmt.Sprintf("%v", r))
+
 			retErr = gErr
 		}
 	}()

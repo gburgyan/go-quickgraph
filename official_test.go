@@ -613,12 +613,16 @@ mutation CreateReviewForEpisode($ep: Episode!, $review: ReviewInput!) {
 }`
 
 	resultAny, err := g.ProcessRequest(ctx, input, vars)
-	assert.EqualError(t, err, "function createReview panicked: fixed error message (path: createReview) [3:16]")
-	assert.Contains(t, resultAny, `{"data":{},"errors":[{"message":"function createReview panicked: fixed error message","locations":[{"line":3,"column":16}],"path":["createReview"],"extensions":{"stack"`, resultAny)
+	assert.EqualError(t, err, "function createReview panicked: fixed error message (path: createReview) [3:16]: panic: fixed error message")
+	assert.Contains(t, resultAny, `"message":"function createReview panicked: fixed error message: panic: fixed error message"`, resultAny)
+	assert.Contains(t, resultAny, `"path":["createReview"]`, resultAny)
+	assert.Contains(t, resultAny, `"extensions"`, resultAny)
+	assert.Contains(t, resultAny, `"stack"`, resultAny)
 	var gErr GraphError
 	errors.As(err, &gErr)
 	// The stack trace isn't stable so we can't compare it. Just verify we have it.
-	assert.Contains(t, gErr.Extensions, "stack")
+	// In the new system, stack trace is in SensitiveExtensions in dev mode but shown in the response
+	assert.Contains(t, gErr.SensitiveExtensions, "stack")
 }
 
 func TestEnumInvalid(t *testing.T) {

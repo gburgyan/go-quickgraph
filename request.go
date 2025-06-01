@@ -3,6 +3,7 @@ package quickgraph
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/alecthomas/participle/v2/lexer"
 	"github.com/gburgyan/go-timing"
@@ -680,7 +681,54 @@ func (r *request) execute(ctx context.Context) (string, error) {
 	}
 
 	if len(errColl) > 0 {
-		result["errors"] = errColl
+		// Log errors through error handler (this is the single place where we log execution errors)
+		for _, err := range errColl {
+			var ge GraphError
+			if errors.As(err, &ge) {
+				// Create details for error handler logging
+				details := map[string]interface{}{
+					"operation": "request_execution",
+				}
+
+				// Add all sensitive extensions to details for logging
+				for k, v := range ge.SensitiveExtensions {
+					details[k] = v
+				}
+
+				// Add other useful context
+				if len(ge.Path) > 0 {
+					details["graphql_path"] = strings.Join(ge.Path, ".")
+				}
+
+				r.graphy.handleError(ctx, ErrorCategoryExecution, ge, details)
+			} else {
+				// Handle non-GraphError
+				r.graphy.handleError(ctx, ErrorCategoryExecution, err, map[string]interface{}{
+					"operation": "request_execution",
+				})
+			}
+		}
+
+		// Handle errors based on production mode for client response
+		var processedErrors []json.RawMessage
+		for _, err := range errColl {
+			var ge GraphError
+			if !errors.As(err, &ge) {
+				ge = GraphError{
+					Message:    err.Error(),
+					InnerError: err,
+				}
+			}
+
+			var errJson []byte
+			if r.graphy.ProductionMode {
+				errJson, _ = ge.MarshalJSONProduction()
+			} else {
+				errJson, _ = ge.MarshalJSON()
+			}
+			processedErrors = append(processedErrors, errJson)
+		}
+		result["errors"] = processedErrors
 	}
 
 	// Serialize the result to JSON.

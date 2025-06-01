@@ -25,6 +25,11 @@ type Graphy struct {
 
 	EnableTiming bool
 
+	// ProductionMode controls error reporting - when true, sensitive information
+	// like stack traces, function names, and inner error details are sanitized
+	// to prevent information disclosure. Defaults to false (development mode).
+	ProductionMode bool
+
 	// QueryLimits defines optional limits to prevent DoS attacks
 	QueryLimits *QueryLimits
 
@@ -268,7 +273,7 @@ func (g *Graphy) ProcessRequest(ctx context.Context, request string, variableJso
 
 	rs, err := g.getRequestStub(tCtx, request)
 	if err != nil {
-		return formatError(err), err
+		return formatErrorWithMode(g.ProductionMode, err), err
 	}
 
 	if timingContext != nil {
@@ -277,7 +282,7 @@ func (g *Graphy) ProcessRequest(ctx context.Context, request string, variableJso
 
 	newRequest, err := rs.newRequest(tCtx, variableJson)
 	if err != nil {
-		return formatError(err), err
+		return formatErrorWithMode(g.ProductionMode, err), err
 	}
 
 	return newRequest.execute(tCtx)

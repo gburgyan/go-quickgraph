@@ -29,16 +29,31 @@ func (g GraphHttpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	// Recover from any panics to prevent server crashes
 	defer func() {
 		if r := recover(); r != nil {
-			// Report the panic through error handler
+			// Create panic error for HTTP handler
 			err := GraphError{
-				Message:    "Internal server error",
-				InnerError: fmt.Errorf("panic: %v", r),
+				Message:           "Internal server error",
+				ProductionMessage: "Internal server error",
+				InnerError:        fmt.Errorf("panic: %v", r),
 			}
-			g.graphy.handleError(request.Context(), ErrorCategoryInternal, err, map[string]interface{}{
-				"stack_trace":    string(debug.Stack()),
+
+			// Add sensitive information that will be filtered in production
+			if err.SensitiveExtensions == nil {
+				err.SensitiveExtensions = make(map[string]string)
+			}
+			err.SensitiveExtensions["stack_trace"] = string(debug.Stack())
+			err.SensitiveExtensions["panic_value"] = fmt.Sprintf("%v", r)
+
+			// Create details for error handler
+			details := map[string]interface{}{
+				"operation":      "http_handler_panic",
 				"request_method": request.Method,
 				"request_path":   request.URL.Path,
-			})
+				"panic_value":    fmt.Sprintf("%v", r),
+				"stack_trace":    string(debug.Stack()),
+			}
+
+			// Report through error handler (this will include all details)
+			g.graphy.handleError(request.Context(), ErrorCategoryInternal, err, details)
 
 			// Return a generic error to the client (no internal details)
 			writer.Header().Set("Content-Type", "application/json")

@@ -53,12 +53,16 @@ func (f ErrorHandlerFunc) HandleError(ctx context.Context, category ErrorCategor
 // - Path: Represents the path in the graph where the error occurred.
 // - Extensions: A map containing additional error information not part of the standard fields.
 // - InnerError: An underlying error that might have caused this GraphError. It is not serialized to JSON.
+// - ProductionMessage: Sanitized message for production use (if different from Message).
+// - SensitiveExtensions: Extensions that should be filtered in production mode.
 type GraphError struct {
-	Message    string            `json:"message"`
-	Locations  []ErrorLocation   `json:"locations,omitempty"`
-	Path       []string          `json:"path,omitempty"`
-	Extensions map[string]string `json:"extensions,omitempty"`
-	InnerError error             `json:"-"`
+	Message             string            `json:"message"`
+	Locations           []ErrorLocation   `json:"locations,omitempty"`
+	Path                []string          `json:"path,omitempty"`
+	Extensions          map[string]string `json:"extensions,omitempty"`
+	InnerError          error             `json:"-"`
+	ProductionMessage   string            `json:"-"` // Sanitized message for production
+	SensitiveExtensions map[string]string `json:"-"` // Extensions to filter in production
 }
 
 // ErrorLocation provides details about where in the source a particular error occurred.
@@ -115,6 +119,81 @@ func NewGraphError(message string, pos lexer.Position, paths ...string) GraphErr
 	gErr.Message = message
 	gErr.Path = paths
 	return gErr
+}
+
+// NewGraphErrorProduction creates a sanitized GraphError for production use
+func NewGraphErrorProduction(message string, pos lexer.Position, paths ...string) GraphError {
+	// In production mode, provide a generic error message to avoid information disclosure
+	genericMessage := "An error occurred while processing the request"
+
+	// For validation errors, keep the original message as it's usually safe
+	if message != "" && !containsSensitiveInfo(message) {
+		genericMessage = message
+	}
+
+	var gErr GraphError
+	if pos.Offset > 0 {
+		loc := lexerPositionError(pos)
+		gErr.Locations = append(gErr.Locations, loc)
+	}
+	gErr.Message = genericMessage
+	gErr.Path = paths
+	return gErr
+}
+
+// NewGraphErrorWithProduction creates a GraphError with both development and production messages
+func NewGraphErrorWithProduction(devMessage, prodMessage string, pos lexer.Position, paths ...string) GraphError {
+	var gErr GraphError
+	if pos.Offset > 0 {
+		loc := lexerPositionError(pos)
+		gErr.Locations = append(gErr.Locations, loc)
+	}
+	gErr.Message = devMessage
+	gErr.ProductionMessage = prodMessage
+	gErr.Path = paths
+	return gErr
+}
+
+// NewPanicError creates a GraphError for function panics with both dev and production messages
+func NewPanicError(functionName string, panicValue interface{}, pos lexer.Position, paths ...string) GraphError {
+	devMessage := fmt.Sprintf("function %s panicked: %v", functionName, panicValue)
+	prodMessage := "Internal server error"
+
+	gErr := NewGraphErrorWithProduction(devMessage, prodMessage, pos, paths...)
+	gErr.InnerError = fmt.Errorf("panic: %v", panicValue)
+
+	// Initialize sensitive extensions
+	if gErr.SensitiveExtensions == nil {
+		gErr.SensitiveExtensions = make(map[string]string)
+	}
+
+	return gErr
+}
+
+// AddSensitiveExtension adds a key-value pair to the SensitiveExtensions field
+// These extensions will be filtered out in production mode
+func (e *GraphError) AddSensitiveExtension(key string, value string) {
+	if e.SensitiveExtensions == nil {
+		e.SensitiveExtensions = make(map[string]string)
+	}
+	e.SensitiveExtensions[key] = value
+}
+
+// containsSensitiveInfo checks if a message contains potentially sensitive information
+func containsSensitiveInfo(message string) bool {
+	// Check for common patterns that might leak sensitive information
+	sensitivePatterns := []string{
+		"panic:", "runtime error:", "stack trace:", "function", "reflect.",
+		"goroutine", "main.go", ".go:", "nil pointer", "index out of range",
+	}
+
+	messageLower := strings.ToLower(message)
+	for _, pattern := range sensitivePatterns {
+		if strings.Contains(messageLower, pattern) {
+			return true
+		}
+	}
+	return false
 }
 
 // lexerPositionError takes a lexer.Position and returns an ErrorLocation that is the equivalent.
@@ -246,31 +325,72 @@ func transformJsonError(input string, err error) error {
 // MarshalJSON implements the json.Marshaler interface for GraphError.
 // This allows us to format the error in the way that GraphQL expects.
 func (e GraphError) MarshalJSON() ([]byte, error) {
-	// There is no really good way to have the inner error get exposed, even
-	// though it has good information. We need a custom marshaller to do this.
+	return e.marshalJSONWithMode(false) // Default to development mode for backward compatibility
+}
 
+// MarshalJSONProduction marshals the error for production use, sanitizing sensitive information
+func (e GraphError) MarshalJSONProduction() ([]byte, error) {
+	return e.marshalJSONWithMode(true)
+}
+
+// marshalJSONWithMode handles JSON marshaling with production mode control
+func (e GraphError) marshalJSONWithMode(productionMode bool) ([]byte, error) {
 	// We need to create a new type that has all of the fields of GraphError
-	// except for InnerError. We can then marshal that type.
-	type graphErrorNoInnerError struct {
+	// except for InnerError and our internal fields
+	type graphErrorForSerialization struct {
 		Message    string            `json:"message"`
 		Locations  []ErrorLocation   `json:"locations,omitempty"`
 		Path       []string          `json:"path,omitempty"`
 		Extensions map[string]string `json:"extensions,omitempty"`
 	}
 
-	// Create a new instance of the new type and copy the fields over.
-	var gErr graphErrorNoInnerError
-	gErr.Message = e.Message
+	// Create a new instance and copy the fields over
+	var gErr graphErrorForSerialization
 	gErr.Locations = e.Locations
 	gErr.Path = e.Path
-	gErr.Extensions = e.Extensions
 
-	// If there is an inner error, append that to the message.
-	if e.InnerError != nil {
-		gErr.Message = fmt.Sprintf("%s: %s", gErr.Message, e.InnerError.Error())
+	// Choose message based on production mode
+	if productionMode && e.ProductionMessage != "" {
+		gErr.Message = e.ProductionMessage
+	} else {
+		gErr.Message = e.Message
+		// In development mode, append inner error details to the message
+		if e.InnerError != nil {
+			gErr.Message = fmt.Sprintf("%s: %s", gErr.Message, e.InnerError.Error())
+		}
 	}
 
-	// Marshal the new type.
+	// Handle extensions based on production mode
+	if productionMode {
+		// In production mode, filter out sensitive extensions
+		gErr.Extensions = make(map[string]string)
+		for k, v := range e.Extensions {
+			// Skip extensions that are marked as sensitive
+			if _, isSensitive := e.SensitiveExtensions[k]; isSensitive {
+				continue
+			}
+			gErr.Extensions[k] = v
+		}
+		// Remove empty extensions map
+		if len(gErr.Extensions) == 0 {
+			gErr.Extensions = nil
+		}
+	} else {
+		// In development mode, include all extensions (both regular and sensitive)
+		gErr.Extensions = make(map[string]string)
+		for k, v := range e.Extensions {
+			gErr.Extensions[k] = v
+		}
+		for k, v := range e.SensitiveExtensions {
+			gErr.Extensions[k] = v
+		}
+		// Remove empty extensions map
+		if len(gErr.Extensions) == 0 {
+			gErr.Extensions = nil
+		}
+	}
+
+	// Marshal the new type
 	return json.Marshal(gErr)
 }
 
@@ -291,7 +411,11 @@ func (e *GraphError) AddExtension(key string, value string) {
 }
 
 func formatError(errs ...error) string {
-	var resultErrors []GraphError
+	return formatErrorWithMode(false, errs...) // Default to development mode for backward compatibility
+}
+
+func formatErrorWithMode(productionMode bool, errs ...error) string {
+	var resultErrors []json.RawMessage
 	for _, err := range errs {
 		var ge GraphError
 		if !errors.As(err, &ge) {
@@ -300,7 +424,14 @@ func formatError(errs ...error) string {
 				InnerError: err,
 			}
 		}
-		resultErrors = append(resultErrors, ge)
+
+		var errJson []byte
+		if productionMode {
+			errJson, _ = ge.MarshalJSONProduction()
+		} else {
+			errJson, _ = ge.MarshalJSON()
+		}
+		resultErrors = append(resultErrors, errJson)
 	}
 	resultMap := map[string]any{
 		"errors": resultErrors,

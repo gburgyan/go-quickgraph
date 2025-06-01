@@ -51,13 +51,21 @@ type ScalarDefinition struct {
 	// (string, int, float64, bool, nil)
 	Serialize func(value interface{}) (interface{}, error)
 
-	// ParseValue converts a JSON value from variables to a Go value
-	// The input value comes from GraphQL variables and should be converted to GoType
+	// ParseValue converts a JSON value from variables to a Go value.
+	// The input value comes from GraphQL variables (JSON-parsed) and should be converted to GoType.
+	// Input types: string, int64, float64, bool, []interface{}, map[string]interface{}, nil
 	ParseValue func(value interface{}) (interface{}, error)
 
-	// ParseLiteral converts a GraphQL literal value to a Go value
-	// This is called when the value appears directly in the query (not from variables)
-	// If not provided, ParseValue will be used as a fallback
+	// ParseLiteral converts a GraphQL literal value to a Go value.
+	// This is called when the value appears directly in the query string (not from variables).
+	// Input is typically a string extracted from the query literal.
+	//
+	// You need to provide ParseLiteral when:
+	// - Literal and variable formats differ (e.g., dates as "2023-01-01" vs variables as timestamps)
+	// - You want different validation rules for literals vs variables
+	// - Literals require different parsing logic than JSON-decoded values
+	//
+	// If not provided, ParseValue will be used as a fallback.
 	ParseLiteral func(value interface{}) (interface{}, error)
 }
 

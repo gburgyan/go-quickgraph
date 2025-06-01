@@ -512,6 +512,13 @@ func (rs *RequestStub) newRequest(ctx context.Context, variableJson string) (*re
 
 	rawVariables := map[string]json.RawMessage{}
 	if variableJson != "" {
+		// Apply memory limits if configured
+		if rs.graphy.MemoryLimits != nil && rs.graphy.MemoryLimits.MaxVariableSize > 0 {
+			if int64(len(variableJson)) > rs.graphy.MemoryLimits.MaxVariableSize {
+				return nil, NewGraphError(fmt.Sprintf("variable payload size %d exceeds maximum allowed size of %d bytes", len(variableJson), rs.graphy.MemoryLimits.MaxVariableSize), lexer.Position{})
+			}
+		}
+
 		err := json.Unmarshal([]byte(variableJson), &rawVariables)
 		if err != nil {
 			return nil, transformJsonError(variableJson, err)

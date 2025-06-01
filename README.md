@@ -27,7 +27,18 @@ type User struct {
 
 func main() {
     ctx := context.Background()
-    g := quickgraph.Graphy{}
+    g := quickgraph.Graphy{
+        // Optional: Add security configuration
+        MemoryLimits: &quickgraph.MemoryLimits{
+            MaxRequestBodySize:            1024 * 1024, // 1MB
+            MaxVariableSize:               64 * 1024,   // 64KB
+            MaxSubscriptionsPerConnection: 10,          // Per-connection limit
+        },
+        QueryLimits: &quickgraph.QueryLimits{
+            MaxDepth:      10,   // Query depth limit
+            MaxComplexity: 1000, // Query complexity limit
+        },
+    }
     
     // Register a function - it becomes a GraphQL query automatically!
     g.RegisterQuery(ctx, "user", func(ctx context.Context, id int) *User {
@@ -79,7 +90,7 @@ Try this query:
 
 - **🔥 Code-First**: Generate schemas from Go code, not the other way around
 - **⚡ Fast**: Aggressive caching and optimized reflection usage
-- **🛡️ Secure**: Built-in DoS protection with query depth and complexity limits  
+- **🛡️ Secure**: Built-in DoS protection, memory limits, and WebSocket authentication
 - **🔄 Real-time**: WebSocket subscriptions with channel-based streaming
 - **🎯 Type-Safe**: Full Go type checking with automatic GraphQL type generation
 - **🚀 Production Ready**: Thread-safe, caching, error handling, and observability
@@ -98,6 +109,7 @@ Try this query:
 - [Real-time Subscriptions](docs/SUBSCRIPTIONS.md) - WebSocket streaming with channels
 
 ### Advanced Usage
+- [Security Guide](SECURITY.md) - Memory limits, authentication, and DoS protection
 - [Authentication & Authorization](docs/AUTH_PATTERNS.md) - Securing your GraphQL API
 - [Performance & Caching](docs/PERFORMANCE.md) - Optimization and DoS protection  
 - [Schema Generation](docs/SCHEMA.md) - Introspection and schema customization

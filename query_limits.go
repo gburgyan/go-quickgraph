@@ -30,6 +30,26 @@ type QueryLimits struct {
 	ComplexityScorer ComplexityScorer
 }
 
+// MemoryLimits defines optional limits to prevent memory exhaustion attacks.
+// All limits are optional - zero values mean unlimited.
+type MemoryLimits struct {
+	// MaxRequestBodySize limits the size of HTTP request bodies in bytes (0 = unlimited)
+	MaxRequestBodySize int64
+
+	// MaxVariableSize limits the size of variable JSON payloads in bytes (0 = unlimited)
+	MaxVariableSize int64
+
+	// SubscriptionBufferSize sets the buffer size for subscription channels (0 = unbuffered)
+	SubscriptionBufferSize int
+
+	// MaxWebSocketConnections limits concurrent WebSocket connections (0 = unlimited)
+	// This is customer-implemented. Left as a placeholder for customer use.
+	MaxWebSocketConnections int
+
+	// MaxSubscriptionsPerConnection limits subscriptions per WebSocket connection (0 = unlimited)
+	MaxSubscriptionsPerConnection int
+}
+
 // ComplexityScorer allows custom complexity scoring for queries
 type ComplexityScorer interface {
 	// ScoreField returns the complexity score for accessing a field

@@ -48,17 +48,85 @@ type SimpleWebSocketConn interface {
 	Close() error
 }
 
+// WebSocketAuthenticator provides a flexible interface for authenticating WebSocket connections.
+// Customers can implement this interface to add their own authentication logic.
+type WebSocketAuthenticator interface {
+	// AuthenticateConnection is called when a WebSocket connection is established.
+	// It receives the connection initialization payload and should return:
+	// - An authenticated context if authentication succeeds
+	// - An error if authentication fails (this will close the connection)
+	// The returned context will be used for all subsequent operations on this connection.
+	AuthenticateConnection(ctx context.Context, initPayload json.RawMessage) (context.Context, error)
+
+	// AuthorizeSubscription is called before each subscription is created.
+	// It receives the authenticated context and subscription request and should return:
+	// - An authorized context if the subscription is allowed
+	// - An error if the subscription should be denied
+	// This allows for fine-grained per-subscription authorization.
+	AuthorizeSubscription(ctx context.Context, query string, variables json.RawMessage) (context.Context, error)
+}
+
+// NoOpWebSocketAuthenticator is a default implementation that allows all connections and subscriptions.
+// This maintains backward compatibility for customers who don't need authentication.
+type NoOpWebSocketAuthenticator struct{}
+
+func (n NoOpWebSocketAuthenticator) AuthenticateConnection(ctx context.Context, initPayload json.RawMessage) (context.Context, error) {
+	return ctx, nil
+}
+
+func (n NoOpWebSocketAuthenticator) AuthorizeSubscription(ctx context.Context, query string, variables json.RawMessage) (context.Context, error) {
+	return ctx, nil
+}
+
 // GraphQLWebSocketHandler handles GraphQL subscriptions over WebSocket
 type GraphQLWebSocketHandler struct {
-	graphy *Graphy
+	graphy        *Graphy
+	authenticator WebSocketAuthenticator
 }
 
 // NewGraphQLWebSocketHandler creates a new WebSocket handler for GraphQL subscriptions
 func NewGraphQLWebSocketHandler(graphy *Graphy) *GraphQLWebSocketHandler {
 	return &GraphQLWebSocketHandler{
-		graphy: graphy,
+		graphy:        graphy,
+		authenticator: NoOpWebSocketAuthenticator{}, // Default to no authentication
 	}
 }
+
+// NewGraphQLWebSocketHandlerWithAuth creates a new WebSocket handler with custom authentication
+func NewGraphQLWebSocketHandlerWithAuth(graphy *Graphy, authenticator WebSocketAuthenticator) *GraphQLWebSocketHandler {
+	return &GraphQLWebSocketHandler{
+		graphy:        graphy,
+		authenticator: authenticator,
+	}
+}
+
+// NOTE: For global WebSocket connection limits (MemoryLimits.MaxWebSocketConnections),
+// customers should implement connection tracking at the HTTP upgrade layer.
+// Example implementation:
+//
+// type ConnectionTracker struct {
+//     mu sync.Mutex
+//     count int
+//     maxConnections int
+// }
+//
+// func (ct *ConnectionTracker) CanConnect() bool {
+//     ct.mu.Lock()
+//     defer ct.mu.Unlock()
+//     return ct.count < ct.maxConnections
+// }
+//
+// func (ct *ConnectionTracker) OnConnect() {
+//     ct.mu.Lock()
+//     defer ct.mu.Unlock()
+//     ct.count++
+// }
+//
+// func (ct *ConnectionTracker) OnDisconnect() {
+//     ct.mu.Lock()
+//     defer ct.mu.Unlock()
+//     ct.count--
+// }
 
 // HandleConnection handles a WebSocket connection using the graphql-ws protocol
 func (h *GraphQLWebSocketHandler) HandleConnection(ctx context.Context, conn SimpleWebSocketConn) {
@@ -67,6 +135,10 @@ func (h *GraphQLWebSocketHandler) HandleConnection(ctx context.Context, conn Sim
 	// Tracks active subscriptions
 	subscriptions := make(map[string]context.CancelFunc)
 	mu := sync.Mutex{}
+
+	// Track authentication state
+	var authenticatedCtx context.Context
+	authenticated := false
 
 	// Cleanup all subscriptions on disconnect
 	defer func() {
@@ -100,6 +172,28 @@ func (h *GraphQLWebSocketHandler) HandleConnection(ctx context.Context, conn Sim
 
 		switch msg.Type {
 		case GQLConnectionInit:
+			// Authenticate the connection
+			authCtx, err := h.authenticator.AuthenticateConnection(ctx, msg.Payload)
+			if err != nil {
+				// Send connection error and close
+				errorPayload := map[string]string{
+					"message": fmt.Sprintf("Authentication failed: %s", err.Error()),
+				}
+				payloadBytes, _ := json.Marshal(errorPayload)
+				errMsg := WebSocketMessage{
+					Type:    GQLConnectionError,
+					Payload: json.RawMessage(payloadBytes),
+				}
+				if data, marshalErr := json.Marshal(errMsg); marshalErr == nil {
+					conn.WriteMessage(data)
+				}
+				return
+			}
+
+			// Authentication successful
+			authenticatedCtx = authCtx
+			authenticated = true
+
 			// Send connection acknowledgment
 			ack := WebSocketMessage{
 				Type: GQLConnectionAck,
@@ -112,6 +206,12 @@ func (h *GraphQLWebSocketHandler) HandleConnection(ctx context.Context, conn Sim
 			return
 
 		case GQLSubscribe:
+			// Check if connection is authenticated
+			if !authenticated {
+				h.sendError(conn, msg.ID, fmt.Errorf("connection not authenticated"))
+				continue
+			}
+
 			// Parse subscription request
 			var payload struct {
 				Query     string          `json:"query"`
@@ -122,15 +222,33 @@ func (h *GraphQLWebSocketHandler) HandleConnection(ctx context.Context, conn Sim
 				continue
 			}
 
-			// Cancel any existing subscription with the same ID
+			// Authorize the subscription
+			authorizedCtx, err := h.authenticator.AuthorizeSubscription(authenticatedCtx, payload.Query, payload.Variables)
+			if err != nil {
+				h.sendError(conn, msg.ID, fmt.Errorf("subscription not authorized: %v", err))
+				continue
+			}
+
+			// Check subscription limits
 			mu.Lock()
+			// Cancel any existing subscription with the same ID first
 			if cancel, exists := subscriptions[msg.ID]; exists {
 				cancel()
+				delete(subscriptions, msg.ID)
+			}
+
+			// Check if we're at the subscription limit
+			if h.graphy.MemoryLimits != nil && h.graphy.MemoryLimits.MaxSubscriptionsPerConnection > 0 {
+				if len(subscriptions) >= h.graphy.MemoryLimits.MaxSubscriptionsPerConnection {
+					mu.Unlock()
+					h.sendError(conn, msg.ID, fmt.Errorf("maximum subscriptions per connection (%d) exceeded", h.graphy.MemoryLimits.MaxSubscriptionsPerConnection))
+					continue
+				}
 			}
 			mu.Unlock()
 
 			// Create subscription context
-			subCtx, cancel := context.WithCancel(ctx)
+			subCtx, cancel := context.WithCancel(authorizedCtx)
 			mu.Lock()
 			subscriptions[msg.ID] = cancel
 			mu.Unlock()

@@ -28,6 +28,9 @@ type Graphy struct {
 	// QueryLimits defines optional limits to prevent DoS attacks
 	QueryLimits *QueryLimits
 
+	// MemoryLimits defines optional limits to prevent memory exhaustion attacks
+	MemoryLimits *MemoryLimits
+
 	processors  map[string]graphFunction
 	typeLookups map[reflect.Type]*typeLookup
 	anyTypes    []*typeLookup

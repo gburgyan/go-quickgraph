@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gburgyan/go-timing"
+	"io"
 	"log"
 	"net/http"
 	"runtime/debug"
@@ -81,7 +82,14 @@ func (g GraphHttpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	}
 
 	var req graphqlRequest
-	err := json.NewDecoder(request.Body).Decode(&req)
+
+	// Apply memory limits if configured
+	var bodyReader io.Reader = request.Body
+	if g.graphy.MemoryLimits != nil && g.graphy.MemoryLimits.MaxRequestBodySize > 0 {
+		bodyReader = io.LimitReader(request.Body, g.graphy.MemoryLimits.MaxRequestBodySize)
+	}
+
+	err := json.NewDecoder(bodyReader).Decode(&req)
 	if err != nil {
 		g.graphy.handleError(ctx, ErrorCategoryHTTP, err, map[string]interface{}{
 			"operation":      "decode_request_body",

@@ -53,7 +53,14 @@ func (r *request) executeSubscription(ctx context.Context) (*SubscriptionResult,
 	}
 
 	// Create output channel for messages
-	outChan := make(chan SubscriptionMessage)
+	bufferSize := 0
+	if r.graphy.MemoryLimits != nil {
+		bufferSize = r.graphy.MemoryLimits.SubscriptionBufferSize
+		if bufferSize < 0 {
+			bufferSize = 0 // Treat negative values as unbuffered
+		}
+	}
+	outChan := make(chan SubscriptionMessage, bufferSize)
 
 	// Start goroutine to handle channel messages
 	go func() {
@@ -139,7 +146,14 @@ func (g *Graphy) ProcessSubscription(ctx context.Context, request string, variab
 	}
 
 	// Create channel for JSON messages
-	jsonChan := make(chan string)
+	bufferSize := 0
+	if g.MemoryLimits != nil {
+		bufferSize = g.MemoryLimits.SubscriptionBufferSize
+		if bufferSize < 0 {
+			bufferSize = 0 // Treat negative values as unbuffered
+		}
+	}
+	jsonChan := make(chan string, bufferSize)
 
 	// Start goroutine to convert messages to JSON
 	go func() {

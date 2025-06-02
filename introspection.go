@@ -135,9 +135,9 @@ func (g *Graphy) EnableIntrospection(ctx context.Context) {
 }
 
 func (g *Graphy) populateIntrospection(st *schemaTypes) {
-	queryName := "__query"
-	mutationName := "__mutation"
-	subscriptionName := "__subscription"
+	queryName := "Query"
+	mutationName := "Mutation"
+	subscriptionName := "Subscription"
 	queries := &__Type{Kind: IntrospectionKindObject, Name: &queryName}
 	mutations := &__Type{Kind: IntrospectionKindObject, Name: &mutationName}
 	subscriptions := &__Type{Kind: IntrospectionKindObject, Name: &subscriptionName}
@@ -184,12 +184,12 @@ func (g *Graphy) populateIntrospection(st *schemaTypes) {
 	}
 
 	// Add the root types to the lookup map
-	is.typeLookupByName["__query"] = queries
-	is.typeLookupByName["__mutation"] = mutations
+	is.typeLookupByName["Query"] = queries
+	is.typeLookupByName["Mutation"] = mutations
 
 	is.Types = append(is.Types, queries, mutations)
 	if hasSubscriptions {
-		is.typeLookupByName["__subscription"] = subscriptions
+		is.typeLookupByName["Subscription"] = subscriptions
 		is.Types = append(is.Types, subscriptions)
 	} else {
 		// If no subscriptions are registered, set it to nil

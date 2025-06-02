@@ -21,6 +21,13 @@ g := &quickgraph.Graphy{
         SubscriptionBufferSize:        100,
         MaxSubscriptionsPerConnection: 10,
     },
+    CORSSettings: &quickgraph.CORSSettings{
+        AllowedOrigins:   []string{"https://myapp.com"},
+        AllowedMethods:   []string{"POST", "OPTIONS"},
+        AllowedHeaders:   []string{"Content-Type", "Authorization"},
+        AllowCredentials: true,
+        MaxAge:           3600,
+    },
 }
 ```
 
@@ -39,6 +46,7 @@ g := &quickgraph.Graphy{
 - ✅ **Query Complexity Limits** - Depth, field count, alias, and complexity protection
 - ✅ **Memory Exhaustion Prevention** - HTTP body and variable size limits
 - ✅ **Information Disclosure Protection** - Production mode error sanitization  
+- ✅ **CORS Configuration** - Flexible cross-origin access control
 - ✅ **WebSocket Authentication** - Pluggable authentication framework
 - ✅ **Input Validation** - Type-safe parameter validation
 - ✅ **Panic Recovery** - Comprehensive error handling
@@ -114,6 +122,166 @@ type MemoryLimits struct {
 - **HTTP Body Limiting**: Uses `io.LimitReader` to prevent large payloads
 - **Variable Validation**: Limits JSON variable size after parsing
 - **Subscription Control**: Manages channel buffers and connection limits
+
+## CORS Configuration
+
+Cross-Origin Resource Sharing (CORS) is essential for allowing web browsers to access your GraphQL API from different domains. go-quickgraph provides comprehensive CORS configuration through the `CORSSettings` struct.
+
+### Basic CORS Setup
+
+```go
+g := &Graphy{
+    // Enable default CORS settings (allows all origins)
+    CORSSettings: DefaultCORSSettings(),
+}
+```
+
+### Custom CORS Configuration
+
+```go
+g := &Graphy{
+    CORSSettings: &CORSSettings{
+        AllowedOrigins:   []string{"https://myapp.com", "https://admin.myapp.com"},
+        AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
+        AllowedHeaders:   []string{"Content-Type", "Authorization"},
+        ExposedHeaders:   []string{"X-Custom-Header"},
+        AllowCredentials: true,
+        MaxAge:           3600, // 1 hour cache for preflight requests
+        EnableForAllResponses: true, // Add CORS headers to all responses, not just OPTIONS
+    },
+}
+```
+
+### CORS Configuration Options
+
+```go
+type CORSSettings struct {
+    // AllowedOrigins specifies allowed origins for CORS requests
+    // Use "*" to allow all origins, or specify exact origins
+    AllowedOrigins []string
+
+    // AllowedMethods specifies allowed HTTP methods
+    // Default: ["GET", "POST", "OPTIONS"]
+    AllowedMethods []string
+
+    // AllowedHeaders specifies allowed request headers
+    // Default: ["Content-Type", "Authorization"]
+    AllowedHeaders []string
+
+    // ExposedHeaders specifies response headers browsers can access
+    // Optional - only set if you need to expose custom headers
+    ExposedHeaders []string
+
+    // AllowCredentials indicates whether credentials are allowed
+    // Important: Cannot be true if AllowedOrigins contains "*"
+    AllowCredentials bool
+
+    // MaxAge specifies preflight cache duration in seconds
+    // Default: 86400 (24 hours)
+    MaxAge int
+
+    // EnableForAllResponses adds CORS headers to all responses
+    // If false, only OPTIONS preflight requests get CORS headers
+    EnableForAllResponses bool
+}
+```
+
+### Production CORS Examples
+
+#### GraphQL Playground Development
+```go
+// Allow GraphQL Playground access during development
+g := &Graphy{
+    CORSSettings: &CORSSettings{
+        AllowedOrigins: []string{"*"}, // Allow all origins
+        AllowedMethods: []string{"GET", "POST", "OPTIONS"},
+        AllowedHeaders: []string{"Content-Type", "Authorization"},
+    },
+}
+```
+
+#### Production Web Application
+```go
+// Strict CORS for production
+g := &Graphy{
+    CORSSettings: &CORSSettings{
+        AllowedOrigins:        []string{"https://myapp.com"},
+        AllowedMethods:        []string{"POST", "OPTIONS"},
+        AllowedHeaders:        []string{"Content-Type", "Authorization"},
+        AllowCredentials:      true,
+        MaxAge:                3600,
+        EnableForAllResponses: true,
+    },
+}
+```
+
+#### Multiple Frontend Environments
+```go
+// Support multiple frontend deployments
+g := &Graphy{
+    CORSSettings: &CORSSettings{
+        AllowedOrigins: []string{
+            "https://app.mycompany.com",
+            "https://staging.mycompany.com", 
+            "https://admin.mycompany.com",
+        },
+        AllowedMethods:        []string{"GET", "POST", "OPTIONS"},
+        AllowedHeaders:        []string{"Content-Type", "Authorization", "X-API-Key"},
+        ExposedHeaders:        []string{"X-Request-ID", "X-Rate-Limit-Remaining"},
+        AllowCredentials:      true,
+        EnableForAllResponses: true,
+    },
+}
+```
+
+### CORS Security Considerations
+
+#### 1. Avoid Wildcard Origins in Production
+```go
+// ❌ Dangerous in production
+CORSSettings: &CORSSettings{
+    AllowedOrigins:   []string{"*"},
+    AllowCredentials: true, // This combination is invalid
+}
+
+// ✅ Specify exact origins
+CORSSettings: &CORSSettings{
+    AllowedOrigins:   []string{"https://myapp.com"},
+    AllowCredentials: true,
+}
+```
+
+#### 2. Minimize Exposed Headers
+```go
+// ❌ Don't expose sensitive headers unnecessarily
+ExposedHeaders: []string{"Authorization", "X-Internal-Token"}
+
+// ✅ Only expose what the frontend needs
+ExposedHeaders: []string{"X-Request-ID"}
+```
+
+#### 3. Use HTTPS Origins
+```go
+// ❌ HTTP origins in production
+AllowedOrigins: []string{"http://myapp.com"}
+
+// ✅ HTTPS only in production
+AllowedOrigins: []string{"https://myapp.com"}
+```
+
+### Disabling CORS
+
+```go
+// CORS is disabled by default
+g := &Graphy{
+    CORSSettings: nil, // No CORS headers will be added
+}
+```
+
+When CORS is disabled:
+- No `Access-Control-*` headers are added to responses
+- Browsers will block cross-origin requests
+- Useful for same-origin deployments or API-only servers
 
 ## WebSocket Security
 
@@ -553,8 +721,76 @@ go test -race ./...
 
 - [ ] **HTTPS Only**: Use TLS for all communication
 - [ ] **Security Headers**: Implement security headers middleware
-- [ ] **CORS Configuration**: Configure appropriate CORS policies
+- [ ] **CORS Configuration**: Configure appropriate CORS policies  
 - [ ] **Rate Limiting**: Implement request rate limiting
+
+## Common GraphQL Vulnerabilities
+
+### 1. Query Depth Attack
+**Attack**: Deeply nested queries that consume excessive processing time
+```graphql
+query {
+  user {
+    friends {
+      friends {
+        friends {
+          # ... 100 levels deep
+        }
+      }
+    }
+  }
+}
+```
+**Protection**: Set `QueryLimits.MaxDepth`
+
+### 2. Query Complexity Attack
+**Attack**: Queries with high computational complexity
+```graphql
+query {
+  users(first: 1000) {
+    posts(first: 1000) {
+      comments(first: 1000) {
+        author { name }
+      }
+    }
+  }
+}
+```
+**Protection**: Set `QueryLimits.MaxComplexity`
+
+### 3. Memory Exhaustion
+**Attack**: Large request payloads or variables
+```json
+{
+  "query": "mutation($data: String!) { process(data: $data) }",
+  "variables": {
+    "data": "A".repeat(10000000)
+  }
+}
+```
+**Protection**: Set `MemoryLimits.MaxRequestBodySize` and `MaxVariableSize`
+
+### 4. Subscription Flooding
+**Attack**: Opening many subscriptions to exhaust server resources
+```javascript
+// Client opens 1000+ concurrent subscriptions
+for (let i = 0; i < 1000; i++) {
+  client.subscribe({ query: "subscription { realTimeData }" });
+}
+```
+**Protection**: Set `MemoryLimits.MaxSubscriptionsPerConnection`
+
+### 5. Unauthorized Access
+**Attack**: Accessing restricted subscriptions without authentication
+```graphql
+subscription {
+  adminNotifications {
+    message
+    sensitiveData
+  }
+}
+```
+**Protection**: Implement `WebSocketAuthenticator` with proper authorization
 
 ### Example Production Configuration
 

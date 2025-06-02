@@ -8,6 +8,8 @@ import (
 	"log"
 	"net/http"
 	"runtime/debug"
+	"strconv"
+	"strings"
 )
 
 type GraphHttpHandler struct {
@@ -23,6 +25,45 @@ func (g *Graphy) HttpHandler() http.Handler {
 type graphqlRequest struct {
 	Query     string          `json:"query"`
 	Variables json.RawMessage `json:"variables"`
+}
+
+// setCORSHeaders sets CORS headers based on the configured CORSSettings
+func (g *GraphHttpHandler) setCORSHeaders(writer http.ResponseWriter, forOptionsRequest bool) {
+	cors := g.graphy.CORSSettings
+	if cors == nil {
+		return
+	}
+
+	// Set CORS headers for OPTIONS requests or if EnableForAllResponses is true
+	if forOptionsRequest || cors.EnableForAllResponses {
+		// Set allowed origins
+		origins := cors.getEffectiveOrigins()
+		writer.Header().Set("Access-Control-Allow-Origin", strings.Join(origins, ", "))
+
+		// Set allowed methods
+		methods := cors.getEffectiveMethods()
+		writer.Header().Set("Access-Control-Allow-Methods", strings.Join(methods, ", "))
+
+		// Set allowed headers
+		headers := cors.getEffectiveHeaders()
+		writer.Header().Set("Access-Control-Allow-Headers", strings.Join(headers, ", "))
+
+		// Set exposed headers if specified
+		if len(cors.ExposedHeaders) > 0 {
+			writer.Header().Set("Access-Control-Expose-Headers", strings.Join(cors.ExposedHeaders, ", "))
+		}
+
+		// Set credentials if allowed
+		if cors.AllowCredentials {
+			writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		}
+
+		// Set max age for OPTIONS requests
+		if forOptionsRequest {
+			maxAge := cors.getEffectiveMaxAge()
+			writer.Header().Set("Access-Control-Max-Age", strconv.Itoa(maxAge))
+		}
+	}
 }
 
 func (g GraphHttpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
@@ -72,7 +113,15 @@ func (g GraphHttpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		ctx = timingContext
 	}
 
+	if request.Method == "OPTIONS" {
+		// Handle CORS preflight requests
+		g.setCORSHeaders(writer, true)
+		writer.WriteHeader(204)
+		return
+	}
+
 	if request.Method == "GET" {
+		g.setCORSHeaders(writer, false)
 		if g.graphy.schemaEnabled {
 			schema := g.graphy.SchemaDefinition(ctx)
 			writer.WriteHeader(200)
@@ -128,6 +177,7 @@ func (g GraphHttpHandler) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	}
 
 	// Return the response string.
+	g.setCORSHeaders(writer, false)
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(200) // Errors are in the response body, and there may be mixed errors and results.
 

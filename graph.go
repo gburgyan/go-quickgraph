@@ -36,6 +36,10 @@ type Graphy struct {
 	// MemoryLimits defines optional limits to prevent memory exhaustion attacks
 	MemoryLimits *MemoryLimits
 
+	// CORSSettings defines CORS configuration for HTTP responses
+	// Nil means no CORS headers will be added
+	CORSSettings *CORSSettings
+
 	processors  map[string]graphFunction
 	typeLookups map[reflect.Type]*typeLookup
 	anyTypes    []*typeLookup

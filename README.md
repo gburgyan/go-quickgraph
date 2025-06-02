@@ -38,6 +38,8 @@ func main() {
             MaxDepth:      10,   // Query depth limit
             MaxComplexity: 1000, // Query complexity limit
         },
+        // Optional: Configure CORS for web clients
+        CORSSettings: quickgraph.DefaultCORSSettings(),
     }
     
     // Register a function - it becomes a GraphQL query automatically!
@@ -91,6 +93,7 @@ Try this query:
 - **🔥 Code-First**: Generate schemas from Go code, not the other way around
 - **⚡ Fast**: Aggressive caching and optimized reflection usage
 - **🛡️ Secure**: Built-in DoS protection, memory limits, and WebSocket authentication
+- **🌐 Web-Ready**: Configurable CORS support for GraphQL playgrounds and web clients
 - **🔄 Real-time**: WebSocket subscriptions with channel-based streaming
 - **🎯 Type-Safe**: Full Go type checking with automatic GraphQL type generation
 - **🚀 Production Ready**: Thread-safe, caching, error handling, and observability
@@ -109,7 +112,7 @@ Try this query:
 - [Real-time Subscriptions](docs/SUBSCRIPTIONS.md) - WebSocket streaming with channels
 
 ### Advanced Usage
-- [Security Guide](SECURITY.md) - Memory limits, authentication, and DoS protection
+- [Security Guide](docs/SECURITY_API.md) - Memory limits, authentication, and DoS protection
 - [Authentication & Authorization](docs/AUTH_PATTERNS.md) - Securing your GraphQL API
 - [Performance & Caching](docs/PERFORMANCE.md) - Optimization and DoS protection  
 - [Schema Generation](docs/SCHEMA.md) - Introspection and schema customization
@@ -140,7 +143,7 @@ go run ./cmd/server
 
 ## Requirements
 
-- Go 1.21 or later
+- Go 1.20 or later
 - No external dependencies for core functionality
 - Optional: WebSocket library for subscriptions (gorilla/websocket recommended)
 

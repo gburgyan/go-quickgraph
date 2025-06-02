@@ -50,6 +50,41 @@ type MemoryLimits struct {
 	MaxSubscriptionsPerConnection int
 }
 
+// CORSSettings defines CORS configuration for HTTP responses.
+// Nil CORSSettings means no CORS headers will be added.
+type CORSSettings struct {
+	// AllowedOrigins specifies allowed origins for CORS requests
+	// Use "*" to allow all origins, or specify exact origins like "https://example.com"
+	// If empty and CORSSettings is not nil, defaults to "*"
+	AllowedOrigins []string
+
+	// AllowedMethods specifies allowed HTTP methods for CORS requests
+	// If empty and CORSSettings is not nil, defaults to ["GET", "POST", "OPTIONS"]
+	AllowedMethods []string
+
+	// AllowedHeaders specifies allowed request headers for CORS requests
+	// If empty and CORSSettings is not nil, defaults to ["Content-Type", "Authorization"]
+	AllowedHeaders []string
+
+	// ExposedHeaders specifies response headers that browsers can access
+	// Optional - if empty, no Access-Control-Expose-Headers header is set
+	ExposedHeaders []string
+
+	// AllowCredentials indicates whether credentials are allowed in CORS requests
+	// Defaults to false
+	AllowCredentials bool
+
+	// MaxAge specifies how long browsers can cache preflight responses in seconds
+	// If 0 and CORSSettings is not nil, defaults to 86400 (24 hours)
+	MaxAge int
+
+	// EnableForAllResponses determines whether CORS headers are added to all responses
+	// If true, CORS headers are added to GET, POST, and other responses
+	// If false, CORS headers are only added to OPTIONS responses
+	// Defaults to false
+	EnableForAllResponses bool
+}
+
 // ComplexityScorer allows custom complexity scoring for queries
 type ComplexityScorer interface {
 	// ScoreField returns the complexity score for accessing a field
@@ -211,4 +246,48 @@ func (c *concurrentResolverGuard) release() {
 		return
 	}
 	atomic.AddInt32(&c.activeCount, -1)
+}
+
+// DefaultCORSSettings returns a CORSSettings struct with sensible defaults for GraphQL APIs
+func DefaultCORSSettings() *CORSSettings {
+	return &CORSSettings{
+		AllowedOrigins:        []string{"*"},
+		AllowedMethods:        []string{"GET", "POST", "OPTIONS"},
+		AllowedHeaders:        []string{"Content-Type", "Authorization"},
+		AllowCredentials:      false,
+		MaxAge:                86400, // 24 hours
+		EnableForAllResponses: false,
+	}
+}
+
+// getEffectiveOrigins returns the origins to use, applying defaults if needed
+func (c *CORSSettings) getEffectiveOrigins() []string {
+	if len(c.AllowedOrigins) > 0 {
+		return c.AllowedOrigins
+	}
+	return []string{"*"}
+}
+
+// getEffectiveMethods returns the methods to use, applying defaults if needed
+func (c *CORSSettings) getEffectiveMethods() []string {
+	if len(c.AllowedMethods) > 0 {
+		return c.AllowedMethods
+	}
+	return []string{"GET", "POST", "OPTIONS"}
+}
+
+// getEffectiveHeaders returns the headers to use, applying defaults if needed
+func (c *CORSSettings) getEffectiveHeaders() []string {
+	if len(c.AllowedHeaders) > 0 {
+		return c.AllowedHeaders
+	}
+	return []string{"Content-Type", "Authorization"}
+}
+
+// getEffectiveMaxAge returns the max age to use, applying defaults if needed
+func (c *CORSSettings) getEffectiveMaxAge() int {
+	if c.MaxAge > 0 {
+		return c.MaxAge
+	}
+	return 86400 // 24 hours
 }

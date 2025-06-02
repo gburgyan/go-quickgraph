@@ -150,6 +150,9 @@ func (g *Graphy) populateIntrospection(st *schemaTypes) {
 		typeLookupByName: make(map[string]*__Type),
 	}
 
+	// Add built-in scalar types to the introspection
+	g.addBuiltInScalars(is)
+
 	processorNames := keys(g.processors)
 	sort.Strings(processorNames)
 
@@ -662,5 +665,21 @@ func (g *Graphy) wrapType(t *__Type, name string, kind __TypeKind) *__Type {
 		Name:   &name,
 		Kind:   kind,
 		OfType: t,
+	}
+}
+
+// addBuiltInScalars adds the standard GraphQL scalar types to the introspection schema.
+// These are the built-in scalar types that are always available in GraphQL.
+func (g *Graphy) addBuiltInScalars(is *__Schema) {
+	// Define the built-in scalar types
+	builtInScalars := []string{"String", "Int", "Float", "Boolean", "ID"}
+
+	for _, scalarName := range builtInScalars {
+		name := scalarName // Create a new variable to avoid pointer issues
+		scalarType := &__Type{
+			Name: &name,
+			Kind: IntrospectionKindScalar,
+		}
+		is.typeLookupByName[name] = scalarType
 	}
 }

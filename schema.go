@@ -2,6 +2,7 @@ package quickgraph
 
 import (
 	"context"
+	"reflect"
 	"sort"
 	"strings"
 )
@@ -132,8 +133,8 @@ func (g *Graphy) getSchemaTypes() *schemaTypes {
 	inputTypes = g.expandTypeLookups(inputTypes)
 	outputTypes = g.expandTypeLookups(outputTypes)
 
-	inputMapping, outputMapping := solveInputOutputNameMapping(inputTypes, outputTypes)
-	enumMapping := createEnumMapping(enumTypes)
+	inputMapping, outputMapping := g.solveInputOutputNameMapping(inputTypes, outputTypes)
+	enumMapping := g.createEnumMapping(enumTypes)
 
 	g.schemaBuffer = &schemaTypes{
 		inputTypes:  inputTypes,
@@ -193,10 +194,10 @@ func appendTypesForSchema(types []*typeLookup, enumTypes []*typeLookup, newTypes
 	return types, enumTypes
 }
 
-func createEnumMapping(enumTypes []*typeLookup) typeNameMapping {
+func (g *Graphy) createEnumMapping(enumTypes []*typeLookup) typeNameMapping {
 	enumMapping := typeNameMapping{}
 	for _, enumType := range enumTypes {
-		enumMapping[enumType] = enumType.name
+		enumMapping[enumType] = g.getGraphQLTypeName(enumType)
 	}
 	return enumMapping
 }
@@ -209,7 +210,7 @@ func makeTypeNameLookup(t typeNameMapping) typeNameLookup {
 	return result
 }
 
-func solveInputOutputNameMapping(inputTypes []*typeLookup, outputTypes []*typeLookup) (typeNameMapping, typeNameMapping) {
+func (g *Graphy) solveInputOutputNameMapping(inputTypes []*typeLookup, outputTypes []*typeLookup) (typeNameMapping, typeNameMapping) {
 	// TODO: Handle same type name in different packages.
 
 	inputMapping := make(typeNameMapping)
@@ -219,7 +220,7 @@ func solveInputOutputNameMapping(inputTypes []*typeLookup, outputTypes []*typeLo
 
 	// Populate outputMapping and check for name collisions along the way
 	for _, outputType := range outputTypes {
-		name := outputType.name
+		name := g.getGraphQLTypeName(outputType)
 		// If this type has implementedBy relationships and is not marked as interfaceOnly,
 		// we'll generate both an interface (with I prefix) and a concrete type
 		if len(outputType.implementedBy) > 0 && !outputType.interfaceOnly {
@@ -235,7 +236,7 @@ func solveInputOutputNameMapping(inputTypes []*typeLookup, outputTypes []*typeLo
 
 	// Populate inputMapping, checking for name collisions and resolving them by appending "Input"
 	for _, inputType := range inputTypes {
-		name := inputType.name
+		name := g.getGraphQLTypeName(inputType)
 		_, exists := outputNames[name]
 		if exists {
 			// If a collision is found, append "Input" to the input type name
@@ -307,6 +308,44 @@ func (g *Graphy) schemaForFunctionParameters(f *graphFunction, mapping typeNameM
 	}
 
 	return sb.String()
+}
+
+// getGraphQLTypeName returns the appropriate GraphQL type name for a typeLookup.
+// For fundamental types, it returns the standard GraphQL scalar names (String, Int, Float, Boolean).
+// For custom scalars, it returns the registered scalar name.
+// For other types, it returns the type's name field.
+func (g *Graphy) getGraphQLTypeName(tl *typeLookup) string {
+	// Check if this is an enum type first (takes precedence over fundamental types)
+	if tl.rootType != nil && tl.rootType.ConvertibleTo(stringEnumValuesType) {
+		// This is an enum, use its type name
+		return tl.name
+	}
+
+	// For fundamental types, we need to use GraphQL scalar names
+	if tl.fundamental {
+		// Check for custom scalar first
+		if scalar, exists := g.GetScalarByType(tl.rootType); exists {
+			return scalar.Name
+		}
+
+		// For built-in types, use standard GraphQL scalar names
+		if tl.rootType != nil {
+			switch tl.rootType.Kind() {
+			case reflect.Bool:
+				return "Boolean"
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+				reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+				return "Int"
+			case reflect.Float32, reflect.Float64:
+				return "Float"
+			case reflect.String:
+				return "String"
+			}
+		}
+	}
+
+	// For non-fundamental types, use the name from the typeLookup
+	return tl.name
 }
 
 func (g *Graphy) gatherFunctionInputsOutputs(f *graphFunction, inputTypes, outputTypes usageMap) {

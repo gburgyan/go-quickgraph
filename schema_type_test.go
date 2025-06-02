@@ -15,7 +15,7 @@ func TestGraphy_schemaForType(t *testing.T) {
 	assert.Equal(t, "typeLookup: quickgraph.Character", cl.String())
 
 	typeLookups := g.expandTypeLookups([]*typeLookup{cl})
-	_, outputMap := solveInputOutputNameMapping(nil, typeLookups)
+	_, outputMap := g.solveInputOutputNameMapping(nil, typeLookups)
 
 	schema := g.schemaForType(TypeOutput, cl, outputMap, nil)
 	expected := `type Character {

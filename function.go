@@ -278,8 +278,15 @@ func (g *Graphy) newGraphFunction(def FunctionDefinition, method bool) graphFunc
 		// A single parameter. We will use the name of the parameter if it is a
 		// struct, otherwise we will use an anonymous argument.
 		paramType := inputTypes[0].paramType
-		if paramType.Kind() == reflect.Struct && len(def.ParameterNames) == 0 {
+		isStructParam := paramType.Kind() == reflect.Struct
+		isPtrToStructParam := paramType.Kind() == reflect.Ptr && paramType.Elem().Kind() == reflect.Struct
+		
+		if (isStructParam || isPtrToStructParam) && len(def.ParameterNames) == 0 {
 			// Invoke option 1
+			// If it's a pointer to struct, use the element type for field inspection
+			if isPtrToStructParam {
+				return g.newStructGraphFunction(def, funcVal, paramType.Elem(), method)
+			}
 			return g.newStructGraphFunction(def, funcVal, paramType, method)
 		}
 		return g.newAnonymousGraphFunction(def, funcVal, inputTypes, method)

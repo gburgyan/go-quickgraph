@@ -1,6 +1,7 @@
 package quickgraph
 
 import (
+	"context"
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"reflect"
@@ -37,7 +38,7 @@ func Test_parseNothing_Error(t *testing.T) {
 	v := reflect.ValueOf(&x).Elem()
 
 	req := &request{}
-	err := parseInputIntoValue(req, genericValue{}, v)
+	err := parseInputIntoValue(context.Background(), req, genericValue{}, v)
 
 	assert.EqualError(t, err, "no input found to parse into value")
 }
@@ -98,7 +99,7 @@ func Test_parseFloatIntoValue_Base(t *testing.T) {
 	v := reflect.ValueOf(&outVal).Elem()
 
 	req := &request{}
-	err := parseInputIntoValue(req, inVal, v)
+	err := parseInputIntoValue(context.Background(), req, inVal, v)
 
 	assert.NoError(t, err)
 	assert.Equal(t, x, outVal)
@@ -115,7 +116,7 @@ func Test_parseFloatIntoValue_Ptr(t *testing.T) {
 	v := reflect.ValueOf(&outVal).Elem()
 
 	req := &request{}
-	err := parseInputIntoValue(req, inVal, v)
+	err := parseInputIntoValue(context.Background(), req, inVal, v)
 
 	assert.NoError(t, err)
 	assert.Equal(t, x, *outVal)
@@ -132,7 +133,7 @@ func Test_parseIntIntoValue_Base(t *testing.T) {
 	v := reflect.ValueOf(&outVal).Elem()
 
 	req := &request{}
-	err := parseInputIntoValue(req, inVal, v)
+	err := parseInputIntoValue(context.Background(), req, inVal, v)
 
 	assert.NoError(t, err)
 	assert.Equal(t, x, outVal)
@@ -149,7 +150,7 @@ func Test_parseIntIntoValue_Ptr(t *testing.T) {
 	v := reflect.ValueOf(&outVal).Elem()
 
 	req := &request{}
-	err := parseInputIntoValue(req, inVal, v)
+	err := parseInputIntoValue(context.Background(), req, inVal, v)
 
 	assert.NoError(t, err)
 	assert.Equal(t, x, *outVal)
@@ -166,7 +167,7 @@ func Test_parseStringIntoValue_Base(t *testing.T) {
 	v := reflect.ValueOf(&outVal).Elem()
 
 	req := &request{}
-	err := parseInputIntoValue(req, inVal, v)
+	err := parseInputIntoValue(context.Background(), req, inVal, v)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "hello", outVal)
@@ -183,7 +184,7 @@ func Test_parseStringIntoValue_Ptr(t *testing.T) {
 	v := reflect.ValueOf(&outVal).Elem()
 
 	req := &request{}
-	err := parseInputIntoValue(req, inVal, v)
+	err := parseInputIntoValue(context.Background(), req, inVal, v)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "hello", *outVal)
@@ -200,7 +201,7 @@ func Test_parseIdentifierIntoValue_Base(t *testing.T) {
 	v := reflect.ValueOf(&outVal).Elem()
 
 	req := &request{}
-	err := parseInputIntoValue(req, inVal, v)
+	err := parseInputIntoValue(context.Background(), req, inVal, v)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "hello", outVal)
@@ -217,7 +218,7 @@ func Test_parseIdentifierIntoValue_Ptr(t *testing.T) {
 	v := reflect.ValueOf(&outVal).Elem()
 
 	req := &request{}
-	err := parseInputIntoValue(req, inVal, v)
+	err := parseInputIntoValue(context.Background(), req, inVal, v)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "hello", *outVal)
@@ -235,7 +236,7 @@ func Test_parseIdentifierIntoValue_BaseType(t *testing.T) {
 	v := reflect.ValueOf(&outVal).Elem()
 
 	req := &request{}
-	err := parseInputIntoValue(req, inVal, v)
+	err := parseInputIntoValue(context.Background(), req, inVal, v)
 
 	assert.NoError(t, err)
 	assert.Equal(t, myType("hello"), outVal)
@@ -253,7 +254,7 @@ func Test_parseIdentifierIntoValue_PtrType(t *testing.T) {
 	v := reflect.ValueOf(&outVal).Elem()
 
 	req := &request{}
-	err := parseInputIntoValue(req, inVal, v)
+	err := parseInputIntoValue(context.Background(), req, inVal, v)
 
 	assert.NoError(t, err)
 	assert.Equal(t, myType("hello"), *outVal)
@@ -606,7 +607,7 @@ func Test_parseMapIntoValue_NilPointerStruct(t *testing.T) {
 	}
 
 	req := &request{}
-	err := parseMapIntoValue(req, inValue, v)
+	err := parseMapIntoValue(context.Background(), req, inValue, v)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, target)
@@ -644,7 +645,7 @@ func Test_parseMapIntoValue_NonNilPointerStruct(t *testing.T) {
 	}
 
 	req := &request{}
-	err := parseMapIntoValue(req, inValue, v)
+	err := parseMapIntoValue(context.Background(), req, inValue, v)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, target)
@@ -686,7 +687,7 @@ func Test_parseMapIntoValue_FieldWithoutJsonTag(t *testing.T) {
 	}
 
 	req := &request{}
-	err := parseMapIntoValue(req, inValue, v)
+	err := parseMapIntoValue(context.Background(), req, inValue, v)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, target.NoTag)
@@ -704,7 +705,7 @@ func Test_parseMapIntoValue_MissingRequiredField(t *testing.T) {
 	}
 
 	req := &request{}
-	err := parseMapIntoValue(req, inValue, v)
+	err := parseMapIntoValue(context.Background(), req, inValue, v)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "missing required fields")
@@ -730,7 +731,7 @@ func Test_parseMapIntoValue_UnknownField(t *testing.T) {
 	}
 
 	req := &request{}
-	err := parseMapIntoValue(req, inValue, v)
+	err := parseMapIntoValue(context.Background(), req, inValue, v)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "field unknownField not found in input struct")
@@ -770,7 +771,7 @@ func Test_parseInputIntoValue_StructWithMap(t *testing.T) {
 	}
 
 	req := &request{}
-	err := parseInputIntoValue(req, inValue, v)
+	err := parseInputIntoValue(context.Background(), req, inValue, v)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "Alice", target.Name)
@@ -803,7 +804,7 @@ func Test_parseMapIntoValue_IgnoredJsonTag(t *testing.T) {
 	}
 
 	req := &request{}
-	err := parseMapIntoValue(req, inValue, v)
+	err := parseMapIntoValue(context.Background(), req, inValue, v)
 
 	// Should succeed even though Ignored field is not provided
 	assert.NoError(t, err)

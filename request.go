@@ -557,7 +557,7 @@ func (rs *RequestStub) newRequest(ctx context.Context, variableJson string) (*re
 			}
 			variables[varName] = variableValue.Elem()
 		} else if variable.Default != nil {
-			err := parseInputIntoValue(nil, *variable.Default, variableValue.Elem())
+			err := parseInputIntoValue(context.Background(), nil, *variable.Default, variableValue.Elem())
 			if err != nil {
 				return nil, AugmentGraphError(err, fmt.Sprintf("error parsing default variable %s into type %s", varName, variable.Type.Name()), lexer.Position{}, varName)
 			}

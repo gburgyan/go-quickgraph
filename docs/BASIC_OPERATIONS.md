@@ -540,21 +540,129 @@ func GetUserWithMetrics(ctx context.Context, id int) (*User, error) {
 
 ## Input Validation
 
-### Basic Validation
+go-quickgraph provides native support for input validation through the `Validator` and `ValidatorWithContext` interfaces. When your input types implement these interfaces, validation is automatically performed before your resolver function is called.
+
+### Native Validation Support
+
+#### Basic Validation with the Validator Interface
+
+```go
+type UserInput struct {
+    Name     string `json:"name"`
+    Email    string `json:"email"`
+    Age      int    `json:"age"`
+}
+
+// Implement the Validator interface
+func (u UserInput) Validate() error {
+    if u.Name == "" {
+        return fmt.Errorf("name is required")
+    }
+    if len(u.Name) < 2 {
+        return fmt.Errorf("name must be at least 2 characters")
+    }
+    if !strings.Contains(u.Email, "@") {
+        return fmt.Errorf("invalid email format")
+    }
+    if u.Age < 13 || u.Age > 120 {
+        return fmt.Errorf("age must be between 13 and 120")
+    }
+    return nil
+}
+
+func CreateUser(ctx context.Context, input UserInput) (*User, error) {
+    // Validation happens automatically before this function is called
+    // If validation fails, this function won't be executed
+    return &User{
+        ID:    generateID(),
+        Name:  input.Name,
+        Email: input.Email,
+        Age:   input.Age,
+    }, nil
+}
+
+// Register without manual validation
+g.RegisterMutation(ctx, "createUser", CreateUser, "input")
+```
+
+#### Context-Aware Validation
+
+For validation that requires access to the request context (e.g., authentication, permissions), implement the `ValidatorWithContext` interface:
+
+```go
+type UpdateUserInput struct {
+    UserID string `json:"userId"`
+    Name   string `json:"name"`
+    Role   string `json:"role"`
+}
+
+// Implement the ValidatorWithContext interface
+func (u UpdateUserInput) ValidateWithContext(ctx context.Context) error {
+    // Check authentication
+    currentUser, ok := ctx.Value("currentUser").(string)
+    if !ok || currentUser == "" {
+        return fmt.Errorf("authentication required")
+    }
+    
+    // Check permissions
+    if u.UserID != currentUser {
+        userRole, _ := ctx.Value("userRole").(string)
+        if userRole != "admin" {
+            return fmt.Errorf("can only modify your own data")
+        }
+    }
+    
+    return nil
+}
+
+func UpdateUser(ctx context.Context, input UpdateUserInput) (*User, error) {
+    // Validation with context happens automatically
+    return updateUserInDB(input)
+}
+```
+
+#### Validation with Pointer Receivers
+
+Validation also works with pointer receivers:
+
+```go
+type ProductInput struct {
+    Name  string  `json:"name"`
+    Price float64 `json:"price"`
+}
+
+// Validator can be implemented on pointer receivers
+func (p *ProductInput) Validate() error {
+    if p.Name == "" {
+        return fmt.Errorf("product name is required")
+    }
+    if p.Price <= 0 {
+        return fmt.Errorf("price must be greater than 0")
+    }
+    return nil
+}
+
+func CreateProduct(ctx context.Context, input *ProductInput) (*Product, error) {
+    // Validation happens automatically for pointer types too
+    return saveProduct(input)
+}
+```
+
+### Manual Validation (Alternative Approach)
+
+If you prefer manual validation or need more control, you can still validate within your resolver:
 
 ```go
 func CreatePost(ctx context.Context, input CreatePostInput) (*Post, error) {
-    // Required field validation
+    // Manual validation
     if strings.TrimSpace(input.Title) == "" {
         return nil, fmt.Errorf("title cannot be empty")
     }
     
-    // Length validation
     if len(input.Title) > 200 {
         return nil, fmt.Errorf("title cannot exceed 200 characters")
     }
     
-    // Business logic validation
     if input.AuthorID <= 0 {
         return nil, fmt.Errorf("invalid author ID")
     }
@@ -569,39 +677,13 @@ func CreatePost(ctx context.Context, input CreatePostInput) (*Post, error) {
 }
 ```
 
-### Custom Validators
+### Validation Best Practices
 
-```go
-type UserInput struct {
-    Name     string `json:"name" validate:"required,min=2,max=50"`
-    Email    string `json:"email" validate:"required,email"`
-    Age      int    `json:"age" validate:"min=13,max=120"`
-}
-
-func (u UserInput) Validate() error {
-    if u.Name == "" {
-        return fmt.Errorf("name is required")
-    }
-    if len(u.Name) < 2 {
-        return fmt.Errorf("name must be at least 2 characters")
-    }
-    if !isValidEmail(u.Email) {
-        return fmt.Errorf("invalid email format")
-    }
-    if u.Age < 13 || u.Age > 120 {
-        return fmt.Errorf("age must be between 13 and 120")
-    }
-    return nil
-}
-
-func CreateUser(ctx context.Context, input UserInput) (*User, error) {
-    if err := input.Validate(); err != nil {
-        return nil, err
-    }
-    
-    return createUser(input)
-}
-```
+1. **Use Native Validation**: Implement `Validator` or `ValidatorWithContext` for automatic validation
+2. **Clear Error Messages**: Return descriptive error messages that help clients understand what went wrong
+3. **Validate Early**: Validation happens before your resolver executes, saving resources
+4. **Context-Aware**: Use `ValidatorWithContext` when validation depends on request context
+5. **Consistent Patterns**: Use the same validation approach across your codebase
 
 ## Testing Operations
 

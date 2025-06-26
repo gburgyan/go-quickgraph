@@ -70,7 +70,7 @@ func (f *graphFunction) getCallParamsNamedInline(ctx context.Context, req *reque
 		for _, param := range parsedParams.Values {
 			if nameMapping, ok := f.paramsByName[param.Name]; ok {
 				val := reflect.New(nameMapping.paramType).Elem()
-				err := parseInputIntoValue(req, param.Value, val)
+				err := parseInputIntoValue(ctx, req, param.Value, val)
 				if err != nil {
 					return nil, err
 				}
@@ -118,7 +118,7 @@ func (f *graphFunction) getCallParamsAnonymousInline(ctx context.Context, req *r
 				}
 			} else {
 				if normalParamCount < len(params.Values) {
-					err := parseInputIntoValue(req, params.Values[normalParamCount].Value, val)
+					err := parseInputIntoValue(ctx, req, params.Values[normalParamCount].Value, val)
 					if err != nil {
 						return nil, err
 					}
@@ -167,6 +167,11 @@ func (f *graphFunction) getCallParamsNamedStruct(ctx context.Context, req *reque
 			valueParam = reflect.New(gft.In(i)).Elem()
 			paramValues[i] = valueParam
 			continue
+		} else if gft.In(i).Kind() == reflect.Ptr && gft.In(i).Elem().Kind() == reflect.Struct {
+			// This is a pointer to struct parameter
+			valueParam = reflect.New(gft.In(i).Elem())
+			paramValues[i] = valueParam
+			continue
 		}
 		panic(fmt.Errorf("invalid parameter type %v", gft.In(i)))
 	}
@@ -184,7 +189,12 @@ func (f *graphFunction) getCallParamsNamedStruct(ctx context.Context, req *reque
 		for _, param := range parsedParams.Values {
 			if nameMapping, ok := f.paramsByName[param.Name]; ok {
 				// Navigate to the target field using the field path
-				targetField := valueParam.Field(nameMapping.paramIndex)
+				// If valueParam is a pointer, dereference it first
+				fieldTarget := valueParam
+				if fieldTarget.Kind() == reflect.Ptr {
+					fieldTarget = fieldTarget.Elem()
+				}
+				targetField := fieldTarget.Field(nameMapping.paramIndex)
 
 				// If we have a fieldPath, navigate through embedded fields
 				// This handles the case where a field is promoted from an anonymous embedded struct
@@ -203,7 +213,7 @@ func (f *graphFunction) getCallParamsNamedStruct(ctx context.Context, req *reque
 					}
 				}
 
-				err := parseInputIntoValue(req, param.Value, targetField)
+				err := parseInputIntoValue(ctx, req, param.Value, targetField)
 				if err != nil {
 					return nil, err
 				}
@@ -218,13 +228,33 @@ func (f *graphFunction) getCallParamsNamedStruct(ctx context.Context, req *reque
 		}
 		return nil, fmt.Errorf("missing required parameters: %v", strings.Join(missingParams, ", "))
 	}
+	
+	// Validate the complete struct after all fields are populated
+	for i := startIndex; i < gft.NumIn(); i++ {
+		if paramValues[i].IsValid() && !gft.In(i).ConvertibleTo(contextType) {
+			// Check if this parameter implements Validator or ValidatorWithContext
+			paramValue := paramValues[i]
+			if paramValue.CanInterface() {
+				if validator, ok := paramValue.Interface().(ValidatorWithContext); ok && ctx != nil {
+					if err := validator.ValidateWithContext(ctx); err != nil {
+						return nil, NewGraphError(fmt.Sprintf("validation failed: %v", err), lexer.Position{})
+					}
+				} else if validator, ok := paramValue.Interface().(Validator); ok {
+					if err := validator.Validate(); err != nil {
+						return nil, NewGraphError(fmt.Sprintf("validation failed: %v", err), lexer.Position{})
+					}
+				}
+			}
+		}
+	}
+	
 	return paramValues, nil
 }
 
 // parseInputIntoValue interprets a genericValue according to the type of the targetValue and assigns the result to targetValue.
 // This method takes into account various types of input such as string, int, float, list, map, identifier, and GraphQL variable.
 // It returns an error if the input cannot be parsed into the target type.
-func parseInputIntoValue(req *request, inValue genericValue, targetValue reflect.Value) (err error) {
+func parseInputIntoValue(ctx context.Context, req *request, inValue genericValue, targetValue reflect.Value) (err error) {
 	// Catch panics and return them as errors.
 	defer func() {
 		if r := recover(); r != nil {
@@ -269,9 +299,9 @@ func parseInputIntoValue(req *request, inValue genericValue, targetValue reflect
 		f := *inValue.Float
 		err = parseFloatIntoValue(req, f, targetValue)
 	} else if inValue.List != nil || isSlice {
-		err = parseListIntoValue(req, inValue, targetValue)
+		err = parseListIntoValue(ctx, req, inValue, targetValue)
 	} else if inValue.Map != nil || isStruct {
-		err = parseMapIntoValue(req, inValue, targetValue)
+		err = parseMapIntoValue(ctx, req, inValue, targetValue)
 	} else {
 		// This should never occur as this should be a parse error
 		// that gets caught by the parser.
@@ -279,6 +309,41 @@ func parseInputIntoValue(req *request, inValue genericValue, targetValue reflect
 	}
 	if err != nil {
 		return err
+	}
+
+	// Check if the parsed value implements the Validator or ValidatorWithContext interface
+	// First check if the value itself (or pointer) implements the interfaces
+	if targetValue.CanInterface() {
+		// Check pointer type first since methods might be defined on pointer receivers
+		if targetValue.Kind() == reflect.Ptr && !targetValue.IsNil() {
+			if validator, ok := targetValue.Interface().(ValidatorWithContext); ok && ctx != nil {
+				if err := validator.ValidateWithContext(ctx); err != nil {
+					return AugmentGraphError(err, "validation failed", inValue.Pos)
+				}
+			} else if validator, ok := targetValue.Interface().(Validator); ok {
+				if err := validator.Validate(); err != nil {
+					return AugmentGraphError(err, "validation failed", inValue.Pos)
+				}
+			}
+		}
+		
+		// Also check the dereferenced value if it's a pointer
+		checkValue := targetValue
+		if checkValue.Kind() == reflect.Ptr && !checkValue.IsNil() {
+			checkValue = checkValue.Elem()
+		}
+		
+		if checkValue.CanInterface() {
+			if validator, ok := checkValue.Interface().(ValidatorWithContext); ok && ctx != nil {
+				if err := validator.ValidateWithContext(ctx); err != nil {
+					return AugmentGraphError(err, "validation failed", inValue.Pos)
+				}
+			} else if validator, ok := checkValue.Interface().(Validator); ok {
+				if err := validator.Validate(); err != nil {
+					return AugmentGraphError(err, "validation failed", inValue.Pos)
+				}
+			}
+		}
 	}
 
 	return nil
@@ -498,11 +563,11 @@ func unmarshalWithEnumUnmarshaler(identifier string, value reflect.Value) (bool,
 
 // parseListIntoValue assigns a list of GenericValues to targetValue. Each item in the list is parsed into a value and assigned
 // to the corresponding index in the slice represented by targetValue. If an item cannot be parsed, it returns an error.
-func parseListIntoValue(req *request, inVal genericValue, targetValue reflect.Value) error {
+func parseListIntoValue(ctx context.Context, req *request, inVal genericValue, targetValue reflect.Value) error {
 	targetType := targetValue.Type()
 	targetValue.Set(reflect.MakeSlice(targetType, len(inVal.List), len(inVal.List)))
 	for i, listItem := range inVal.List {
-		err := parseInputIntoValue(req, listItem, targetValue.Index(i))
+		err := parseInputIntoValue(ctx, req, listItem, targetValue.Index(i))
 		if err != nil {
 			return err
 		}
@@ -513,7 +578,7 @@ func parseListIntoValue(req *request, inVal genericValue, targetValue reflect.Va
 // parseMapIntoValue assigns a map of GenericValues to the struct represented by targetValue. Each field in the input map is parsed
 // into a value and set on the struct field that has a matching "json" tag or field name. If a required field is missing from the
 // input map, it returns an error.
-func parseMapIntoValue(req *request, inValue genericValue, targetValue reflect.Value) error {
+func parseMapIntoValue(ctx context.Context, req *request, inValue genericValue, targetValue reflect.Value) error {
 	// A map is a little more complicated. We need to loop through the fields of the target type
 	// and set the values from the input map. This is how we initialize a struct from a map.
 	targetType := targetValue.Type()
@@ -565,7 +630,7 @@ func parseMapIntoValue(req *request, inValue genericValue, targetValue reflect.V
 
 		if fieldValue.Kind() != reflect.Invalid {
 			// We have found the field, so parse the value into it.
-			err := parseInputIntoValue(req, namedValue.Value, fieldValue)
+			err := parseInputIntoValue(ctx, req, namedValue.Value, fieldValue)
 			if err != nil {
 				return AugmentGraphError(err, fmt.Sprintf("error setting field %s", fieldName), inValue.Pos, fieldName)
 			}

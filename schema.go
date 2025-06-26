@@ -80,6 +80,12 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) string {
 		})
 
 		for _, function := range functions {
+			// Add function description if available
+			if function.description != nil && *function.description != "" {
+				sb.WriteString(formatDescription(*function.description, 1))
+				sb.WriteString("\n")
+			}
+			
 			sb.WriteString("\t")
 			sb.WriteString(function.name)
 			if len(function.paramsByName) > 0 {
@@ -93,6 +99,14 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) string {
 			schemaRef := g.schemaRefForType(function.baseReturnType, st.outputTypeNameLookup)
 
 			sb.WriteString(schemaRef)
+			
+			// Add deprecation if applicable
+			if function.deprecatedReason != nil && *function.deprecatedReason != "" {
+				sb.WriteString(" @deprecated(reason: \"")
+				sb.WriteString(*function.deprecatedReason)
+				sb.WriteString("\")")
+			}
+			
 			sb.WriteString("\n")
 		}
 		sb.WriteString("}\n\n")

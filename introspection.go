@@ -270,6 +270,11 @@ func (g *Graphy) getIntrospectionBaseType(is *__Schema, tl *typeLookup, io TypeK
 	result := &__Type{Name: &name}
 	is.typeLookupByName[name] = result
 
+	// Add type description if available
+	if description := g.getTypeDescription(tl); description != "" {
+		result.Description = &description
+	}
+
 	// Delegate to specialized type creators based on type characteristics
 	switch {
 	case len(tl.union) > 0:
@@ -278,6 +283,10 @@ func (g *Graphy) getIntrospectionBaseType(is *__Schema, tl *typeLookup, io TypeK
 		g.createEnumIntrospectionType(tl, result)
 	case tl.fundamental:
 		result.Kind = IntrospectionKindScalar
+		// Check for custom scalar description
+		if scalar, exists := g.GetScalarByType(tl.rootType); exists && scalar.Description != "" {
+			result.Description = &scalar.Description
+		}
 	case io == TypeInput:
 		result.Kind = IntrospectionKindInputObject
 		g.addIntrospectionSchemaFields(is, tl, io, result)
@@ -539,6 +548,9 @@ func (g *Graphy) addIntrospectionSchemaFields(is *__Schema, tl *typeLookup, io T
 					Type:         fieldType,
 					IsDeprecated: ft.isDeprecated,
 				}
+				if ft.description != "" {
+					field.Description = &ft.description
+				}
 				if ft.isDeprecated {
 					field.DeprecationReason = &ft.deprecatedReason
 				}
@@ -548,11 +560,26 @@ func (g *Graphy) addIntrospectionSchemaFields(is *__Schema, tl *typeLookup, io T
 					Name: fieldName,
 					Type: g.getIntrospectionModifiedType(is, g.typeLookup(ft.resultType), io),
 				}
+				if ft.description != "" {
+					input.Description = &ft.description
+				}
 				result.InputFields = append(result.InputFields, input)
 			}
 		} else if ft.fieldType == FieldTypeGraphFunction {
 			call, args := g.introspectionCall(is, ft.graphFunction)
-			result.fieldsRaw = append(result.fieldsRaw, __Field{Name: fieldName, Type: call, Args: args})
+			field := __Field{
+				Name: fieldName,
+				Type: call,
+				Args: args,
+			}
+			if ft.graphFunction.description != nil && *ft.graphFunction.description != "" {
+				field.Description = ft.graphFunction.description
+			}
+			if ft.graphFunction.deprecatedReason != nil && *ft.graphFunction.deprecatedReason != "" {
+				field.IsDeprecated = true
+				field.DeprecationReason = ft.graphFunction.deprecatedReason
+			}
+			result.fieldsRaw = append(result.fieldsRaw, field)
 		}
 	}
 }

@@ -101,6 +101,10 @@ type graphFunction struct {
 	rawReturnType  reflect.Type
 	isSubscription bool
 	channelType    reflect.Type // For subscriptions, the channel type returned by the function
+
+	// Documentation
+	description      *string
+	deprecatedReason *string
 }
 
 type functionParamNameMapping struct {
@@ -299,13 +303,15 @@ func (g *Graphy) newAnonymousGraphFunction(def FunctionDefinition, graphFunc ref
 	// parameters as we don't have any names to use.
 
 	gf := graphFunction{
-		g:              g,
-		name:           def.Name,
-		mode:           def.Mode,
-		function:       graphFunc,
-		method:         method,
-		paramsByName:   map[string]functionParamNameMapping{},
-		isSubscription: def.Mode == ModeSubscription,
+		g:                g,
+		name:             def.Name,
+		mode:             def.Mode,
+		function:         graphFunc,
+		method:           method,
+		paramsByName:     map[string]functionParamNameMapping{},
+		isSubscription:   def.Mode == ModeSubscription,
+		description:      def.Description,
+		deprecatedReason: def.DeprecatedReason,
 	}
 
 	if len(def.ParameterNames) > 0 {
@@ -381,13 +387,15 @@ func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflec
 	// the names of the struct fields as the parameter names.
 
 	gf := graphFunction{
-		g:              g,
-		name:           def.Name,
-		paramType:      NamedParamsStruct,
-		mode:           def.Mode,
-		function:       graphFunc,
-		method:         method,
-		isSubscription: def.Mode == ModeSubscription,
+		g:                g,
+		name:             def.Name,
+		paramType:        NamedParamsStruct,
+		mode:             def.Mode,
+		function:         graphFunc,
+		method:           method,
+		isSubscription:   def.Mode == ModeSubscription,
+		description:      def.Description,
+		deprecatedReason: def.DeprecatedReason,
 	}
 
 	mft := graphFunc.Type()

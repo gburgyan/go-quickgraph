@@ -25,6 +25,7 @@ type fieldLookup struct {
 
 	isDeprecated     bool
 	deprecatedReason string
+	description      string
 }
 
 type typeLookup struct {
@@ -253,19 +254,26 @@ func (g *Graphy) baseFieldLookup(field reflect.StructField, index []int) fieldLo
 		// The special parts are:
 		//  - name: the name of the field
 		//  - deprecated: if exists, the field is deprecated with the value as the reason
+		//  - description: the description of the field
 
 		for _, part := range graphyParts {
-			parts := strings.Split(part, "=")
+			parts := strings.SplitN(part, "=", 2)
 			if len(parts) == 1 {
 				tfl.name = parts[0]
 			} else {
 				// If the value is quoted, strip the quotes.
+				value := strings.TrimSpace(parts[1])
+				if len(value) >= 2 && value[0] == '"' && value[len(value)-1] == '"' {
+					value = value[1 : len(value)-1]
+				}
 				switch parts[0] {
 				case "name":
-					tfl.name = parts[1]
+					tfl.name = value
 				case "deprecated":
 					tfl.isDeprecated = true
-					tfl.deprecatedReason = parts[1]
+					tfl.deprecatedReason = value
+				case "description":
+					tfl.description = value
 				}
 			}
 		}

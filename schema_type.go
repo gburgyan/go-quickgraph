@@ -131,10 +131,10 @@ func (g *Graphy) schemaForEnum(et *typeLookup) string {
 			sb.WriteString(formatDescription(s.Description, 1))
 			sb.WriteString("\n")
 		}
-		
+
 		sb.WriteString("\t")
 		sb.WriteString(s.Name)
-		
+
 		// Add deprecation if applicable
 		if s.IsDeprecated {
 			sb.WriteString(" @deprecated")
@@ -144,7 +144,7 @@ func (g *Graphy) schemaForEnum(et *typeLookup) string {
 				sb.WriteString("\")")
 			}
 		}
-		
+
 		sb.WriteString("\n")
 	}
 	sb.WriteString("}\n")
@@ -159,14 +159,14 @@ func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup, mapping typeNameMap
 	}
 
 	sb := &strings.Builder{}
-	
+
 	// Add type description if available
 	description := g.getTypeDescription(t)
 	if description != "" {
 		sb.WriteString(formatDescription(description, 0))
 		sb.WriteString("\n")
 	}
-	
+
 	sb.WriteString(g.getSchemaTypePrefix(kind, t))
 	sb.WriteString(name)
 	sb.WriteString(g.getSchemaImplementedInterfaces(t, mapping))
@@ -179,14 +179,14 @@ func (g *Graphy) schemaForType(kind TypeKind, t *typeLookup, mapping typeNameMap
 
 func (g *Graphy) schemaForInterface(t *typeLookup, interfaceName string, mapping typeNameMapping, inputMapping typeNameMapping) string {
 	sb := &strings.Builder{}
-	
+
 	// Add interface description if available
 	description := g.getTypeDescription(t)
 	if description != "" {
 		sb.WriteString(formatDescription(description, 0))
 		sb.WriteString("\n")
 	}
-	
+
 	sb.WriteString("interface ")
 	sb.WriteString(interfaceName)
 	sb.WriteString(" {\n")
@@ -197,14 +197,14 @@ func (g *Graphy) schemaForInterface(t *typeLookup, interfaceName string, mapping
 
 func (g *Graphy) schemaForConcreteType(t *typeLookup, name string, mapping typeNameMapping, inputMapping typeNameMapping) string {
 	sb := &strings.Builder{}
-	
+
 	// Add concrete type description if available
 	description := g.getTypeDescription(t)
 	if description != "" {
 		sb.WriteString(formatDescription(description, 0))
 		sb.WriteString("\n")
 	}
-	
+
 	sb.WriteString("type ")
 	sb.WriteString(name)
 	// This concrete type implements the interface
@@ -334,7 +334,7 @@ func (g *Graphy) getSchemaFields(t *typeLookup, kind TypeKind, mapping typeNameM
 			sb.WriteString(formatDescription(field.description, 1))
 			sb.WriteString("\n")
 		}
-		
+
 		sb.WriteString("\t")
 		sb.WriteString(field.name)
 		sb.WriteString(fieldTypeString)
@@ -542,13 +542,13 @@ func (g *Graphy) schemaForScalarTypes() string {
 
 	for _, name := range scalarNames {
 		scalar := g.scalars.byName[name]
-		
+
 		// Add scalar description if available
 		if scalar.Description != "" {
 			sb.WriteString(formatDescription(scalar.Description, 0))
 			sb.WriteString("\n")
 		}
-		
+
 		sb.WriteString("scalar ")
 		sb.WriteString(scalar.Name)
 		sb.WriteString("\n")
@@ -560,16 +560,21 @@ func (g *Graphy) schemaForScalarTypes() string {
 
 // getTypeDescription retrieves the description for a type from GraphTypeExtension if available
 func (g *Graphy) getTypeDescription(t *typeLookup) string {
+	// First check if we have a cached description in the typeLookup
+	if t.description != nil && *t.description != "" {
+		return *t.description
+	}
+
 	if t.fundamental || t.rootType == nil {
 		return ""
 	}
-	
+
 	// Check if type implements GraphTypeExtension
 	checkType := t.rootType
 	if checkType.Kind() == reflect.Ptr {
 		checkType = checkType.Elem()
 	}
-	
+
 	// Check both value and pointer receivers
 	if checkType.Implements(graphTypeExtensionType) || reflect.PtrTo(checkType).Implements(graphTypeExtensionType) {
 		var gtei GraphTypeExtension
@@ -583,7 +588,7 @@ func (g *Graphy) getTypeDescription(t *typeLookup) string {
 		typeExtension := gtei.GraphTypeExtension()
 		return typeExtension.Description
 	}
-	
+
 	return ""
 }
 
@@ -592,9 +597,9 @@ func formatDescription(description string, indent int) string {
 	if description == "" {
 		return ""
 	}
-	
+
 	indentStr := strings.Repeat("\t", indent)
-	
+
 	// Check if description contains newlines
 	if strings.Contains(description, "\n") {
 		// Multi-line description
@@ -602,19 +607,19 @@ func formatDescription(description string, indent int) string {
 		sb.WriteString(indentStr)
 		sb.WriteString(`"""`)
 		sb.WriteString("\n")
-		
+
 		lines := strings.Split(description, "\n")
 		for _, line := range lines {
 			sb.WriteString(indentStr)
 			sb.WriteString(line)
 			sb.WriteString("\n")
 		}
-		
+
 		sb.WriteString(indentStr)
 		sb.WriteString(`"""`)
 		return sb.String()
 	}
-	
+
 	// Single-line description
 	return fmt.Sprintf(`%s"""%s"""`, indentStr, description)
 }

@@ -266,8 +266,10 @@ func TestScalarSchemaGeneration(t *testing.T) {
 	schema := graphy.SchemaDefinition(ctx)
 
 	// Check that scalars are included in schema
-	assert.Contains(t, schema, "scalar DateTime # RFC3339 formatted date-time string")
-	assert.Contains(t, schema, "scalar UserID # Unique identifier for users")
+	assert.Contains(t, schema, `"""RFC3339 formatted date-time string"""
+scalar DateTime`)
+	assert.Contains(t, schema, `"""Unique identifier for users"""
+scalar UserID`)
 
 	// Verify scalars are sorted alphabetically
 	dateTimeIndex := strings.Index(schema, "scalar DateTime")

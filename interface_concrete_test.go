@@ -28,17 +28,17 @@ func TestInterfaceWithConcreteTypeFields(t *testing.T) {
 
 	// Define concrete types with additional fields
 	type Dog struct {
-		Name    string `json:"name"`
-		Age     int    `json:"age"`
-		Breed   string `json:"breed"`
-		GoodBoy bool   `json:"goodBoy"`
+		Name    string `graphy:"name"`
+		Age     int    `graphy:"age"`
+		Breed   string `graphy:"breed"`
+		GoodBoy bool   `graphy:"goodBoy"`
 	}
 
 	type Cat struct {
-		Name   string `json:"name"`
-		Age    int    `json:"age"`
-		Color  string `json:"color"`
-		Indoor bool   `json:"indoor"`
+		Name   string `graphy:"name"`
+		Age    int    `graphy:"age"`
+		Color  string `graphy:"color"`
+		Indoor bool   `graphy:"indoor"`
 	}
 
 	// Create test data
@@ -160,19 +160,19 @@ func TestEmbeddedStructInterface(t *testing.T) {
 
 	// Base "interface" as embedded struct
 	type Character struct {
-		ID   string `json:"id"`
-		Name string `json:"name"`
+		ID   string `graphy:"id"`
+		Name string `graphy:"name"`
 	}
 
 	type Human struct {
 		Character
-		Height float64 `json:"height"`
+		Height float64 `graphy:"height"`
 	}
 
 	type Alien struct {
 		Character
-		Planet    string `json:"planet"`
-		Tentacles int    `json:"tentacles"`
+		Planet    string `graphy:"planet"`
+		Tentacles int    `graphy:"tentacles"`
 	}
 
 	// Function returns any but actual types are concrete

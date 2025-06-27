@@ -8,26 +8,26 @@ import (
 
 // Test types for anonymous field support
 type PaginationInput struct {
-	Limit  int `json:"limit"`
-	Offset int `json:"offset"`
+	Limit  int `graphy:"limit"`
+	Offset int `graphy:"offset"`
 }
 
 type SearchInput struct {
 	PaginationInput          // anonymous embedding
-	Query           string   `json:"query"`
-	Tags            []string `json:"tags"`
+	Query           string   `graphy:"query"`
+	Tags            []string `graphy:"tags"`
 }
 
 type FilterOptions struct {
-	MinPrice *float64 `json:"minPrice"`
-	MaxPrice *float64 `json:"maxPrice"`
+	MinPrice *float64 `graphy:"minPrice"`
+	MaxPrice *float64 `graphy:"maxPrice"`
 }
 
 type AdvancedSearchInput struct {
 	PaginationInput        // anonymous embedding
 	*FilterOptions         // anonymous pointer embedding
-	Query           string `json:"query"`
-	SortBy          string `json:"sortBy"`
+	Query           string `graphy:"query"`
+	SortBy          string `graphy:"sortBy"`
 }
 
 type SearchResult struct {

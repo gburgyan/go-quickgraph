@@ -759,11 +759,11 @@ query mixed($in: string!) {
 
 type TestA struct {
 	B      *TestB
-	Ignore *string `json:"-"`
+	Ignore *string `graphy:"-"`
 }
 
 type TestB struct {
-	Val string `json:"-"`
+	Val string `graphy:"-"`
 }
 
 func (b TestB) NonPointer() string {

@@ -9,52 +9,52 @@ import (
 )
 
 type __Directive struct {
-	Name         string   `json:"name"`
-	Description  *string  `json:"description"`
-	Locations    []string `json:"locations"`
+	Name         string   `graphy:"name"`
+	Description  *string  `graphy:"description"`
+	Locations    []string `graphy:"locations"`
 	Args         []__InputValue
-	IsRepeatable bool `json:"isRepeatable"`
+	IsRepeatable bool `graphy:"isRepeatable"`
 }
 
 type __Schema struct {
-	Description  *string `json:"description"`
-	Queries      *__Type `json:"queryType"`
-	Mutations    *__Type `json:"mutationType"`
-	Subscription *__Type `json:"subscriptionType"`
+	Description  *string `graphy:"description"`
+	Queries      *__Type `graphy:"queryType"`
+	Mutations    *__Type `graphy:"mutationType"`
+	Subscription *__Type `graphy:"subscriptionType"`
 
-	Types      []*__Type      `json:"types"`
-	Directives []*__Directive `json:"directives"`
+	Types      []*__Type      `graphy:"types"`
+	Directives []*__Directive `graphy:"directives"`
 
 	typeLookupByName map[string]*__Type
 }
 
 type __Type struct {
-	Kind           __TypeKind `json:"kind"`
-	Name           *string    `json:"name"`
-	Description    *string    `json:"description"`
+	Kind           __TypeKind `graphy:"kind"`
+	Name           *string    `graphy:"name"`
+	Description    *string    `graphy:"description"`
 	fieldsRaw      []__Field
-	Interfaces     []*__Type `json:"interfaces"`
-	PossibleTypes  []*__Type `json:"possibleTypes"`
+	Interfaces     []*__Type `graphy:"interfaces"`
+	PossibleTypes  []*__Type `graphy:"possibleTypes"`
 	enumValuesRaw  []__EnumValue
 	InputFields    []__InputValue
-	OfType         *__Type `json:"ofType"`
-	SpecifiedByUrl *string `json:"specifiedByUrl"`
+	OfType         *__Type `graphy:"ofType"`
+	SpecifiedByUrl *string `graphy:"specifiedByUrl"`
 }
 
 type __EnumValue struct {
-	Name              string  `json:"name"`
-	Description       *string `json:"description"`
-	IsDeprecated      bool    `json:"isDeprecated"`
-	DeprecationReason *string `json:"deprecationReason"`
+	Name              string  `graphy:"name"`
+	Description       *string `graphy:"description"`
+	IsDeprecated      bool    `graphy:"isDeprecated"`
+	DeprecationReason *string `graphy:"deprecationReason"`
 }
 
 type __Field struct {
-	Name              string         `json:"name"`
-	Description       *string        `json:"description"`
-	Args              []__InputValue `json:"args"`
-	Type              *__Type        `json:"type"`
-	IsDeprecated      bool           `json:"isDeprecated"`
-	DeprecationReason *string        `json:"deprecationReason"`
+	Name              string         `graphy:"name"`
+	Description       *string        `graphy:"description"`
+	Args              []__InputValue `graphy:"args"`
+	Type              *__Type        `graphy:"type"`
+	IsDeprecated      bool           `graphy:"isDeprecated"`
+	DeprecationReason *string        `graphy:"deprecationReason"`
 }
 
 type __TypeKind string
@@ -71,10 +71,10 @@ const (
 )
 
 type __InputValue struct {
-	Name         string  `json:"name"`
-	Description  *string `json:"description"`
-	Type         *__Type `json:"type"`
-	DefaultValue *string `json:"defaultValue"`
+	Name         string  `graphy:"name"`
+	Description  *string `graphy:"description"`
+	Type         *__Type `graphy:"type"`
+	DefaultValue *string `graphy:"defaultValue"`
 }
 
 func (it *__Type) Fields(includeDeprecatedOpt *bool) []__Field {

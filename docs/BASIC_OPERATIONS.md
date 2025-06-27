@@ -10,8 +10,8 @@ Queries are read-only operations that fetch data. They map directly to Go functi
 
 ```go
 type User struct {
-    ID   int    `json:"id"`
-    Name string `json:"name"`
+    ID   int    `graphy:"id"`
+    Name string `graphy:"name"`
 }
 
 func GetUser(ctx context.Context, id int) (*User, error) {
@@ -147,8 +147,8 @@ Mutations are write operations that modify data. They also map to Go functions b
 
 ```go
 type CreateUserInput struct {
-    Name  string `json:"name"`
-    Email string `json:"email"`
+    Name  string `graphy:"name"`
+    Email string `graphy:"email"`
 }
 
 func CreateUser(ctx context.Context, input CreateUserInput) (*User, error) {
@@ -197,9 +197,9 @@ mutation {
 
 ```go
 type UpdateUserInput struct {
-    ID    int     `json:"id"`
-    Name  *string `json:"name"`  // Optional update
-    Email *string `json:"email"` // Optional update
+    ID    int     `graphy:"id"`
+    Name  *string `graphy:"name"`  // Optional update
+    Email *string `graphy:"email"` // Optional update
 }
 
 func UpdateUser(ctx context.Context, input UpdateUserInput) (*User, error) {
@@ -272,11 +272,11 @@ Use structs for complex input - fields become GraphQL arguments:
 
 ```go
 type CreatePostInput struct {
-    Title    string   `json:"title"`
-    Body     string   `json:"body"`
-    AuthorID int      `json:"authorID"`
-    Tags     []string `json:"tags"`
-    Draft    *bool    `json:"draft"` // Optional field
+    Title    string   `graphy:"title"`
+    Body     string   `graphy:"body"`
+    AuthorID int      `graphy:"authorID"`
+    Tags     []string `graphy:"tags"`
+    Draft    *bool    `graphy:"draft"` // Optional field
 }
 
 func CreatePost(ctx context.Context, input CreatePostInput) (*Post, error) {
@@ -449,8 +449,8 @@ func GetUser(ctx context.Context, id int) (*User, error) {
 
 ```go
 type ValidationError struct {
-    Field   string `json:"field"`
-    Message string `json:"message"`
+    Field   string `graphy:"field"`
+    Message string `graphy:"message"`
 }
 
 func (e ValidationError) Error() string {
@@ -548,9 +548,9 @@ go-quickgraph provides native support for input validation through the `Validato
 
 ```go
 type UserInput struct {
-    Name     string `json:"name"`
-    Email    string `json:"email"`
-    Age      int    `json:"age"`
+    Name     string `graphy:"name"`
+    Email    string `graphy:"email"`
+    Age      int    `graphy:"age"`
 }
 
 // Implement the Validator interface
@@ -591,9 +591,9 @@ For validation that requires access to the request context (e.g., authentication
 
 ```go
 type UpdateUserInput struct {
-    UserID string `json:"userId"`
-    Name   string `json:"name"`
-    Role   string `json:"role"`
+    UserID string `graphy:"userId"`
+    Name   string `graphy:"name"`
+    Role   string `graphy:"role"`
 }
 
 // Implement the ValidatorWithContext interface
@@ -627,8 +627,8 @@ Validation also works with pointer receivers:
 
 ```go
 type ProductInput struct {
-    Name  string  `json:"name"`
-    Price float64 `json:"price"`
+    Name  string  `graphy:"name"`
+    Price float64 `graphy:"price"`
 }
 
 // Validator can be implemented on pointer receivers

@@ -62,9 +62,9 @@ go-quickgraph uses Go reflection to discover types:
 
 ```go
 type User struct {
-    ID    int      `json:"id"`
-    Name  string   `json:"name"`
-    Posts []Post   `json:"posts"`
+    ID    int      `graphy:"id"`
+    Name  string   `graphy:"name"`
+    Posts []Post   `graphy:"posts"`
 }
 
 // This automatically becomes:
@@ -110,9 +110,9 @@ Functions can accept parameters in different ways:
 **Struct-based (Recommended for 3+ parameters):**
 ```go
 type UserInput struct {
-    Name  string `json:"name"`
-    Email string `json:"email"`
-    Age   *int   `json:"age"` // Optional field
+    Name  string `graphy:"name"`
+    Email string `graphy:"email"`
+    Age   *int   `graphy:"age"` // Optional field
 }
 
 func CreateUser(ctx context.Context, input UserInput) (*User, error) {
@@ -281,20 +281,36 @@ func main() {
 }
 ```
 
-### 2. Consider JSON Tags for Field Names
+### 2. Consider Struct Tags for Field Names
+
+go-quickgraph uses struct tags to control GraphQL field names and metadata:
+
 ```go
-// ✅ With JSON tags - control GraphQL field casing
+// ✅ Recommended: Use graphy tags for new code
 type User struct {
+    ID   int    `graphy:"id,description=User identifier"`
+    Name string `graphy:"name,description=User's full name"`
+}
+
+// ✅ Backward Compatible: JSON tags still work for legacy code
+type LegacyUser struct {
     ID   int    `json:"id"`    // GraphQL field: "id"
     Name string `json:"name"`  // GraphQL field: "name"
 }
 
-// ✅ Without JSON tags - uses Go field names
+// ✅ Without tags - uses Go field names
 type User struct {
     ID   int     // GraphQL field: "ID"  
     Name string  // GraphQL field: "Name"
 }
 ```
+
+**Tag Support:**
+- **`graphy` tags** (recommended): Full support for field names, descriptions, deprecation, etc.
+- **`json` tags** (legacy support): Recognized for field naming to ease migration from existing codebases
+- **Tag priority**: `graphy` tags take precedence over `json` tags when both are present
+
+**Migration Note:** If you have existing Go structs with `json` tags, they'll work seamlessly with go-quickgraph. This backward compatibility feature makes it easy to adopt go-quickgraph in existing projects without modifying all your type definitions. However, for new code and when adding GraphQL-specific metadata (descriptions, deprecation notices), use `graphy` tags.
 
 ### 3. Handle Errors Gracefully
 ```go
@@ -316,10 +332,10 @@ func GetUser(ctx context.Context, id int) *User {
 ```go
 // ✅ Easy to extend and maintain
 type CreateUserInput struct {
-    Name     string   `json:"name"`
-    Email    string   `json:"email"`
-    Roles    []string `json:"roles"`
-    Settings *UserSettings `json:"settings"`
+    Name     string   `graphy:"name"`
+    Email    string   `graphy:"email"`
+    Roles    []string `graphy:"roles"`
+    Settings *UserSettings `graphy:"settings"`
 }
 
 // ❌ Too many individual parameters

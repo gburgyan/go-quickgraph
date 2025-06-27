@@ -562,11 +562,11 @@ func Test_parseIntIntoValue_Uint32BitSystem(t *testing.T) {
 
 // Test struct for parseMapIntoValue tests
 type TestMapStruct struct {
-	Name     string  `json:"name"`
-	Age      int     `json:"age"`
-	Optional *bool   `json:"optional"`
+	Name     string  `graphy:"name"`
+	Age      int     `graphy:"age"`
+	Optional *bool   `graphy:"optional"`
 	NoTag    *string // Field without JSON tag - pointer so it's optional
-	Ignored  string  `json:"-"` // Field that should be ignored
+	Ignored  string  `graphy:"-"` // Field that should be ignored
 }
 
 func Test_parseMapIntoValue_NilPointerStruct(t *testing.T) {
@@ -779,7 +779,7 @@ func Test_parseInputIntoValue_StructWithMap(t *testing.T) {
 }
 
 func Test_parseMapIntoValue_IgnoredJsonTag(t *testing.T) {
-	// Test that fields with json:"-" tag are properly ignored
+	// Test that fields with graphy:"-" tag are properly ignored
 	var target TestMapStruct
 	v := reflect.ValueOf(&target).Elem()
 

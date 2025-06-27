@@ -29,16 +29,16 @@ import (
 
 // Define your domain types - just regular Go structs!
 type Book struct {
-    ID     int    `json:"id"`
-    Title  string `json:"title"`
-    Author string `json:"author"`
-    Year   int    `json:"year"`
+    ID     int    `graphy:"id"`
+    Title  string `graphy:"title"`
+    Author string `graphy:"author"`
+    Year   int    `graphy:"year"`
 }
 
 type Author struct {
-    ID   int    `json:"id"`
-    Name string `json:"name"`
-    Bio  string `json:"bio"`
+    ID   int    `graphy:"id"`
+    Name string `graphy:"name"`
+    Bio  string `graphy:"bio"`
 }
 ```
 
@@ -87,9 +87,9 @@ func AddBook(ctx context.Context, input BookInput) (*Book, error) {
 
 // Input type for mutations
 type BookInput struct {
-    Title  string `json:"title"`
-    Author string `json:"author"`
-    Year   int    `json:"year"`
+    Title  string `graphy:"title"`
+    Author string `graphy:"author"`
+    Year   int    `graphy:"year"`
 }
 ```
 
@@ -224,8 +224,8 @@ type User struct {
 
 // ✅ With json tags - more control over GraphQL field names
 type User struct {
-    Name  string `json:"name"`   // GraphQL field: "name"
-    Email string `json:"email"`  // GraphQL field: "email"
+    Name  string `graphy:"name"`   // GraphQL field: "name"
+    Email string `graphy:"email"`  // GraphQL field: "email"
 }
 ```
 

@@ -12,9 +12,9 @@ import (
 
 // Test types for nested validation
 type valAddressInput struct {
-	Street  string `json:"street"`
-	City    string `json:"city"`
-	ZipCode string `json:"zipCode"`
+	Street  string `graphy:"street"`
+	City    string `graphy:"city"`
+	ZipCode string `graphy:"zipCode"`
 }
 
 func (a valAddressInput) Validate() error {
@@ -40,9 +40,9 @@ func (a valAddressInput) Validate() error {
 }
 
 type valPersonInput struct {
-	Name    string          `json:"name"`
-	Age     int             `json:"age"`
-	Address valAddressInput `json:"address"`
+	Name    string          `graphy:"name"`
+	Age     int             `graphy:"age"`
+	Address valAddressInput `graphy:"address"`
 }
 
 func (p valPersonInput) Validate() error {
@@ -119,8 +119,8 @@ func TestValidationWithNestedTypes(t *testing.T) {
 
 // Test types for parameter modes
 type valRangeInput struct {
-	Min int `json:"min"`
-	Max int `json:"max"`
+	Min int `graphy:"min"`
+	Max int `graphy:"max"`
 }
 
 func (r valRangeInput) Validate() error {
@@ -137,7 +137,7 @@ func (r valRangeInput) Validate() error {
 }
 
 type valValidatedInt struct {
-	Value int `json:"value"`
+	Value int `graphy:"value"`
 }
 
 func (v valValidatedInt) Validate() error {
@@ -205,8 +205,8 @@ func TestValidationWithParameterModes(t *testing.T) {
 
 // Test types for error propagation
 type valTestInput struct {
-	Field1 string `json:"field1"`
-	Field2 int    `json:"field2"`
+	Field1 string `graphy:"field1"`
+	Field2 int    `graphy:"field2"`
 }
 
 func (t valTestInput) Validate() error {
@@ -244,9 +244,9 @@ func TestValidationErrorPropagation(t *testing.T) {
 
 // Test types for optional fields
 type valOptionalFieldsInput struct {
-	RequiredField string  `json:"requiredField"`
-	OptionalField *string `json:"optionalField"`
-	OptionalInt   *int    `json:"optionalInt"`
+	RequiredField string  `graphy:"requiredField"`
+	OptionalField *string `graphy:"optionalField"`
+	OptionalInt   *int    `graphy:"optionalInt"`
 }
 
 func (o valOptionalFieldsInput) Validate() error {
@@ -328,8 +328,8 @@ func TestValidationWithOptionalFields(t *testing.T) {
 
 // Test types for arrays
 type valItemInput struct {
-	Name     string `json:"name"`
-	Quantity int    `json:"quantity"`
+	Name     string `graphy:"name"`
+	Quantity int    `graphy:"quantity"`
 }
 
 func (i valItemInput) Validate() error {
@@ -346,8 +346,8 @@ func (i valItemInput) Validate() error {
 }
 
 type valOrderInput struct {
-	CustomerName string         `json:"customerName"`
-	Items        []valItemInput `json:"items"`
+	CustomerName string         `graphy:"customerName"`
+	Items        []valItemInput `graphy:"items"`
 }
 
 func (o valOrderInput) Validate() error {
@@ -453,9 +453,9 @@ func (v valValidationError) Error() string {
 }
 
 type valComplexInput struct {
-	Username string `json:"username"`
-	Email    string `json:"email"`
-	Age      int    `json:"age"`
+	Username string `graphy:"username"`
+	Email    string `graphy:"email"`
+	Age      int    `graphy:"age"`
 }
 
 func (c valComplexInput) Validate() error {
@@ -528,7 +528,7 @@ func TestValidationWithCustomErrors(t *testing.T) {
 }
 
 type valTrackedInput struct {
-	Value string `json:"value"`
+	Value string `graphy:"value"`
 }
 
 func (t valTrackedInput) Validate() error {

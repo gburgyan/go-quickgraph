@@ -10,22 +10,22 @@ Go structs automatically become GraphQL object types:
 
 ```go
 type User struct {
-    ID       int       `json:"id"`
-    Name     string    `json:"name"`
-    Email    *string   `json:"email"`    // Optional field (nullable)
-    Posts    []Post    `json:"posts"`    // Array of non-nullable Posts
-    Settings *Settings `json:"settings"` // Optional nested object
+    ID       int       `graphy:"id"`
+    Name     string    `graphy:"name"`
+    Email    *string   `graphy:"email"`    // Optional field (nullable)
+    Posts    []Post    `graphy:"posts"`    // Array of non-nullable Posts
+    Settings *Settings `graphy:"settings"` // Optional nested object
 }
 
 type Post struct {
-    ID    int    `json:"id"`
-    Title string `json:"title"`
-    Body  string `json:"body"`
+    ID    int    `graphy:"id"`
+    Title string `graphy:"title"`
+    Body  string `graphy:"body"`
 }
 
 type Settings struct {
-    Theme       string `json:"theme"`
-    Newsletters bool   `json:"newsletters"`
+    Theme       string `graphy:"theme"`
+    Newsletters bool   `graphy:"newsletters"`
 }
 ```
 
@@ -53,31 +53,31 @@ type Settings {
 
 ### Struct Field Tags
 
-go-quickgraph uses struct tags to control field naming and metadata. The `graphy` tag takes precedence over the `json` tag:
+go-quickgraph uses the `graphy` tag to control GraphQL field naming and metadata. The library also supports `json` tags for backward compatibility.
 
 ```go
 type Product struct {
     // Primary: graphy tag for field naming and metadata
     ID          int     `graphy:"id,description=Unique product identifier"`
     
-    // Both tags: graphy takes priority for field name
-    Name        string  `graphy:"productName,description=Product display name" json:"name"`
+    // Standard field naming
+    Name        string  `graphy:"productName,description=Product display name"`
     
-    // Fallback: json tag used when no graphy tag
-    Price       float64 `json:"price"`
+    // Standard field
+    Price       float64 `graphy:"price"`
     
     // Advanced graphy tag features
     Deprecated  string  `graphy:"oldField,deprecated=Use newField instead"`
     
     // Exclude fields
-    Internal    string  `graphy:"-"`        // Excluded via graphy
-    Secret      string  `json:"-"`          // Excluded via json
+    Internal    string  `graphy:"-"`        // Excluded from GraphQL schema
+    Secret      string  `graphy:"-"`          // Also excluded
 }
 ```
 
 **Tag Priority:**
-1. `graphy` tag (highest priority)
-2. `json` tag (fallback)
+1. `graphy` tag (highest priority - recommended)
+2. `json` tag (fallback for backward compatibility)
 3. Field name (if no tags)
 
 **Graphy Tag Format:**
@@ -92,9 +92,9 @@ Add methods to structs to create computed fields:
 
 ```go
 type User struct {
-    ID        int    `json:"id"`
-    FirstName string `json:"firstName"`
-    LastName  string `json:"lastName"`
+    ID        int    `graphy:"id"`
+    FirstName string `graphy:"firstName"`
+    LastName  string `graphy:"lastName"`
 }
 
 // Method becomes a GraphQL field
@@ -138,9 +138,9 @@ func (r UserRole) EnumValues() []string {
 
 // Use in your types
 type User struct {
-    ID   int      `json:"id"`
-    Name string   `json:"name"`
-    Role UserRole `json:"role"`
+    ID   int      `graphy:"id"`
+    Name string   `graphy:"name"`
+    Role UserRole `graphy:"role"`
 }
 ```
 
@@ -179,21 +179,21 @@ Use Go's anonymous struct embedding to create GraphQL interfaces:
 ```go
 // Base type becomes the interface
 type Node struct {
-    ID   string `json:"id"`
-    Type string `json:"type"`
+    ID   string `graphy:"id"`
+    Type string `graphy:"type"`
 }
 
 // Types that embed Node implement the Node interface
 type User struct {
     Node                              // Anonymous embedding
-    Name  string `json:"name"`
-    Email string `json:"email"`
+    Name  string `graphy:"name"`
+    Email string `graphy:"email"`
 }
 
 type Post struct {
     Node                              // Anonymous embedding
-    Title string `json:"title"`
-    Body  string `json:"body"`
+    Title string `graphy:"title"`
+    Body  string `graphy:"body"`
 }
 ```
 
@@ -230,8 +230,8 @@ Sometimes you only want the interface, not the concrete type:
 
 ```go
 type BaseEntity struct {
-    ID        string    `json:"id"`
-    CreatedAt time.Time `json:"createdAt"`
+    ID        string    `graphy:"id"`
+    CreatedAt time.Time `graphy:"createdAt"`
 }
 
 // Opt out of concrete type generation
@@ -244,13 +244,13 @@ func (b BaseEntity) GraphTypeExtension() GraphTypeInfo {
 
 type User struct {
     BaseEntity
-    Name string `json:"name"`
+    Name string `graphy:"name"`
 }
 
 type Product struct {
     BaseEntity  
-    Name  string  `json:"name"`
-    Price float64 `json:"price"`
+    Name  string  `graphy:"name"`
+    Price float64 `graphy:"price"`
 }
 ```
 
@@ -364,19 +364,19 @@ When a union contains an interface type, it automatically expands to include all
 ```go
 // Interface type
 type Employee struct {
-    ID   int    `json:"id"`
-    Name string `json:"name"`
+    ID   int    `graphy:"id"`
+    Name string `graphy:"name"`
 }
 
 // Implementations
 type Developer struct {
     Employee
-    Languages []string `json:"languages"`
+    Languages []string `graphy:"languages"`
 }
 
 type Manager struct {
     Employee
-    Department string `json:"department"`
+    Department string `graphy:"department"`
 }
 
 // Union with interface
@@ -404,11 +404,11 @@ Use pointers to make fields optional (nullable):
 
 ```go
 type User struct {
-    ID       int     `json:"id"`
-    Name     string  `json:"name"`      // Required
-    Email    *string `json:"email"`     // Optional
-    Age      *int    `json:"age"`       // Optional
-    IsActive bool    `json:"isActive"`  // Required (defaults to false)
+    ID       int     `graphy:"id"`
+    Name     string  `graphy:"name"`      // Required
+    Email    *string `graphy:"email"`     // Optional
+    Age      *int    `graphy:"age"`       // Optional
+    IsActive bool    `graphy:"isActive"`  // Required (defaults to false)
 }
 ```
 
@@ -416,16 +416,16 @@ type User struct {
 
 ```go
 type User struct {
-    ID       int       `json:"id"`
-    Profile  Profile   `json:"profile"`     // Required nested object
-    Posts    []Post    `json:"posts"`       // Required array of required items
-    Comments []*Comment `json:"comments"`    // Required array of optional items
-    Tags     *[]string `json:"tags"`        // Optional array of required strings
+    ID       int       `graphy:"id"`
+    Profile  Profile   `graphy:"profile"`     // Required nested object
+    Posts    []Post    `graphy:"posts"`       // Required array of required items
+    Comments []*Comment `graphy:"comments"`    // Required array of optional items
+    Tags     *[]string `graphy:"tags"`        // Optional array of required strings
 }
 
 type Profile struct {
-    Bio       *string `json:"bio"`
-    AvatarURL *string `json:"avatarUrl"`
+    Bio       *string `graphy:"bio"`
+    AvatarURL *string `graphy:"avatarUrl"`
 }
 ```
 
@@ -435,8 +435,8 @@ Handle circular references carefully:
 
 ```go
 type User struct {
-    ID   int    `json:"id"`
-    Name string `json:"name"`
+    ID   int    `graphy:"id"`
+    Name string `graphy:"name"`
 }
 
 // Add relationships as methods to avoid infinite recursion
@@ -445,8 +445,8 @@ func (u *User) Posts(ctx context.Context) ([]Post, error) {
 }
 
 type Post struct {
-    ID    int    `json:"id"`
-    Title string `json:"title"`
+    ID    int    `graphy:"id"`
+    Title string `graphy:"title"`
 }
 
 func (p *Post) Author(ctx context.Context) (*User, error) {
@@ -460,10 +460,10 @@ For polymorphic returns, use type discovery:
 
 ```go
 type Content struct {
-    ID   string `json:"id"`
-    Type string `json:"type"`
+    ID   string `graphy:"id"`
+    Type string `graphy:"type"`
     // Private field for actual type
-    actualType interface{} `json:"-" graphy:"-"`
+    actualType interface{} `graphy:"-"`
 }
 
 // Enable runtime type resolution
@@ -484,14 +484,14 @@ func NewArticle(id, title, body string) *Article {
 
 type Article struct {
     Content
-    Title string `json:"title"`
-    Body  string `json:"body"`
+    Title string `graphy:"title"`
+    Body  string `graphy:"body"`
 }
 
 type Video struct {
     Content
-    Duration int    `json:"duration"`
-    URL      string `json:"url"`
+    Duration int    `graphy:"duration"`
+    URL      string `graphy:"url"`
 }
 
 // Function can return base type
@@ -513,15 +513,15 @@ Go structs become GraphQL input types when used as function parameters:
 
 ```go
 type CreateUserInput struct {
-    Name     string   `json:"name"`
-    Email    string   `json:"email"`
-    Role     UserRole `json:"role"`
-    Settings *UserSettingsInput `json:"settings"`
+    Name     string   `graphy:"name"`
+    Email    string   `graphy:"email"`
+    Role     UserRole `graphy:"role"`
+    Settings *UserSettingsInput `graphy:"settings"`
 }
 
 type UserSettingsInput struct {
-    Theme       string `json:"theme"`
-    Newsletters bool   `json:"newsletters"`
+    Theme       string `graphy:"theme"`
+    Newsletters bool   `graphy:"newsletters"`
 }
 
 func CreateUser(ctx context.Context, input CreateUserInput) (*User, error) {
@@ -554,14 +554,14 @@ Share common fields across input types:
 
 ```go
 type PaginationInput struct {
-    Limit  int `json:"limit"`
-    Offset int `json:"offset"`
+    Limit  int `graphy:"limit"`
+    Offset int `graphy:"offset"`
 }
 
 type UserSearchInput struct {
     PaginationInput      // Fields promoted to top level
-    Query   string       `json:"query"`
-    Role    *UserRole    `json:"role"`
+    Query   string       `graphy:"query"`
+    Role    *UserRole    `graphy:"role"`
 }
 
 func SearchUsers(ctx context.Context, input UserSearchInput) ([]*User, error) {
@@ -585,16 +585,16 @@ func SearchUsers(ctx context.Context, input UserSearchInput) ([]*User, error) {
 ```go
 // ✅ Clear, specific types
 type CreateUserInput struct {
-    Name  string   `json:"name"`
-    Email string   `json:"email"`
-    Role  UserRole `json:"role"`
+    Name  string   `graphy:"name"`
+    Email string   `graphy:"email"`
+    Role  UserRole `graphy:"role"`
 }
 
 // ❌ Generic, unclear types
 type UserData struct {
-    Field1 string `json:"field1"`
-    Field2 string `json:"field2"`
-    Field3 string `json:"field3"`
+    Field1 string `graphy:"field1"`
+    Field2 string `graphy:"field2"`
+    Field3 string `graphy:"field3"`
 }
 ```
 
@@ -602,16 +602,16 @@ type UserData struct {
 ```go
 // ✅ Clear optional vs required fields
 type UpdateUserInput struct {
-    Name     *string   `json:"name"`     // Optional update
-    Email    *string   `json:"email"`    // Optional update
-    IsActive *bool     `json:"isActive"` // Optional update (including false)
+    Name     *string   `graphy:"name"`     // Optional update
+    Email    *string   `graphy:"email"`    // Optional update
+    IsActive *bool     `graphy:"isActive"` // Optional update (including false)
 }
 
 // ❌ Required fields for partial updates
 type UpdateUserInput struct {
-    Name     string `json:"name"`     // Must always provide
-    Email    string `json:"email"`    // Must always provide
-    IsActive bool   `json:"isActive"` // Can't distinguish false from unset
+    Name     string `graphy:"name"`     // Must always provide
+    Email    string `graphy:"email"`    // Must always provide
+    IsActive bool   `graphy:"isActive"` // Can't distinguish false from unset
 }
 ```
 
@@ -624,8 +624,8 @@ func (u *User) PostCount(ctx context.Context) (int, error) {
 
 // ❌ Static fields that may be stale
 type User struct {
-    ID        int `json:"id"`
-    PostCount int `json:"postCount"` // May be outdated
+    ID        int `graphy:"id"`
+    PostCount int `graphy:"postCount"` // May be outdated
 }
 ```
 
@@ -633,9 +633,9 @@ type User struct {
 ```go
 // ✅ Efficient for GraphQL selection
 type User struct {
-    ID      int     `json:"id"`
-    Name    string  `json:"name"`
-    Profile Profile `json:"profile"` // Separate object for complex data
+    ID      int     `graphy:"id"`
+    Name    string  `graphy:"name"`
+    Profile Profile `graphy:"profile"` // Separate object for complex data
 }
 
 func (u *User) Posts(ctx context.Context, limit *int) ([]Post, error) {
@@ -644,11 +644,11 @@ func (u *User) Posts(ctx context.Context, limit *int) ([]Post, error) {
 
 // ❌ Always loads everything
 type User struct {
-    ID           int      `json:"id"`
-    Name         string   `json:"name"`
-    Bio          string   `json:"bio"`
-    AvatarURL    string   `json:"avatarUrl"`
-    AllUserPosts []Post   `json:"posts"` // Always loaded, inefficient
+    ID           int      `graphy:"id"`
+    Name         string   `graphy:"name"`
+    Bio          string   `graphy:"bio"`
+    AvatarURL    string   `graphy:"avatarUrl"`
+    AllUserPosts []Post   `graphy:"posts"` // Always loaded, inefficient
 }
 ```
 

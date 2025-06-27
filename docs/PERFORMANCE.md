@@ -355,7 +355,7 @@ func complexityMiddleware(analyzer *ComplexityAnalyzer) func(http.Handler) http.
                 r.Body = io.NopCloser(bytes.NewReader(body))
                 
                 var req struct {
-                    Query string `json:"query"`
+                    Query string `graphy:"query"`
                 }
                 if json.Unmarshal(body, &req) == nil {
                     if cost, err := analyzer.AnalyzeQuery(req.Query); err != nil {
@@ -378,9 +378,9 @@ Load expensive fields only when requested using method patterns:
 
 ```go
 type User struct {
-    ID    int    `json:"id"`
-    Name  string `json:"name"`
-    Email string `json:"email"`
+    ID    int    `graphy:"id"`
+    Name  string `graphy:"name"`
+    Email string `graphy:"email"`
     
     // Don't preload expensive data
     cachedStats *UserStats
@@ -419,9 +419,9 @@ Load expensive fields only when requested:
 
 ```go
 type User struct {
-    ID       int     `json:"id"`
-    Name     string  `json:"name"`
-    Email    string  `json:"email"`
+    ID       int     `graphy:"id"`
+    Name     string  `graphy:"name"`
+    Email    string  `graphy:"email"`
     
     // Expensive fields loaded lazily
     posts    []Post  // Not included in JSON by default
@@ -543,7 +543,7 @@ func rateLimitMiddleware(limiter *RateLimiter) func(http.Handler) http.Handler {
 ```go
 // ✅ Use pointers for large or optional structs
 type User struct {
-    Profile *UserProfile `json:"profile"` // Only allocated when needed
+    Profile *UserProfile `graphy:"profile"` // Only allocated when needed
 }
 
 // ✅ Embed small structs instead of using pointers
@@ -559,8 +559,8 @@ type Timestamps struct {
 
 // ✅ Use slices for collections
 type User struct {
-    Tags     []string   `json:"tags"`     // Dynamic collection
-    PostIDs  []int      `json:"postIds"`  // Variable length
+    Tags     []string   `graphy:"tags"`     // Dynamic collection
+    PostIDs  []int      `graphy:"postIds"`  // Variable length
 }
 ```
 

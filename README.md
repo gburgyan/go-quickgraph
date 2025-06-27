@@ -6,6 +6,8 @@
 
 ## Quick Start
 
+**📖 [Read the Quickstart Guide](docs/QUICKSTART.md)** - Learn go-quickgraph in 5 minutes with practical examples.
+
 ```bash
 go get github.com/gburgyan/go-quickgraph
 ```
@@ -101,6 +103,7 @@ Try this query:
 ## Documentation
 
 ### Getting Started
+- **[Quickstart Guide](docs/QUICKSTART.md)** - Learn go-quickgraph in 5 minutes (start here!)
 - [Installation & Setup](docs/GETTING_STARTED.md) - Your first GraphQL API in 5 minutes
 - [Core Concepts](docs/CORE_CONCEPTS.md) - Understanding the code-first approach
 - [Basic Operations](docs/BASIC_OPERATIONS.md) - Queries, mutations, and simple types

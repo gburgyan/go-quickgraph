@@ -228,7 +228,7 @@ func (f *graphFunction) getCallParamsNamedStruct(ctx context.Context, req *reque
 		}
 		return nil, fmt.Errorf("missing required parameters: %v", strings.Join(missingParams, ", "))
 	}
-	
+
 	// Validate the complete struct after all fields are populated
 	for i := startIndex; i < gft.NumIn(); i++ {
 		if paramValues[i].IsValid() && !gft.In(i).ConvertibleTo(contextType) {
@@ -247,7 +247,7 @@ func (f *graphFunction) getCallParamsNamedStruct(ctx context.Context, req *reque
 			}
 		}
 	}
-	
+
 	return paramValues, nil
 }
 
@@ -326,13 +326,13 @@ func parseInputIntoValue(ctx context.Context, req *request, inValue genericValue
 				}
 			}
 		}
-		
+
 		// Also check the dereferenced value if it's a pointer
 		checkValue := targetValue
 		if checkValue.Kind() == reflect.Ptr && !checkValue.IsNil() {
 			checkValue = checkValue.Elem()
 		}
-		
+
 		if checkValue.CanInterface() {
 			if validator, ok := checkValue.Interface().(ValidatorWithContext); ok && ctx != nil {
 				if err := validator.ValidateWithContext(ctx); err != nil {
@@ -583,7 +583,8 @@ func parseMapIntoValue(ctx context.Context, req *request, inValue genericValue, 
 	// and set the values from the input map. This is how we initialize a struct from a map.
 	targetType := targetValue.Type()
 	// TODO: Cache this so we don't have to reconstruct it every time.
-	// Loop through the fields of the target type and make a map of the fields by "json" tag.
+	// Loop through the fields of the target type and make a map of the fields by tags.
+	// Priority: graphy tag > json tag > field name
 	fieldMap := map[string]reflect.StructField{}
 	requiredFields := map[string]bool{}
 
@@ -598,14 +599,54 @@ func parseMapIntoValue(ctx context.Context, req *request, inValue genericValue, 
 
 	for i := 0; i < targetType.NumField(); i++ {
 		field := targetType.Field(i)
-		if tag, ok := field.Tag.Lookup("json"); ok {
-			// Only use the name from the tag if it's not "-" and ignore anything after a comma.
-			if tag == "-" {
+		fieldName := ""
+		graphyProvidedName := false
+
+		// Check graphy tag first for metadata and name
+		if graphyTag, ok := field.Tag.Lookup("graphy"); ok {
+			graphyParts := strings.Split(graphyTag, ",")
+			if graphyParts[0] == "-" {
 				continue
 			}
-			tag = strings.Split(tag, ",")[0]
-			fieldMap[tag] = field
+			// Handle both simple name and name=value format
+			for _, part := range graphyParts {
+				parts := strings.SplitN(part, "=", 2)
+				if len(parts) == 1 && parts[0] != "" && !strings.Contains(parts[0], "=") {
+					// Simple name without = sign
+					fieldName = parts[0]
+					graphyProvidedName = true
+					break
+				} else if len(parts) == 2 && parts[0] == "name" {
+					// name=value format
+					value := strings.TrimSpace(parts[1])
+					if len(value) >= 2 && value[0] == '"' && value[len(value)-1] == '"' {
+						value = value[1 : len(value)-1]
+					}
+					fieldName = value
+					graphyProvidedName = true
+					break
+				}
+			}
 		}
+
+		// If graphy didn't provide a name, fall back to json tag
+		if !graphyProvidedName {
+			if jsonTag, ok := field.Tag.Lookup("json"); ok {
+				// Only use the name from the tag if it's not "-" and ignore anything after a comma.
+				if jsonTag == "-" {
+					continue
+				}
+				fieldName = strings.Split(jsonTag, ",")[0]
+			}
+		}
+
+		// Use the determined field name (or field.Name if no tag)
+		if fieldName != "" {
+			fieldMap[fieldName] = field
+		} else {
+			fieldMap[field.Name] = field
+		}
+
 		if field.Type.Kind() != reflect.Ptr {
 			requiredFields[field.Name] = true
 		}

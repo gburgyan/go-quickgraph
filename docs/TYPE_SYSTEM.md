@@ -51,6 +51,41 @@ type Settings {
 }
 ```
 
+### Struct Field Tags
+
+go-quickgraph uses struct tags to control field naming and metadata. The `graphy` tag takes precedence over the `json` tag:
+
+```go
+type Product struct {
+    // Primary: graphy tag for field naming and metadata
+    ID          int     `graphy:"id,description=Unique product identifier"`
+    
+    // Both tags: graphy takes priority for field name
+    Name        string  `graphy:"productName,description=Product display name" json:"name"`
+    
+    // Fallback: json tag used when no graphy tag
+    Price       float64 `json:"price"`
+    
+    // Advanced graphy tag features
+    Deprecated  string  `graphy:"oldField,deprecated=Use newField instead"`
+    
+    // Exclude fields
+    Internal    string  `graphy:"-"`        // Excluded via graphy
+    Secret      string  `json:"-"`          // Excluded via json
+}
+```
+
+**Tag Priority:**
+1. `graphy` tag (highest priority)
+2. `json` tag (fallback)
+3. Field name (if no tags)
+
+**Graphy Tag Format:**
+- Simple: `graphy:"fieldName"`
+- With metadata: `graphy:"fieldName,description=Field description"`
+- Multiple attributes: `graphy:"name=fieldName,deprecated=Reason,description=Desc"`
+- Exclude field: `graphy:"-"`
+
 ### Field Methods
 
 Add methods to structs to create computed fields:

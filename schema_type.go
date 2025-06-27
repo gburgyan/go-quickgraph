@@ -30,6 +30,11 @@ func (g *Graphy) schemaForTypes(kind TypeKind, mapping typeNameMapping, inputMap
 		t := typeQueue[i]
 		name := mapping[t]
 
+		// Skip if no name mapping exists for this type
+		if name == "" {
+			continue
+		}
+
 		// Skip if already processed
 		if completed[name] {
 			continue
@@ -383,6 +388,14 @@ func (g *Graphy) getSchemaGraphFunctionType(field *fieldLookup, outputMapping ty
 }
 func (g *Graphy) schemaForUnion(name string, t *typeLookup, mapping typeNameMapping) string {
 	sb := strings.Builder{}
+
+	// Add union description if available
+	description := g.getTypeDescription(t)
+	if description != "" {
+		sb.WriteString(formatDescription(description, 0))
+		sb.WriteString("\n")
+	}
+
 	sb.WriteString("union ")
 	sb.WriteString(name)
 	sb.WriteString(" =")

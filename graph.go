@@ -392,10 +392,14 @@ func (g *Graphy) typeLookup(typ reflect.Type) *typeLookup {
 	} else {
 		result.name = rootTyp.Name()
 		// If the name is empty (anonymous types), try to get it from the package path
-		if result.name == "" && rootTyp.PkgPath() != "" {
-			// Extract the type name from the full type string
+		if result.name == "" {
+			// For types without a direct name, try to extract from the string representation
 			typStr := rootTyp.String()
-			// Handle cases like "quickgraph.DescribedUser"
+			// Handle pointer types like "*handlers.Employee"
+			typStr = strings.TrimPrefix(typStr, "*")
+			// Handle slice types like "[]handlers.Employee"
+			typStr = strings.TrimPrefix(typStr, "[]")
+			// Handle cases like "handlers.Employee"
 			if idx := strings.LastIndex(typStr, "."); idx != -1 {
 				result.name = typStr[idx+1:]
 			} else {

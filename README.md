@@ -21,8 +21,8 @@ import (
 )
 
 type User struct {
-    Name  string `json:"name"`
-    Email string `json:"email"`
+    Name  string `graphy:"name"`
+    Email string `graphy:"email"`
 }
 
 func main() {

@@ -14,24 +14,24 @@ import (
 // retrieved from https://graphql.org/learn/queries/.
 
 type Character struct {
-	Id        string       `json:"id"`
-	Name      string       `json:"name"`
-	Friends   []*Character `json:"friends"`
-	AppearsIn []episode    `json:"appearsIn"`
+	Id        string       `graphy:"id"`
+	Name      string       `graphy:"name"`
+	Friends   []*Character `graphy:"friends"`
+	AppearsIn []episode    `graphy:"appearsIn"`
 }
 
 type ConnectionEdge struct {
-	Node *Character `json:"node"`
+	Node *Character `graphy:"node"`
 }
 
 type FriendsConnection struct {
-	TotalCount int               `json:"totalCount"`
-	Edges      []*ConnectionEdge `json:"edges"`
+	TotalCount int               `graphy:"totalCount"`
+	Edges      []*ConnectionEdge `graphy:"edges"`
 }
 
 type Starship struct {
-	Id   string `json:"id"`
-	Name string `json:"name"`
+	Id   string `graphy:"id"`
+	Name string `graphy:"name"`
 	// TODO: Add support for length.
 }
 
@@ -58,9 +58,9 @@ func (c *Character) FriendsConnection(first int) *FriendsConnection {
 }
 
 type Review struct {
-	Stars      int     `json:"stars"`
-	Commentary *string `json:"commentary"`
-	Ignore     *string `json:"-"`
+	Stars      int     `graphy:"stars"`
+	Commentary *string `graphy:"commentary"`
+	Ignore     *string `graphy:"-"`
 }
 
 type episode string
@@ -81,12 +81,12 @@ const (
 
 type Human struct {
 	Character
-	HeightMeters float64 `json:"HeightMeters"`
+	HeightMeters float64 `graphy:"HeightMeters"`
 }
 
 type Droid struct {
 	Character
-	PrimaryFunction string `json:"primaryFunction"`
+	PrimaryFunction string `graphy:"primaryFunction"`
 }
 
 func roundToPrecision(number float64, precision int) float64 {

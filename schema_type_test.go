@@ -404,7 +404,9 @@ type ConnectionEdge {
 	node: Character
 }
 
+"""An extended object"""
 type ExtendedObject {
+	"""The character"""
 	char1: Character! @deprecated(reason: "No longer used")
 	newCharacter(name: String!): Character!
 }

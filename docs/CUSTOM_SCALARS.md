@@ -66,9 +66,9 @@ if err != nil {
 }
 
 type Event struct {
-    ID        int       `json:"id"`
-    Name      string    `json:"name"`
-    StartTime time.Time `json:"startTime"` // Uses DateTime scalar
+    ID        int       `graphy:"id"`
+    Name      string    `graphy:"name"`
+    StartTime time.Time `graphy:"startTime"` // Uses DateTime scalar
 }
 ```
 
@@ -99,9 +99,9 @@ if err != nil {
 }
 
 type Product struct {
-    ID       int                    `json:"id"`
-    Name     string                 `json:"name"`
-    Metadata map[string]interface{} `json:"metadata"` // Uses JSON scalar
+    ID       int                    `graphy:"id"`
+    Name     string                 `graphy:"name"`
+    Metadata map[string]interface{} `graphy:"metadata"` // Uses JSON scalar
 }
 ```
 
@@ -284,9 +284,9 @@ err := g.RegisterScalar(ctx, quickgraph.ScalarDefinition{
 **Usage in Types:**
 ```go
 type User struct {
-    ID    UserID `json:"id"`
-    Name  string `json:"name"`
-    Email string `json:"email"`
+    ID    UserID `graphy:"id"`
+    Name  string `graphy:"name"`
+    Email string `graphy:"email"`
 }
 
 func GetUser(ctx context.Context, id UserID) (*User, error) {

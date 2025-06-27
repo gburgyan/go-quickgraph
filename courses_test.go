@@ -11,14 +11,14 @@ import (
 )
 
 type Course struct {
-	Title      string  `json:"title"`
-	Instructor string  `json:"instructor"`
-	Price      float64 `json:"price"`
+	Title      string  `graphy:"title"`
+	Instructor string  `graphy:"instructor"`
+	Price      float64 `graphy:"price"`
 }
 
 type PriceConvertInput struct {
-	Currency string  `json:"currency"`
-	Ignore   *string `json:"-"`
+	Currency string  `graphy:"currency"`
+	Ignore   *string `graphy:"-"`
 }
 
 func (c *Course) PriceConvert(in PriceConvertInput) (string, error) {
@@ -170,7 +170,7 @@ func Test_Missing_Struct_Param(t *testing.T) {
 }`
 
 	type TestInput struct {
-		Categories []*string `json:"categories"`
+		Categories []*string `graphy:"categories"`
 	}
 
 	f := func(ctx context.Context, input TestInput) []*Course {

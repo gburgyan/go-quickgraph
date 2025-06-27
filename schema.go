@@ -85,7 +85,7 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) string {
 				sb.WriteString(formatDescription(*function.description, 1))
 				sb.WriteString("\n")
 			}
-			
+
 			sb.WriteString("\t")
 			sb.WriteString(function.name)
 			if len(function.paramsByName) > 0 {
@@ -99,14 +99,14 @@ func (g *Graphy) SchemaDefinition(ctx context.Context) string {
 			schemaRef := g.schemaRefForType(function.baseReturnType, st.outputTypeNameLookup)
 
 			sb.WriteString(schemaRef)
-			
+
 			// Add deprecation if applicable
 			if function.deprecatedReason != nil && *function.deprecatedReason != "" {
 				sb.WriteString(" @deprecated(reason: \"")
 				sb.WriteString(*function.deprecatedReason)
 				sb.WriteString("\")")
 			}
-			
+
 			sb.WriteString("\n")
 		}
 		sb.WriteString("}\n\n")
@@ -235,6 +235,10 @@ func (g *Graphy) solveInputOutputNameMapping(inputTypes []*typeLookup, outputTyp
 	// Populate outputMapping and check for name collisions along the way
 	for _, outputType := range outputTypes {
 		name := g.getGraphQLTypeName(outputType)
+		// Skip if name is empty - this type won't be rendered
+		if name == "" {
+			continue
+		}
 		// If this type has implementedBy relationships and is not marked as interfaceOnly,
 		// we'll generate both an interface (with I prefix) and a concrete type
 		if len(outputType.implementedBy) > 0 && !outputType.interfaceOnly {
@@ -251,9 +255,13 @@ func (g *Graphy) solveInputOutputNameMapping(inputTypes []*typeLookup, outputTyp
 	// Populate inputMapping, checking for name collisions and resolving them by appending "Input"
 	for _, inputType := range inputTypes {
 		name := g.getGraphQLTypeName(inputType)
+		// Skip if name is empty - this type won't be rendered
+		if name == "" {
+			continue
+		}
 		_, exists := outputNames[name]
-		if exists {
-			// If a collision is found, append "Input" to the input type name
+		if exists && !strings.HasSuffix(name, "Input") {
+			// If a collision is found and the name doesn't already end with "Input", append it
 			name += "Input"
 		}
 		inputMapping[inputType] = name

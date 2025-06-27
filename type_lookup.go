@@ -220,9 +220,10 @@ func (g *Graphy) processBaseTypeFieldLookup(typ reflect.Type, prevIndex []int, t
 }
 
 func (g *Graphy) baseFieldLookup(field reflect.StructField, index []int) fieldLookup {
-	// If there's a json tag on the field, use that for the name of the field.
-	// Otherwise, use the name of the field.
-	// If there's a json tag with a "-" value, ignore the field.
+	// Process tags with the following priority:
+	// 1. graphy tag takes precedence for field naming and metadata
+	// 2. json tag is used as fallback for field naming
+	// If either tag has a "-" value, ignore the field.
 	tfl := fieldLookup{
 		name:         field.Name,
 		resultType:   field.Type,
@@ -230,16 +231,10 @@ func (g *Graphy) baseFieldLookup(field reflect.StructField, index []int) fieldLo
 		fieldType:    FieldTypeField,
 	}
 
-	if jsonTag := field.Tag.Get("json"); jsonTag != "" {
-		jsonParts := strings.Split(jsonTag, ",")
-		if jsonParts[0] == "-" {
-			return fieldLookup{}
-		}
-		if jsonParts[0] != "" {
-			tfl.name = jsonParts[0]
-		}
-	}
+	// Track if graphy tag provided a name
+	graphyProvidedName := false
 
+	// First, check graphy tag for metadata and name
 	if graphyTag := field.Tag.Get("graphy"); graphyTag != "" {
 		graphyParts := strings.Split(graphyTag, ",")
 
@@ -258,9 +253,11 @@ func (g *Graphy) baseFieldLookup(field reflect.StructField, index []int) fieldLo
 
 		for _, part := range graphyParts {
 			parts := strings.SplitN(part, "=", 2)
-			if len(parts) == 1 {
+			if len(parts) == 1 && parts[0] != "" && !strings.Contains(parts[0], "=") {
+				// Simple name without = sign (and not a key=value pattern)
 				tfl.name = parts[0]
-			} else {
+				graphyProvidedName = true
+			} else if len(parts) == 2 {
 				// If the value is quoted, strip the quotes.
 				value := strings.TrimSpace(parts[1])
 				if len(value) >= 2 && value[0] == '"' && value[len(value)-1] == '"' {
@@ -269,12 +266,26 @@ func (g *Graphy) baseFieldLookup(field reflect.StructField, index []int) fieldLo
 				switch parts[0] {
 				case "name":
 					tfl.name = value
+					graphyProvidedName = true
 				case "deprecated":
 					tfl.isDeprecated = true
 					tfl.deprecatedReason = value
 				case "description":
 					tfl.description = value
 				}
+			}
+		}
+	}
+
+	// If graphy tag didn't provide a name, fall back to json tag
+	if !graphyProvidedName {
+		if jsonTag := field.Tag.Get("json"); jsonTag != "" {
+			jsonParts := strings.Split(jsonTag, ",")
+			if jsonParts[0] == "-" {
+				return fieldLookup{}
+			}
+			if jsonParts[0] != "" {
+				tfl.name = jsonParts[0]
 			}
 		}
 	}

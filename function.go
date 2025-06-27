@@ -284,7 +284,7 @@ func (g *Graphy) newGraphFunction(def FunctionDefinition, method bool) graphFunc
 		paramType := inputTypes[0].paramType
 		isStructParam := paramType.Kind() == reflect.Struct
 		isPtrToStructParam := paramType.Kind() == reflect.Ptr && paramType.Elem().Kind() == reflect.Struct
-		
+
 		if (isStructParam || isPtrToStructParam) && len(def.ParameterNames) == 0 {
 			// Invoke option 1
 			// If it's a pointer to struct, use the element type for field inspection
@@ -435,12 +435,44 @@ func (g *Graphy) newStructGraphFunction(def FunctionDefinition, graphFunc reflec
 	var processField func(field reflect.StructField, fieldIndex int, fieldPath []int)
 	processField = func(field reflect.StructField, fieldIndex int, fieldPath []int) {
 		name := field.Name
-		if jsonTag := field.Tag.Get("json"); jsonTag != "" {
-			if jsonTag == "-" {
+		graphyProvidedName := false
+
+		// Check graphy tag first for metadata and name
+		if graphyTag := field.Tag.Get("graphy"); graphyTag != "" {
+			graphyParts := strings.Split(graphyTag, ",")
+			if graphyParts[0] == "-" {
 				return
 			}
-			// Ignore anything after the first comma.
-			name = strings.Split(jsonTag, ",")[0]
+			// Handle both simple name and name=value format
+			for _, part := range graphyParts {
+				parts := strings.SplitN(part, "=", 2)
+				if len(parts) == 1 && parts[0] != "" && !strings.Contains(parts[0], "=") {
+					// Simple name without = sign
+					name = parts[0]
+					graphyProvidedName = true
+					break
+				} else if len(parts) == 2 && parts[0] == "name" {
+					// name=value format
+					value := strings.TrimSpace(parts[1])
+					if len(value) >= 2 && value[0] == '"' && value[len(value)-1] == '"' {
+						value = value[1 : len(value)-1]
+					}
+					name = value
+					graphyProvidedName = true
+					break
+				}
+			}
+		}
+
+		// If graphy didn't provide a name, fall back to json tag
+		if !graphyProvidedName {
+			if jsonTag := field.Tag.Get("json"); jsonTag != "" {
+				if jsonTag == "-" {
+					return
+				}
+				// Ignore anything after the first comma.
+				name = strings.Split(jsonTag, ",")[0]
+			}
 		}
 
 		mapping := functionParamNameMapping{

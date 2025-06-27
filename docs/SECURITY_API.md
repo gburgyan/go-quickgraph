@@ -305,7 +305,7 @@ type JWTWebSocketAuthenticator struct {
 
 func (j *JWTWebSocketAuthenticator) AuthenticateConnection(ctx context.Context, initPayload json.RawMessage) (context.Context, error) {
     var payload struct {
-        Authorization string `json:"authorization"`
+        Authorization string `graphy:"authorization"`
     }
     
     if err := json.Unmarshal(initPayload, &payload); err != nil {

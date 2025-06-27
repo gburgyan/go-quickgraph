@@ -344,7 +344,7 @@ func (g *Graphy) typeLookup(typ reflect.Type) *typeLookup {
 		// Check if this is likely an embedded implementation by comparing the returned name
 		// with the actual type name. If they differ and the returned name matches a field name,
 		// it's likely inherited from an embedded type.
-		if typeExtension.Name != rootTyp.Name() {
+		if typeExtension.Name != "" && typeExtension.Name != rootTyp.Name() {
 			// Check if this type embeds another type with this name
 			hasEmbeddedWithName := false
 			if rootTyp.Kind() == reflect.Struct {
@@ -374,8 +374,12 @@ func (g *Graphy) typeLookup(typ reflect.Type) *typeLookup {
 				result.interfaceOnly = typeExtension.InterfaceOnly
 			}
 		} else {
-			// Names match, use the extension
-			result.name = typeExtension.Name
+			// Names match or Name is empty, use the actual type name
+			if typeExtension.Name == "" {
+				result.name = rootTyp.Name()
+			} else {
+				result.name = typeExtension.Name
+			}
 			if typeExtension.Deprecated != "" {
 				result.isDeprecated = true
 				result.deprecatedReason = typeExtension.Deprecated
@@ -387,6 +391,21 @@ func (g *Graphy) typeLookup(typ reflect.Type) *typeLookup {
 		}
 	} else {
 		result.name = rootTyp.Name()
+		// If the name is empty (anonymous types), try to get it from the package path
+		if result.name == "" {
+			// For types without a direct name, try to extract from the string representation
+			typStr := rootTyp.String()
+			// Handle pointer types like "*handlers.Employee"
+			typStr = strings.TrimPrefix(typStr, "*")
+			// Handle slice types like "[]handlers.Employee"
+			typStr = strings.TrimPrefix(typStr, "[]")
+			// Handle cases like "handlers.Employee"
+			if idx := strings.LastIndex(typStr, "."); idx != -1 {
+				result.name = typStr[idx+1:]
+			} else {
+				result.name = typStr
+			}
+		}
 	}
 
 	// Check if this type is registered as a scalar first

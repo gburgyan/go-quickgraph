@@ -8,8 +8,8 @@ Here's a simple subscription that sends the current time every second:
 
 ```go
 type TimeUpdate struct {
-    Timestamp time.Time `json:"timestamp"`
-    Formatted string    `json:"formatted"`
+    Timestamp time.Time `graphy:"timestamp"`
+    Formatted string    `graphy:"formatted"`
 }
 
 func CurrentTime(ctx context.Context, intervalMs int) (<-chan TimeUpdate, error) {
@@ -147,9 +147,9 @@ Stream updates when data changes:
 
 ```go
 type ProductUpdate struct {
-    Product   Product    `json:"product"`
-    Action    string     `json:"action"` // "created", "updated", "deleted"
-    Timestamp time.Time  `json:"timestamp"`
+    Product   Product    `graphy:"product"`
+    Action    string     `graphy:"action"` // "created", "updated", "deleted"
+    Timestamp time.Time  `graphy:"timestamp"`
 }
 
 var productUpdates = make(chan ProductUpdate, 100) // Buffered channel
@@ -265,10 +265,10 @@ const (
 )
 
 type OrderUpdate struct {
-    OrderID   string      `json:"orderID"`
-    Status    OrderStatus `json:"status"`
-    Message   string      `json:"message"`
-    Timestamp time.Time   `json:"timestamp"`
+    OrderID   string      `graphy:"orderID"`
+    Status    OrderStatus `graphy:"status"`
+    Message   string      `graphy:"message"`
+    Timestamp time.Time   `graphy:"timestamp"`
 }
 
 var orderChannels = make(map[string][]chan OrderUpdate)
@@ -352,9 +352,9 @@ Check authentication in subscription functions:
 
 ```go
 type UserUpdate struct {
-    User      User      `json:"user"`
-    Action    string    `json:"action"`
-    Timestamp time.Time `json:"timestamp"`
+    User      User      `graphy:"user"`
+    Action    string    `graphy:"action"`
+    Timestamp time.Time `graphy:"timestamp"`
 }
 
 func UserUpdates(ctx context.Context) (<-chan UserUpdate, error) {
@@ -441,9 +441,9 @@ Batch multiple updates to reduce client load:
 
 ```go
 type BatchedUpdate struct {
-    Updates   []ProductUpdate `json:"updates"`
-    Count     int             `json:"count"`
-    Timestamp time.Time       `json:"timestamp"`
+    Updates   []ProductUpdate `graphy:"updates"`
+    Count     int             `graphy:"count"`
+    Timestamp time.Time       `graphy:"timestamp"`
 }
 
 func BatchedProductUpdates(ctx context.Context, batchSize int, intervalMs int) (<-chan BatchedUpdate, error) {
@@ -549,9 +549,9 @@ import (
 )
 
 type SubscriptionMessage struct {
-    ID      string      `json:"id"`
-    Type    string      `json:"type"`
-    Payload interface{} `json:"payload,omitempty"`
+    ID      string      `graphy:"id"`
+    Type    string      `graphy:"type"`
+    Payload interface{} `graphy:"payload,omitempty"`
 }
 
 func subscribeToProductUpdates() {

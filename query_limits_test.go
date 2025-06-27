@@ -11,10 +11,10 @@ import (
 
 // Test types for limit testing
 type LimitTestNode struct {
-	ID       string           `json:"id"`
-	Name     string           `json:"name"`
-	Children []*LimitTestNode `json:"children"`
-	Parent   *LimitTestNode   `json:"parent"`
+	ID       string           `graphy:"id"`
+	Name     string           `graphy:"name"`
+	Children []*LimitTestNode `graphy:"children"`
+	Parent   *LimitTestNode   `graphy:"parent"`
 }
 
 func createDeepNode(depth int) *LimitTestNode {

@@ -9,7 +9,7 @@ import (
 type BaseType struct {
 	ID         string
 	Name       string
-	actualType interface{} `json:"-"`
+	actualType interface{} `graphy:"-"`
 }
 
 func (b *BaseType) ActualType() interface{} {

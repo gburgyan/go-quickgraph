@@ -8,15 +8,15 @@ import (
 
 // Test types for parameter mode testing
 type UserInput struct {
-	ID     string  `json:"id"`
-	Name   *string `json:"name"`
-	Active *bool   `json:"active"`
+	ID     string  `graphy:"id"`
+	Name   *string `graphy:"name"`
+	Active *bool   `graphy:"active"`
 }
 
 type User struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Active bool   `json:"active"`
+	ID     string `graphy:"id"`
+	Name   string `graphy:"name"`
+	Active bool   `graphy:"active"`
 }
 
 // Test functions with different signatures

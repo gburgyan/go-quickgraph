@@ -37,9 +37,9 @@ import (
 )
 
 type User struct {
-    ID    string `json:"id"`
-    Name  string `json:"name"`
-    Email string `json:"email"`
+    ID    string `graphy:"id"`
+    Name  string `graphy:"name"`
+    Email string `graphy:"email"`
 }
 
 func main() {
@@ -402,9 +402,9 @@ Use `GraphTypeExtension` to add descriptions to types:
 
 ```go
 type User struct {
-    ID    string `json:"id"`
-    Name  string `json:"name"`
-    Email string `json:"email"`
+    ID    string `graphy:"id"`
+    Name  string `graphy:"name"`
+    Email string `graphy:"email"`
 }
 
 func (User) GraphTypeExtension() quickgraph.GraphTypeInfo {
@@ -420,9 +420,9 @@ Use the `graphy` tag to add field descriptions:
 
 ```go
 type User struct {
-    ID    string `json:"id" graphy:"description=Unique user identifier"`
-    Name  string `json:"name" graphy:"description=User's display name"`
-    Email string `json:"email" graphy:"description=Email address,deprecated=Use primaryEmail instead"`
+    ID    string `graphy:"id" graphy:"description=Unique user identifier"`
+    Name  string `graphy:"name" graphy:"description=User's display name"`
+    Email string `graphy:"email" graphy:"description=Email address,deprecated=Use primaryEmail instead"`
 }
 ```
 

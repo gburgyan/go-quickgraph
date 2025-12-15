@@ -530,6 +530,369 @@ func isValidEmail(email string) bool {
 }
 ```
 
+## Production Error Sanitization
+
+### ⚠️ Critical: Preventing Information Disclosure
+
+One of the most critical security features in go-quickgraph is **error sanitization** in production mode. Without proper configuration, GraphQL errors can expose sensitive internal information including:
+
+- Stack traces with file paths and line numbers
+- Function names and internal implementation details  
+- Memory addresses and pointer information
+- Runtime error messages with system internals
+- Reflection call details and Go internals
+
+### Automatic Error Sanitization
+
+```go
+g := &quickgraph.Graphy{
+    ProductionMode: true, // 🔒 CRITICAL: Enables error sanitization
+}
+```
+
+When `ProductionMode: true` is set:
+
+- **Sensitive error messages** are replaced with generic messages
+- **Sensitive extensions** (stack traces, function names) are filtered from client responses
+- **Production messages** override development messages in error responses
+- **Internal error details** are still logged via error handlers for debugging
+
+### Error Message Examples
+
+#### Development Mode (ProductionMode: false)
+```json
+{
+  "errors": [{
+    "message": "function getUserProfile panicked: runtime error: nil pointer dereference",
+    "path": ["getUserProfile"],
+    "extensions": {
+      "stack": "goroutine 1 [running]:\nmain.go:123\nhandler.go:456",
+      "function_name": "getUserProfile", 
+      "panic_value": "runtime error: nil pointer dereference"
+    }
+  }]
+}
+```
+
+#### Production Mode (ProductionMode: true)
+```json
+{
+  "errors": [{
+    "message": "Internal server error",
+    "path": ["getUserProfile"]
+  }]
+}
+```
+
+### Built-in Sensitive Pattern Detection
+
+go-quickgraph automatically detects and sanitizes messages containing:
+
+#### Runtime Errors & Panics
+- `panic:` messages
+- `runtime error:` messages  
+- `stack trace` references
+- `goroutine` information
+
+#### Go Internals
+- `reflect.` method calls
+- Source locations like `main.go:123`
+- Memory addresses like `0x40e020`
+- Function signatures like `func(string, int)`
+- Method calls like `pkg.Method()`
+
+#### System Information
+- File system paths (`/app/src/handlers.go`)
+- Windows paths (`C:\\Program Files\\app\\main.go`)
+- Interface type references (`interface {}`)
+- Nil pointer and slice bounds errors
+
+### Production Error Creation Functions
+
+#### NewGraphErrorProduction
+```go
+// Creates sanitized errors for production use
+err := quickgraph.NewGraphErrorProduction(
+    "function getUserData panicked: nil pointer", // Original message
+    pos,     // Position info
+    "users", "profile", // Path segments
+)
+// Result: "An error occurred while processing the request"
+```
+
+#### NewGraphErrorWithProduction 
+```go
+// Creates errors with separate dev/prod messages
+err := quickgraph.NewGraphErrorWithProduction(
+    "function getUserData panicked: nil pointer", // Development message
+    "Internal server error",                     // Production message
+    pos,
+    "users", "profile",
+)
+```
+
+#### NewPanicError
+```go
+// Automatically creates sanitized panic errors
+err := quickgraph.NewPanicError(
+    "getUserData",           // Function name
+    "nil pointer dereference", // Panic value
+    pos,
+    "users", "profile",
+)
+// Development: "function getUserData panicked: nil pointer dereference"
+// Production: "Internal server error"
+```
+
+### Sensitive Extensions Filtering
+
+```go
+// Add sensitive debugging information
+gErr := quickgraph.GraphError{
+    Message: "Database connection failed",
+    ProductionMessage: "Internal server error",
+    Extensions: map[string]string{
+        "query_id": "12345",        // Safe - included in production
+        "timestamp": "2024-01-01",  // Safe - included in production
+    },
+    SensitiveExtensions: map[string]string{
+        "stack_trace":   "goroutine 1 [running]...",  // Filtered in production
+        "function_name": "connectToDatabase",          // Filtered in production
+        "db_host":       "internal-db.company.com",   // Filtered in production
+        "panic_value":   "connection refused",        // Filtered in production
+    },
+}
+
+// In production mode, only "query_id" and "timestamp" are sent to client
+```
+
+### JSON Marshaling for Production
+
+```go
+// Development marshaling - includes all information
+jsonBytes, err := gErr.MarshalJSON()
+
+// Production marshaling - filters sensitive information
+jsonBytes, err := gErr.MarshalJSONProduction()
+
+// Framework automatically uses production marshaling when ProductionMode: true
+```
+
+### Custom Error Sanitization
+
+For advanced use cases, customize the error sanitization patterns:
+
+```go
+// Create custom sanitizer
+customSanitizer := &quickgraph.ErrorSanitizer{
+    RegexPatterns: []*regexp.Regexp{
+        regexp.MustCompile(`\bsecret\b`),     // Flag "secret" as sensitive
+        regexp.MustCompile(`\bapi[_-]key\b`), // Flag API key references
+        regexp.MustCompile(`\bpassword\b`),   // Flag password references
+    },
+    StringPatterns: []string{
+        "confidential",    // Simple substring matching
+        "internal-only",
+    },
+    CustomSanitizer: func(message string) bool {
+        // Custom logic for sensitivity detection
+        return strings.Contains(message, "SENSITIVE_DATA")
+    },
+}
+
+// Apply custom sanitizer (primarily for testing)
+quickgraph.SetErrorSanitizer(customSanitizer)
+```
+
+### Error Handler Integration
+
+```go
+// Error handlers receive full error details regardless of production mode
+g.SetErrorHandler(quickgraph.ErrorHandlerFunc(func(ctx context.Context, category quickgraph.ErrorCategory, err error, details map[string]interface{}) {
+    // Log complete error information for internal debugging
+    logger.WithFields(logrus.Fields{
+        "category": string(category),
+        "error":    err.Error(),           // Full error message
+        "details":  details,              // All extensions including sensitive ones
+        "path":     details["path"],
+        "function": details["function_name"], // Available even in production
+        "stack":    details["stack"],         // Full stack trace available
+    }).Error("GraphQL error occurred")
+    
+    // Send alerts for critical errors
+    if strings.Contains(err.Error(), "panic") {
+        alertManager.SendAlert("GraphQL Panic", err.Error())
+    }
+}))
+```
+
+### Testing Error Sanitization
+
+```go
+func TestErrorSanitization(t *testing.T) {
+    // Test development mode shows details
+    g := &quickgraph.Graphy{ProductionMode: false}
+    g.RegisterQuery(context.Background(), "testPanic", panicFunc)
+    
+    result, err := g.ProcessRequest(context.Background(), `{testPanic}`, "{}")
+    assert.Contains(t, result, "testPanic panicked")    // Function name visible
+    assert.Contains(t, result, "panic details")        // Panic details visible
+    assert.Contains(t, result, "stack")               // Stack trace in extensions
+    
+    // Test production mode sanitizes details
+    g.ProductionMode = true
+    result, err = g.ProcessRequest(context.Background(), `{testPanic}`, "{}")
+    assert.NotContains(t, result, "testPanic panicked") // Function name hidden
+    assert.NotContains(t, result, "panic details")     // Panic details hidden
+    assert.NotContains(t, result, "stack")             // Stack trace filtered
+    assert.Contains(t, result, "Internal server error") // Generic message shown
+}
+```
+
+### Error Sanitization Best Practices
+
+#### 1. Always Enable Production Mode
+```go
+// ❌ Dangerous - exposes internal details
+g := &quickgraph.Graphy{
+    ProductionMode: false, // Never use false in production
+}
+
+// ✅ Secure - sanitizes error responses
+g := &quickgraph.Graphy{
+    ProductionMode: true, // Always true in production
+}
+```
+
+#### 2. Use Appropriate Error Creation Functions
+```go
+// ❌ Manual error creation without sanitization
+return nil, fmt.Errorf("database connection failed: %s", internalDetails)
+
+// ✅ Use production-aware error functions
+return nil, quickgraph.NewGraphErrorWithProduction(
+    fmt.Sprintf("database connection failed: %s", internalDetails), // Dev message
+    "Database temporarily unavailable", // Production message
+    pos, "getUserData",
+)
+```
+
+#### 3. Add Sensitive Information to SensitiveExtensions
+```go
+// ❌ Sensitive data in regular extensions
+gErr.Extensions["db_password"] = password
+gErr.Extensions["api_key"] = apiKey
+
+// ✅ Sensitive data in SensitiveExtensions
+gErr.AddSensitiveExtension("db_password", password)
+gErr.AddSensitiveExtension("api_key", apiKey)
+```
+
+#### 4. Monitor Error Handler Output
+```go
+// Error handlers receive full details for monitoring
+g.SetErrorHandler(quickgraph.ErrorHandlerFunc(func(ctx context.Context, category quickgraph.ErrorCategory, err error, details map[string]interface{}) {
+    // Full error information available for internal logging
+    // Use this for debugging, monitoring, and alerting
+    internalLogger.Log(err.Error(), details)
+    
+    // Track error patterns
+    if strings.Contains(err.Error(), "panic") {
+        metrics.IncrementCounter("graphql.panics")
+    }
+}))
+```
+
+### Security Impact
+
+**Without Error Sanitization** (ProductionMode: false):
+- Attackers can see internal file structures
+- Function names reveal implementation details
+- Stack traces show code paths and vulnerabilities
+- Memory addresses can aid in memory exploitation
+- Database connection strings may be exposed
+
+**With Error Sanitization** (ProductionMode: true):
+- Clients receive only generic error messages
+- Internal details are hidden from attackers
+- Debugging information still available via error handlers
+- Maintains security while preserving functionality
+
+### Configuration Examples
+
+#### Development Environment
+```go
+// Show detailed errors for debugging
+g := &quickgraph.Graphy{
+    ProductionMode: false,
+    EnableIntrospection: true,
+}
+```
+
+#### Staging Environment
+```go
+// Production-like error handling with detailed logging
+g := &quickgraph.Graphy{
+    ProductionMode: true,
+    EnableIntrospection: false,
+}
+g.SetErrorHandler(DetailedLoggingErrorHandler)
+```
+
+#### Production Environment
+```go
+// Maximum security with monitoring
+g := &quickgraph.Graphy{
+    ProductionMode: true,
+    EnableIntrospection: false,
+    QueryLimits: productionQueryLimits,
+    MemoryLimits: productionMemoryLimits,
+}
+g.SetErrorHandler(MonitoringErrorHandler)
+```
+
+### Troubleshooting Production Errors
+
+Since production mode sanitizes client-facing errors, use error handlers for debugging:
+
+```go
+// Comprehensive error handler for production debugging
+type ProductionErrorHandler struct {
+    logger *logrus.Logger
+    alerts AlertManager
+}
+
+func (p *ProductionErrorHandler) HandleError(ctx context.Context, category quickgraph.ErrorCategory, err error, details map[string]interface{}) {
+    // Create structured log entry
+    entry := p.logger.WithFields(logrus.Fields{
+        "category": string(category),
+        "error":    err.Error(),
+        "path":     details["path"],
+        "query":    details["query"],
+        "user":     getUserFromContext(ctx),
+    })
+    
+    // Add available debugging information
+    if stack, ok := details["stack"]; ok {
+        entry = entry.WithField("stack_trace", stack)
+    }
+    if function, ok := details["function_name"]; ok {
+        entry = entry.WithField("function", function)
+    }
+    
+    // Log with appropriate level
+    switch category {
+    case quickgraph.ErrorCategoryInternal:
+        entry.Error("Internal GraphQL error")
+        p.alerts.SendAlert("GraphQL Internal Error", err.Error())
+    case quickgraph.ErrorCategoryExecution:
+        entry.Warn("GraphQL execution error")
+    case quickgraph.ErrorCategoryValidation:
+        entry.Info("GraphQL validation error")
+    }
+}
+```
+
 ## Error Handling & Monitoring
 
 ### Production Error Handler
@@ -697,11 +1060,13 @@ go test -race ./...
 
 ### ⚠️ Critical Configuration
 
-- [ ] **Enable Production Mode**: Set `ProductionMode: true` 
+- [ ] **Enable Production Mode**: Set `ProductionMode: true` (CRITICAL for error sanitization)
 - [ ] **Configure Memory Limits**: Set appropriate `MemoryLimits`
 - [ ] **Configure Query Limits**: Set `QueryLimits` to prevent DoS
 - [ ] **WebSocket Authentication**: Replace default `NoOpWebSocketAuthenticator`
 - [ ] **Disable Introspection**: Only enable in development environments
+- [ ] **Error Handler Setup**: Implement production error handler for debugging
+- [ ] **Verify Error Sanitization**: Test that sensitive information is not exposed
 
 ### Authentication & Authorization
 

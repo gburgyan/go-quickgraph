@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/alecthomas/participle/v2/lexer"
+	"regexp"
 	"strings"
+
+	"github.com/alecthomas/participle/v2/lexer"
 )
 
 // ErrorCategory represents different types of errors that can occur
@@ -123,20 +125,21 @@ func NewGraphError(message string, pos lexer.Position, paths ...string) GraphErr
 
 // NewGraphErrorProduction creates a sanitized GraphError for production use
 func NewGraphErrorProduction(message string, pos lexer.Position, paths ...string) GraphError {
-	// In production mode, provide a generic error message to avoid information disclosure
-	genericMessage := "An error occurred while processing the request"
-
-	// For validation errors, keep the original message as it's usually safe
-	if message != "" && !containsSensitiveInfo(message) {
-		genericMessage = message
+	// Handle empty message case
+	if message == "" {
+		message = "An error occurred while processing the request"
+	} else if containsSensitiveInfo(message) {
+		// If the original message contains sensitive info, replace with generic message
+		message = "An error occurred while processing the request"
 	}
+	// If not sensitive, keep the original message
 
 	var gErr GraphError
 	if pos.Offset > 0 {
 		loc := lexerPositionError(pos)
 		gErr.Locations = append(gErr.Locations, loc)
 	}
-	gErr.Message = genericMessage
+	gErr.Message = message
 	gErr.Path = paths
 	return gErr
 }
@@ -179,20 +182,89 @@ func (e *GraphError) AddSensitiveExtension(key string, value string) {
 	e.SensitiveExtensions[key] = value
 }
 
+// ErrorSanitizer provides configurable error sanitization rules
+type ErrorSanitizer struct {
+	// RegexPatterns are compiled regex patterns that identify sensitive information
+	RegexPatterns []*regexp.Regexp
+	// StringPatterns are simple substring patterns for basic matching
+	StringPatterns []string
+	// CustomSanitizer is a function that can provide additional sanitization logic
+	CustomSanitizer func(string) bool
+}
+
+// defaultErrorSanitizer provides the default sanitization rules
+var defaultErrorSanitizer = &ErrorSanitizer{
+	RegexPatterns: []*regexp.Regexp{
+		// Runtime errors and panics
+		regexp.MustCompile(`(?i)\bpanic\b`),
+		regexp.MustCompile(`(?i)\bruntime error\b`),
+		regexp.MustCompile(`(?i)\bstack trace\b`),
+		regexp.MustCompile(`(?i)\bgoroutine\b`),
+
+		// Go internals and reflection
+		regexp.MustCompile(`(?i)\breflect\.`),
+		// File with line number patterns like "main.go:123" or "/app/main.go:45"
+		regexp.MustCompile(`[A-Za-z0-9_/.-]+\.go:\d+`),
+
+		// Memory and pointer errors
+		regexp.MustCompile(`(?i)\bnil pointer\b`),
+		regexp.MustCompile(`(?i)\bindex out of range\b`),
+		regexp.MustCompile(`(?i)\bslice bounds out of range\b`),
+
+		// Function names and internal details
+		regexp.MustCompile(`\bfunc\([^)]+\)`),                                      // Function signatures like "func(string)"
+		regexp.MustCompile(`\b[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*\(\)`), // Method calls like "pkg.Method()"
+
+		// Memory addresses and internal structures
+		regexp.MustCompile(`0x[0-9a-fA-F]+`),    // Hexadecimal memory addresses
+		regexp.MustCompile(`\binterface\s*\{}`), // Interface{} type references
+
+		// File system paths that might reveal structure
+		regexp.MustCompile(`/[a-zA-Z_][a-zA-Z0-9_/.-]*/[a-zA-Z_][a-zA-Z0-9_.-]*\.go`), // File paths
+		regexp.MustCompile(`[A-Z]:[\\]+.*\.go`),                                       // Windows file paths
+	},
+	StringPatterns: []string{},
+}
+
+// SetErrorSanitizer allows custom error sanitization rules (primarily for testing)
+func SetErrorSanitizer(sanitizer *ErrorSanitizer) {
+	defaultErrorSanitizer = sanitizer
+}
+
 // containsSensitiveInfo checks if a message contains potentially sensitive information
+// using the configured sanitization rules
 func containsSensitiveInfo(message string) bool {
-	// Check for common patterns that might leak sensitive information
-	sensitivePatterns := []string{
-		"panic:", "runtime error:", "stack trace:", "function", "reflect.",
-		"goroutine", "main.go", ".go:", "nil pointer", "index out of range",
+	return defaultErrorSanitizer.ContainsSensitiveInfo(message)
+}
+
+// ContainsSensitiveInfo checks if a message contains sensitive information using this sanitizer's rules
+func (es *ErrorSanitizer) ContainsSensitiveInfo(message string) bool {
+	if message == "" {
+		return false
 	}
 
-	messageLower := strings.ToLower(message)
-	for _, pattern := range sensitivePatterns {
-		if strings.Contains(messageLower, pattern) {
+	// Check regex patterns for sensitive information
+	for _, pattern := range es.RegexPatterns {
+		if pattern.MatchString(message) {
 			return true
 		}
 	}
+
+	// Check simple string patterns
+	messageLower := strings.ToLower(message)
+	for _, pattern := range es.StringPatterns {
+		if strings.Contains(messageLower, strings.ToLower(pattern)) {
+			return true
+		}
+	}
+
+	// Use custom sanitizer if provided
+	if es.CustomSanitizer != nil {
+		if es.CustomSanitizer(message) {
+			return true
+		}
+	}
+
 	return false
 }
 

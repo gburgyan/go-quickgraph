@@ -20,3 +20,18 @@
 # Go workspace file
 go.work
 /examples/quickstart/quickstart
+/coverage.html
+/.idea/codeStyles/codeStyleConfig.xml
+/.idea/codeStyles/Project.xml
+/.idea/runConfigurations/Run_Sample.xml
+/.idea/runConfigurations/Run_Server.xml
+/.idea/.gitignore
+/.idea/codestream.xml
+/.idea/copilot.data.migration.agent.xml
+/.idea/copilot.data.migration.edit.xml
+/.idea/GitLink.xml
+/.idea/jpa-buddy.xml
+/.idea/misc.xml
+/.idea/modules.xml
+/.idea/vcs.xml
+/.vscode/launch.json
